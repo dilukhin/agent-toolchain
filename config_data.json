@@ -1,0 +1,167 @@
+{
+  "settings": {
+    "provider_name": "RouterAI",
+    "npm_package": "@ai-sdk/openai-compatible",
+    "base_url": "https://routerai.ru/api/v1"
+  },
+  "models": {
+    "openai/gpt-4o": {
+      "name": "OpenAI GPT-4o [дорогая универсальная, 264/1056 ₽]",
+      "description": "Дорогая универсальная модель, запасной вариант для сложных задач",
+      "price_input_rub_per_1m": 264,
+      "price_output_rub_per_1m": 1056
+    },
+    "openai/gpt-4o-mini": {
+      "name": "OpenAI GPT-4o mini [дешёвая быстрая, 13/55 ₽]",
+      "description": "Быстрая и дешёвая модель для простых задач",
+      "price_input_rub_per_1m": 13,
+      "price_output_rub_per_1m": 55
+    },
+    "deepseek/deepseek-chat": {
+      "name": "DeepSeek Chat [дешёвая code/chat, 29/82 ₽]",
+      "description": "Недорогая модель для анализа кода и повседневных задач",
+      "price_input_rub_per_1m": 29,
+      "price_output_rub_per_1m": 82
+    },
+    "anthropic/claude-opus-4.7": {
+      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 462/2314 ₽]",
+      "description": "Топовая модель для сложного агентного программирования",
+      "price_input_rub_per_1m": 462,
+      "price_output_rub_per_1m": 2314,
+      "cache_read_rub_per_1m": 46
+    },
+    "qwen/qwen3.6-plus": {
+      "name": "Qwen 3.6 Plus [основная, 30/180 ₽]",
+      "description": "Основная рабочая модель для OpenCode",
+      "price_input_rub_per_1m": 30,
+      "price_output_rub_per_1m": 180
+    },
+    "deepseek/deepseek-v4-pro": {
+      "name": "DeepSeek V4 Pro [reasoning, 61/122 ₽]",
+      "description": "Сильная reasoning/code модель",
+      "price_input_rub_per_1m": 61,
+      "price_output_rub_per_1m": 122
+    },
+    "minimax/minimax-m2.7": {
+      "name": "MiniMax M2.7 [дешёвая, 25/111 ₽]",
+      "description": "Дешёвая рабочая модель",
+      "price_input_rub_per_1m": 25,
+      "price_output_rub_per_1m": 111
+    },
+    "z-ai/glm-5": {
+      "name": "GLM-5 [архитектор, 55/177 ₽]",
+      "description": "Для архитектора/ревьюера: планирование, декомпозиция",
+      "price_input_rub_per_1m": 55,
+      "price_output_rub_per_1m": 177
+    },
+    "moonshotai/kimi-k2.5": {
+      "name": "Kimi K2.5 [агентная, 37/175 ₽]",
+      "description": "Запасная агентная для tool-use и анализа кода",
+      "price_input_rub_per_1m": 37,
+      "price_output_rub_per_1m": 175
+    },
+    "z-ai/glm-5-turbo": {
+      "name": "GLM-5 Turbo [fallback, 111/370 ₽]",
+      "description": "Дорогой fallback для длинных цепочек",
+      "price_input_rub_per_1m": 111,
+      "price_output_rub_per_1m": 370
+    },
+    "openai/gpt-5.2-codex": {
+      "name": "GPT-5.2-Codex [код/агент, 162/1296 ₽]",
+      "description": "Оптимизированная для программной инженерии",
+      "price_input_rub_per_1m": 162,
+      "price_output_rub_per_1m": 1296
+    },
+    "qwen/qwen3-coder-next": {
+      "name": "Qwen 3 Coder Next [код/агент, 10/74 ₽]",
+      "description": "Новая модель RouterAI для кодинга"
+    },
+    "qwen/qwen3.5-122b-a10b": {
+      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 25/200 ₽]",
+      "description": "Мультимодальная модель с reasoning, контекст 262K токенов"
+    }
+  },
+  "config_defaults": {
+    "model": "opencode/deepseek-v4-flash-free",
+    "small_model": "opencode/gpt-5-nano"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "1.15.4"
+  },
+  "bmad_skills": [
+    "bmad-advanced-elicitation",
+    "bmad-agent-analyst",
+    "bmad-agent-architect",
+    "bmad-agent-dev",
+    "bmad-agent-pm",
+    "bmad-agent-tech-writer",
+    "bmad-agent-ux-designer",
+    "bmad-brainstorming",
+    "bmad-check-implementation-readiness",
+    "bmad-checkpoint-preview",
+    "bmad-code-review",
+    "bmad-correct-course",
+    "bmad-create-architecture",
+    "bmad-create-epics-and-stories",
+    "bmad-create-prd",
+    "bmad-create-story",
+    "bmad-customize",
+    "bmad-dev-story",
+    "bmad-document-project",
+    "bmad-domain-research",
+    "bmad-edit-prd",
+    "bmad-editorial-review-prose",
+    "bmad-editorial-review-structure",
+    "bmad-generate-project-context",
+    "bmad-help",
+    "bmad-index-docs",
+    "bmad-investigate",
+    "bmad-market-research",
+    "bmad-party-mode",
+    "bmad-prd",
+    "bmad-prfaq",
+    "bmad-product-brief",
+    "bmad-qa-generate-e2e-tests",
+    "bmad-quick-dev",
+    "bmad-retrospective",
+    "bmad-review-adversarial-general",
+    "bmad-review-edge-case-hunter",
+    "bmad-shard-doc",
+    "bmad-spec",
+    "bmad-sprint-planning",
+    "bmad-sprint-status",
+    "bmad-technical-research",
+    "bmad-ux",
+    "bmad-validate-prd"
+  ],
+  "helper_tools": {
+    "ssh_relay": {
+      "version": "0.5.0",
+      "location_hint": "~/projects/ssh_relay/",
+      "dependencies": ["Python 3.12+", "paramiko"],
+      "github_repo": "https://github.com/dilukhin/ssh_relay.git"
+    },
+    "bundle": {
+      "location_hint": "~/projects/bundle/",
+      "github_repo": "https://github.com/dilukhin/bundle.git",
+      "script": "bundle.py"
+    }
+  },
+  "platform_specific": {
+    "windows": {
+      "config_dir": "%APPDATA%\\opencode",
+      "agents_dir": "%USERPROFILE%\\.agents",
+      "stash_dir": "%USERPROFILE%\\projects\\stash\\opencode.ai",
+      "python_cmd": "py",
+      "powershell_encoding_fix": "$env:PYTHONIOENCODING = 'utf-8'; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8;",
+      "session_files": "%LOCALAPPDATA%\\ssh_relay\\sessions\\"
+    },
+    "linux": {
+      "config_dir": "~/.config/opencode",
+      "agents_dir": "~/.agents",
+      "stash_dir": "~/projects/stash/opencode.ai",
+      "python_cmd": "python3",
+      "session_files": "~/.local/share/ssh_relay/sessions/"
+    }
+  }
+}
