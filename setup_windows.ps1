@@ -21,19 +21,19 @@ npm install -g @opencode-ai/cli --silent 2>$null
 npm install --save-dev @opencode-ai/plugin@1.15.4 --silent 2>$null
 Write-Host "      Done (may require admin rights)" -ForegroundColor Gray
 
-# 3. Create API key file placeholder
-Write-Host "[3/6] Creating API key placeholder..." -ForegroundColor Yellow
+# 3. Create API key file placeholder only if it does not exist
+Write-Host "[3/6] Preparing API key file..." -ForegroundColor Yellow
 $API_KEY_FILE = "$STASH_DIR\api-key.txt"
-"your-routerai-api-key-here" | Set-Content $API_KEY_FILE -Encoding UTF8
-Write-Host "      Created: $API_KEY_FILE" -ForegroundColor Gray
+if (-not (Test-Path -LiteralPath $API_KEY_FILE)) {
+    "your-routerai-api-key-here" | Set-Content $API_KEY_FILE -Encoding UTF8
+    Write-Host "      Created: $API_KEY_FILE" -ForegroundColor Gray
+} else {
+    Write-Host "      Existing API key file preserved: $API_KEY_FILE" -ForegroundColor Gray
+}
 
 # 4. Generate opencode.jsonc
 Write-Host "[4/6] Generating opencode.jsonc..." -ForegroundColor Yellow
 $keyPath = (Resolve-Path $API_KEY_FILE).Path.Replace('/', '\')
-$json = @"
-`"{`"\$schema`": `"https://opencode.ai/config.json`", `"provider`": `"{`"routerai`": `"{`"npm`": `"@ai-sdk/openai-compatible`", `"name`": `"RouterAI`", `"options`": `"{`"baseURL`": `"https://routerai.ru/api/v1`", `"apiKey`": `"`"{file:$keyPath}`"`"`"`"`"`"`"}, `"models`": `"{`"qwen/qwen3.6-plus`": `"{`"name`": `"Qwen3.6Plus`"`"}"`"`"`"`"}`"`"`"`"`"}
-"@
-# Simplified version
 $json = @{
     '`$schema' = 'https://opencode.ai/config.json'
     provider = @{
@@ -80,7 +80,7 @@ Write-Host "[5/6] Creating AGENTS.md..." -ForegroundColor Yellow
 Правила:
 - Отвечай на русском, без воды, структурированно
 - Не сканируй node_modules, .git, кэши, логи
-- Никогда не exposed секреты, API-ключи, токены
+- Никогда не экспонируй секреты, API-ключи, токены
 - Сохраняй прогресс рано при работе с документами
 "@ | Set-Content "$CONFIG_DIR\AGENTS.md" -Encoding UTF8
 
@@ -98,6 +98,6 @@ Set-Location $SCRIPT_ROOT
 Write-Host ""
 Write-Host "=== Setup Complete ===" -ForegroundColor Green
 Write-Host "Config directory: $CONFIG_DIR" -ForegroundColor Gray
-Write-Host "Edit this file and insert your RouterAI API key:" -ForegroundColor Yellow
+Write-Host "Insert your RouterAI API key into this file if it still contains the placeholder:" -ForegroundColor Yellow
 Write-Host "  $API_KEY_FILE" -ForegroundColor White
 Write-Host "Then run: opencode" -ForegroundColor Cyan
