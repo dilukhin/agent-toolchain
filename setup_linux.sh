@@ -20,11 +20,16 @@ cd "$CONFIG_DIR"
 npm install -g @opencode-ai/cli 2>/dev/null || sudo npm install -g @opencode-ai/cli
 npm install --save-dev @opencode-ai/plugin@1.15.4
 
-# 3. Create API key file placeholder  
-echo "[3/6] Creating API key placeholder..."
+# 3. Create API key file placeholder only if it does not exist
+echo "[3/6] Preparing API key file..."
 API_KEY_FILE="$STASH_DIR/api-key.txt"
-echo "your-routerai-api-key-here" > "$API_KEY_FILE"
-echo "      Created: $API_KEY_FILE"
+if [ ! -e "$API_KEY_FILE" ]; then
+  echo "your-routerai-api-key-here" > "$API_KEY_FILE"
+  echo "      Created: $API_KEY_FILE"
+else
+  echo "      Existing API key file preserved: $API_KEY_FILE"
+fi
+chmod 600 "$API_KEY_FILE"
 
 # 4. Generate opencode.jsonc
 echo "[4/6] Generating opencode.jsonc..."
@@ -95,6 +100,6 @@ cd "$SCRIPT_DIR"
 echo ""
 echo "=== Setup Complete ==="
 echo "Config directory: $CONFIG_DIR"
-echo "Edit this file and insert your RouterAI API key:"
+echo "Insert your RouterAI API key into this file if it still contains the placeholder:"
 echo "  $API_KEY_FILE"
 echo "Then run: opencode"
