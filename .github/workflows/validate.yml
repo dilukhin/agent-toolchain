@@ -22,7 +22,17 @@ jobs:
         run: py -3 .\tests\run_migration_ci.py
       - name: Validate Windows setup and BMAD
         shell: powershell
-        run: .\validate_setup.ps1 -TestBmad
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "validate-out.txt"
+          $err = Join-Path $env:RUNNER_TEMP "validate-err.txt"
+          $proc = Start-Process pwsh -ArgumentList @("-NoProfile", "-File", ".\validate_setup.ps1", "-TestBmad") -Wait -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+          $output = ((Get-Content -LiteralPath $out -Raw -ErrorAction SilentlyContinue) + (Get-Content -LiteralPath $err -Raw -ErrorAction SilentlyContinue))
+          Write-Host $output
+          if ($proc.ExitCode -ne 0) {
+            $annotation = $output.Replace('%','%25').Replace("`r",'').Replace("`n",'%0A')
+            Write-Host "::error title=Windows full validation::$annotation"
+            exit $proc.ExitCode
+          }
 
   linux:
     runs-on: ubuntu-latest
@@ -44,4 +54,17 @@ jobs:
       - name: Validate migration regressions
         run: python3 ./tests/run_migration_ci.py
       - name: Validate Linux setup and BMAD
-        run: bash ./validate_setup.sh --bmad
+        shell: bash
+        run: |
+          set +e
+          output="$(bash ./validate_setup.sh --bmad 2>&1)"
+          rc=$?
+          set -e
+          printf '%s\n' "$output"
+          if [[ $rc -ne 0 ]]; then
+            annotation="${output//'%'/'%25'}"
+            annotation="${annotation//$'\r'/}"
+            annotation="${annotation//$'\n'/'%0A'}"
+            printf '::error title=Linux full validation::%s\n' "$annotation"
+            exit "$rc"
+          fi
