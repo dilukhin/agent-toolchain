@@ -138,6 +138,37 @@ class CoreMigrationTests(unittest.TestCase):
             self.assertEqual(cred["path"], str(external_key.resolve()))
             self.assertNotIn("sha256", cred)
 
+    def test_inline_credential_is_preserved_and_no_placeholder_is_created(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            config_dir = home / ".config" / "opencode"
+            stash_dir = home / "projects" / "stash" / "opencode.ai"
+            credential_dir = config_dir / "credentials"
+            config_dir.mkdir(parents=True)
+            existing = {
+                "provider": {"routerai": {
+                    "npm": "@ai-sdk/openai-compatible",
+                    "name": "RouterAI",
+                    "options": {
+                        "baseURL": "https://routerai.ru/api/v1",
+                        "apiKey": "INLINE_SECRET_VALUE_MUST_NOT_BE_PRINTED_OR_MIGRATED",
+                    },
+                    "models": {},
+                }},
+            }
+            config_path = config_dir / "opencode.jsonc"
+            before_bytes = (json.dumps(existing, indent=2) + "\n").encode("utf-8")
+            config_path.write_bytes(before_bytes)
+
+            cp = self._run_core(home, config_dir, stash_dir, credential_dir)
+            self.assertEqual(cp.returncode, 2)
+            self.assertEqual(config_path.read_bytes(), before_bytes)
+            self.assertFalse((credential_dir / "routerai-api-key.txt").exists())
+            self.assertFalse((stash_dir / "api-key.txt").exists())
+            self.assertNotIn("INLINE_SECRET_VALUE", cp.stdout)
+            self.assertNotIn("INLINE_SECRET_VALUE", cp.stderr)
+            self.assertIn("not a {file:...} reference", cp.stdout)
+
     def test_fresh_install_uses_profile_credential_directory(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             home = Path(td) / "home"
