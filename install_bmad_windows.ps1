@@ -4,8 +4,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$BmadVersion = "6.8.0"
-$ExpectedIntegrity = "sha512-RRkXdhrFJdnD7lIeR6OuacUDDPZA+0/k+kHmD+9Us7XQ5W6ptSAzxsS/SoNkNe37X0YHwQIyLyKGV9b3iXzWpw=="
+$ConfigPath = Join-Path $PSScriptRoot "config_data.json"
+$BmadConfig = (Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json).bmad
+$BmadVersion = [string]$BmadConfig.version
+$ExpectedIntegrity = [string]$BmadConfig.npm_integrity
 $ProjectPath = [System.IO.Path]::GetFullPath($ProjectPath)
 $ManifestPath = Join-Path $ProjectPath "_bmad\_config\manifest.yaml"
 $SkillsPath = Join-Path $ProjectPath ".agents\skills"
@@ -21,7 +23,8 @@ if ([version]$nodeVersion -lt [version]"20.12.0") {
 
 if (Test-Path -LiteralPath $ManifestPath) {
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw
-    if ($manifest -notmatch '(?m)^\s*version:\s*6\.8\.0\s*$') {
+    $escapedVersion = [regex]::Escape($BmadVersion)
+    if ($manifest -notmatch "(?m)^\s*version:\s*$escapedVersion\s*$") {
         throw "Existing BMAD is not version $BmadVersion. It was preserved; update it manually before retrying."
     }
 } elseif (Test-Path -LiteralPath $SkillsPath) {
