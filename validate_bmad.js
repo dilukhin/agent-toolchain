@@ -15,6 +15,10 @@ const skillsRoot = path.join(projectRoot, '.agents', 'skills');
 
 function fail(message) {
   console.error(`BMAD validation failed: ${message}`);
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    const annotation = String(message).replaceAll('%', '%25').replaceAll('\r', '').replaceAll('\n', '%0A');
+    console.error(`::error title=BMAD validation::${annotation}`);
+  }
   process.exit(1);
 }
 
