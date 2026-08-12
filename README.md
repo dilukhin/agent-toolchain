@@ -71,6 +71,8 @@ Setup владеет только явно управляемым содержи
 
 Если существующий JSONC использует комментарии/trailing commas и для миграции пришлось бы переформатировать файл, setup предпочитает `modified/conflict`, а не уничтожение авторского форматирования. Произвольный config без распознаваемого `provider.routerai` также сохраняется как conflict.
 
+Если существующий `apiKey` задан не через `{file:...}` (например, inline или другим механизмом), setup не читает и не переносит значение, не создаёт параллельный placeholder и оставляет config как `modified/conflict` для явного решения пользователя.
+
 ### Существующий `AGENTS.md`
 
 Произвольный пользовательский `AGENTS.md` не забирается целиком во владение. Setup делает backup и добавляет маркированный managed block. Последующие обновления меняют только этот блок; пользовательский текст вокруг него сохраняется.
@@ -86,12 +88,13 @@ Windows: %USERPROFILE%\.config\opencode\credentials\routerai-api-key.txt
 Linux:   ~/.config/opencode/credentials/routerai-api-key.txt
 ```
 
-Но существующая рабочая установка важнее default path. Если `opencode.jsonc` уже содержит `apiKey: "{file:...}"`, setup считает этот путь фактическим credential path, сохраняет файл как внешний и не создаёт параллельный placeholder в canonical/legacy location.
+Но существующая рабочая установка важнее default path. Если `opencode.jsonc` уже содержит `apiKey: "{file:...}"`, setup считает этот путь фактическим credential path, сохраняет точную текстовую ссылку и сам файл как внешний и не создаёт параллельный placeholder в canonical/legacy location.
 
 Правила:
 
-- config ссылается на существующий внешний key → сохранить путь и байты, содержимое не читать/не печатать;
+- config ссылается на существующий внешний key → сохранить ссылку и байты, содержимое не читать/не печатать;
 - config ссылается на отсутствующий key → сообщить missing/conflict, не создавать другой key с другим именем;
+- config содержит non-file/inline `apiKey` → сохранить config как conflict, не читать/не выводить значение и не создавать placeholder;
 - fresh install → создать canonical credential placeholder и ссылку на него;
 - credential metadata в manifest содержит provider/mode/path, но не secret и не SHA-256 секрета;
 - Linux managed credential получает `0600`.
@@ -116,7 +119,7 @@ OpenCode CLI (`opencode-ai`) и `@opencode-ai/plugin` используют npm `
 
 ## BMAD
 
-BMAD остаётся project-local и имеет отдельную политику **pinned-tested**. Сейчас проект сохраняет проверенный pin `bmad-method@6.8.0`; более новая upstream-версия не становится штатной автоматически, пока не обновлены integrity/expected contract и не пройдены Windows/Linux install/reinstall validators.
+BMAD остаётся project-local и имеет отдельную политику **pinned-tested**. Штатный pin этой версии проекта — `bmad-method@6.10.0` с проверенным npm integrity и контрактом **46 skills**. Новая upstream-версия не становится штатной автоматически, пока не обновлены integrity/expected contract и не пройдены Windows/Linux install/reinstall validators.
 
 ```powershell
 .\install_bmad_windows.ps1 C:\path\to\project
@@ -138,7 +141,7 @@ BMAD создаёт `<project>/_bmad` и `<project>/.agents/skills`. Глоба�
 ./validate_setup.sh --bmad
 ```
 
-Дополнительный regression suite `tests/test_setup_migration.py` проверяет сценарии, найденные на реальной существующей машине: external `{file:...}` credential без лишнего placeholder, fresh canonical credential, safe merge RouterAI config, managed block AGENTS и benign/unsafe untracked dependency paths.
+Дополнительный regression suite `tests/test_setup_migration.py` проверяет сценарии, найденные на реальной существующей машине: external `{file:...}` credential без лишнего placeholder, сохранение exact file reference, inline credential conflict, fresh canonical credential, safe merge RouterAI config, managed block AGENTS и benign/unsafe untracked dependency paths.
 
 GitHub Actions выполняет regression suite и полные Windows/Linux validators.
 
