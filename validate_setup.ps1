@@ -56,7 +56,7 @@ description: Test authoritative ssh-relay skill.
 compatibility: opencode
 ---
 # ssh relay fixture
-"@ | Set-Content -LiteralPath (Join-Path $skillDir "SKILL.md") -Encoding UTF8
+"@ | Set-Content -LiteralPath (Join-Path $skillDir "SKILL.md") -Encoding ASCII
     } else {
         foreach ($skill in @("recovery-mode", "risk-gate", "safe-cli", "unknown-system-safety")) {
             $skillDir = Join-Path $seed "opencode\skills\$skill"
@@ -68,7 +68,7 @@ description: Test authoritative $skill skill.
 compatibility: opencode
 ---
 # $skill fixture
-"@ | Set-Content -LiteralPath (Join-Path $skillDir "SKILL.md") -Encoding UTF8
+"@ | Set-Content -LiteralPath (Join-Path $skillDir "SKILL.md") -Encoding ASCII
         }
     }
     Invoke-GitChecked @("-C", $seed, "add", ".")
@@ -103,8 +103,8 @@ try {
     $keyFile = Join-Path $stashDir "api-key.txt"
     [System.IO.File]::WriteAllBytes($keyFile, [System.Text.Encoding]::UTF8.GetBytes("rk-test-preserve`r`nsecond-line"))
     $keyBefore = (Get-FileHash -LiteralPath $keyFile -Algorithm SHA256).Hash
-    "user skill must survive" | Set-Content -LiteralPath (Join-Path $skillsDir "custom-user\SKILL.md") -Encoding UTF8
-    "BMAD-like user skill must survive" | Set-Content -LiteralPath (Join-Path $skillsDir "bmad-user-skill\SKILL.md") -Encoding UTF8
+    "user skill must survive" | Set-Content -LiteralPath (Join-Path $skillsDir "custom-user\SKILL.md") -Encoding ASCII
+    "BMAD-like user skill must survive" | Set-Content -LiteralPath (Join-Path $skillsDir "bmad-user-skill\SKILL.md") -Encoding ASCII
 
     $setupParams = @{
         ConfigDir = $configDir
