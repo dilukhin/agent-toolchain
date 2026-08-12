@@ -1,6 +1,7 @@
 """Compatibility wrappers for migration-specific reconciliation rules."""
 from __future__ import annotations
 
+import copy
 import json
 import re
 from pathlib import Path
@@ -10,6 +11,9 @@ from setup_lib import (
     Reporter,
     STATE_CONFLICT,
     STATE_OK,
+    STATE_OUTDATED,
+    atomic_write,
+    backup_file,
     merge_routerai_config,
     parse_jsonc_object,
     reconcile_opencode_config as _reconcile_opencode_config,
@@ -18,6 +22,19 @@ from setup_lib import (
 )
 
 _FILE_REF_RE = re.compile(r"\{file:(.+)\}")
+
+
+def can_add_routerai_provider(config: dict[str, Any] | None) -> bool:
+    """Return True for a parsed config where RouterAI can be added additively.
+
+    We intentionally accept only an existing ``provider`` object with no ``routerai``
+    entry. This keeps foreign providers and all unrelated top-level settings intact,
+    while malformed/conflicting ``provider.routerai`` shapes remain conflicts.
+    """
+    if config is None:
+        return False
+    providers = config.get("provider")
+    return isinstance(providers, dict) and "routerai" not in providers
 
 
 def _preserve_exact_external_reference(destination: Path, desired_data: bytes) -> bytes:
@@ -65,11 +82,93 @@ def _format_sensitive_change(destination: Path, desired_data: bytes, previous: d
     return merge_error is None and merged is not None and merged != existing
 
 
+def _reconcile_additive_foreign_provider(*, destination: Path, desired_data: bytes,
+                                         source_label: str, manifest: dict[str, Any],
+                                         reporter: Reporter, check: bool,
+                                         state_dir: Path) -> bool | None:
+    """Add RouterAI to an unowned config that already contains other providers.
+
+    Returns ``None`` when the special migration does not apply. The migration is
+    deliberately additive: it preserves foreign providers, plugin/permission settings,
+    and absent top-level model defaults. JSONC with comments/trailing commas remains a
+    conflict because serializing it would destroy user formatting/comments.
+    """
+    if not destination.is_file():
+        return None
+    previous = manifest.get("managed_files", {}).get("OpenCode config")
+    if previous is not None:
+        return None
+
+    existing_data = destination.read_bytes()
+    existing, error, has_jsonc_features = parse_jsonc_object(existing_data)
+    desired, desired_error, _ = parse_jsonc_object(desired_data)
+    if error or desired_error or existing is None or desired is None:
+        return None
+    if not can_add_routerai_provider(existing):
+        return None
+    desired_router = routerai_provider(desired)
+    if desired_router is None:
+        return None
+
+    if has_jsonc_features:
+        reporter.add(
+            "OpenCode config",
+            STATE_CONFLICT,
+            "existing config uses other providers but contains comments/trailing commas; preserved to avoid formatting loss",
+        )
+        return False
+
+    providers = existing.get("provider")
+    assert isinstance(providers, dict)
+    merged = copy.deepcopy(existing)
+    merged_providers = merged["provider"]
+    assert isinstance(merged_providers, dict)
+    merged_providers["routerai"] = copy.deepcopy(desired_router)
+    if "$schema" not in merged and "$schema" in desired:
+        merged["$schema"] = desired["$schema"]
+
+    reporter.add(
+        "OpenCode config",
+        STATE_OUTDATED,
+        "existing foreign providers/settings preserved; RouterAI provider can be added additively",
+    )
+    if check:
+        return False
+
+    backup = backup_file(destination, state_dir, "OpenCode config")
+    merged_data = (json.dumps(merged, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    atomic_write(destination, merged_data)
+    manifest["managed_files"]["OpenCode config"] = {
+        "path": str(destination),
+        "sha256": sha256_bytes(merged_data),
+        "source": source_label,
+        "mode": "merged-json",
+    }
+    reporter.add(
+        "OpenCode config migration",
+        STATE_OK,
+        f"added only provider.routerai; foreign providers/settings preserved; backup: {backup}",
+    )
+    return True
+
+
 def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_label: str,
                               manifest: dict[str, Any], reporter: Reporter, check: bool,
                               force: bool, state_dir: Path) -> bool:
     """Reconcile config while preserving generated idempotency and exact file refs."""
     desired_data = _preserve_exact_external_reference(destination, desired_data)
+    additive = _reconcile_additive_foreign_provider(
+        destination=destination,
+        desired_data=desired_data,
+        source_label=source_label,
+        manifest=manifest,
+        reporter=reporter,
+        check=check,
+        state_dir=state_dir,
+    )
+    if additive is not None:
+        return additive
+
     previous = manifest.get("managed_files", {}).get("OpenCode config")
     if _format_sensitive_change(destination, desired_data, previous):
         reporter.add(
