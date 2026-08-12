@@ -131,24 +131,27 @@ def main(argv: list[str] | None = None) -> int:
     compatible_existing = existing_config is not None and routerai_provider(existing_config) is not None
     config_can_be_managed = (not config_path.exists()) or previous_config is not None or compatible_existing
 
+    manifest_credential, manifest_mode = _credential_from_manifest(manifest, config_dir)
     api_key_file: Path | None = None
     credential_mode: str | None = None
     if existing_file_ref:
-        api_key_file = resolve_credential_path(existing_file_ref, config_dir)
-        credential_mode = "external-file"
-    else:
-        manifest_credential, manifest_mode = _credential_from_manifest(manifest, config_dir)
-        if manifest_credential is not None:
-            api_key_file = manifest_credential
+        referenced = resolve_credential_path(existing_file_ref, config_dir)
+        api_key_file = referenced
+        if manifest_credential is not None and referenced == manifest_credential:
             credential_mode = manifest_mode or "external-file"
-        elif config_can_be_managed and config_parse_error is None:
-            if args.credential_dir:
-                api_key_file = credential_dir / "routerai-api-key.txt"
-                credential_mode = "managed-path"
-            else:
-                # Compatibility for direct setup_core callers from the first reconciler generation.
-                api_key_file = stash_dir / "api-key.txt"
-                credential_mode = "legacy-managed-path"
+        else:
+            credential_mode = "external-file"
+    elif manifest_credential is not None:
+        api_key_file = manifest_credential
+        credential_mode = manifest_mode or "external-file"
+    elif config_can_be_managed and config_parse_error is None:
+        if args.credential_dir:
+            api_key_file = credential_dir / "routerai-api-key.txt"
+            credential_mode = "managed-path"
+        else:
+            # Compatibility for direct setup_core callers from the first reconciler generation.
+            api_key_file = stash_dir / "api-key.txt"
+            credential_mode = "legacy-managed-path"
 
     if api_key_file is None:
         detail = (f"cannot determine credential because existing config is not safely mergeable: {config_parse_error}"
