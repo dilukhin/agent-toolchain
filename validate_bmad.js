@@ -5,7 +5,9 @@ const path = require('node:path');
 
 const projectRoot = path.resolve(process.argv[2] || process.cwd());
 const repoRoot = __dirname;
-const expected = require(path.join(repoRoot, 'config_data.json')).bmad.skills;
+const config = require(path.join(repoRoot, 'config_data.json'));
+const expected = config.bmad.skills;
+const expectedVersion = config.bmad.version;
 const bmadRoot = path.join(projectRoot, '_bmad');
 const manifestPath = path.join(bmadRoot, '_config', 'manifest.yaml');
 const skillManifestPath = path.join(bmadRoot, '_config', 'skill-manifest.csv');
@@ -21,7 +23,10 @@ for (const requiredPath of [manifestPath, skillManifestPath, skillsRoot]) {
 }
 
 const manifest = fs.readFileSync(manifestPath, 'utf8');
-if (!/^\s*version:\s*6\.8\.0\s*$/m.test(manifest)) fail('version 6.8.0 is not recorded');
+const escapedVersion = expectedVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+if (!new RegExp(`^\\s*version:\\s*${escapedVersion}\\s*$`, 'm').test(manifest)) {
+  fail(`version ${expectedVersion} is not recorded`);
+}
 if (!/^\s*- name:\s*core\s*$/m.test(manifest) || !/^\s*- name:\s*bmm\s*$/m.test(manifest)) {
   fail('core and bmm modules are required');
 }
@@ -55,4 +60,4 @@ for (const [label, actual] of [['manifest', manifestSorted], ['installed skills'
   }
 }
 
-console.log(`BMAD validation passed: ${expectedIds.length} skills, version 6.8.0, target ${projectRoot}`);
+console.log(`BMAD validation passed: ${expectedIds.length} skills, version ${expectedVersion}, target ${projectRoot}`);
