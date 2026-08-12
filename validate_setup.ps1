@@ -34,18 +34,18 @@ $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("opencode-setup-" + [gu
 New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
 
 function Invoke-GitChecked {
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
-    & git @Args | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "git failed: git $($Args -join ' ')" }
+    param([string[]]$GitArgs)
+    & git @GitArgs | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "git failed: git $($GitArgs -join ' ')" }
 }
 
 function New-FixtureRemote {
     param([string]$Kind, [string]$Branch)
     $seed = Join-Path $testRoot "$Kind-seed"
     $bare = Join-Path $testRoot "$Kind.git"
-    Invoke-GitChecked init -q -b $Branch $seed
-    Invoke-GitChecked -C $seed config user.email "test@example.invalid"
-    Invoke-GitChecked -C $seed config user.name "opencode-setup-test"
+    Invoke-GitChecked @("init", "-q", "-b", $Branch, $seed)
+    Invoke-GitChecked @("-C", $seed, "config", "user.email", "test@example.invalid")
+    Invoke-GitChecked @("-C", $seed, "config", "user.name", "opencode-setup-test")
     if ($Kind -eq "ssh") {
         $skillDir = Join-Path $seed "opencode\skills\ssh-relay"
         New-Item -ItemType Directory -Path $skillDir -Force | Out-Null
@@ -71,9 +71,9 @@ compatibility: opencode
 "@ | Set-Content -LiteralPath (Join-Path $skillDir "SKILL.md") -Encoding UTF8
         }
     }
-    Invoke-GitChecked -C $seed add .
-    Invoke-GitChecked -C $seed commit -qm init
-    Invoke-GitChecked clone -q --bare $seed $bare
+    Invoke-GitChecked @("-C", $seed, "add", ".")
+    Invoke-GitChecked @("-C", $seed, "commit", "-qm", "init")
+    Invoke-GitChecked @("clone", "-q", "--bare", $seed, $bare)
     return $bare
 }
 
