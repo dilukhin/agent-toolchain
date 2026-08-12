@@ -28,7 +28,7 @@ from setup_lib import (
     sha256_bytes,
     validate_skill,
 )
-from setup_migration import reconcile_opencode_config
+from setup_migration import can_add_routerai_provider, reconcile_opencode_config
 from setup_runtime import ensure_agent_safe_runtime, ensure_ssh_relay_runtime, reconcile_npm
 
 LEGACY_AGENTS = """# Global OpenCode instructions
@@ -92,7 +92,7 @@ def _record_credential(manifest: dict, path: Path, mode: str) -> bool:
 def _has_nonfile_routerai_credential(config: dict | None) -> bool:
     """Return True when an existing RouterAI apiKey is present but is not {file:...}.
 
-    Such values may be inline secrets or another credential mechanism.  The setup must
+    Such values may be inline secrets or another credential mechanism. The setup must
     never print, migrate, or replace them automatically with a placeholder file.
     """
     if config is None:
@@ -148,13 +148,19 @@ def main(argv: list[str] | None = None) -> int:
 
     previous_config = manifest["managed_files"].get("OpenCode config")
     compatible_existing = existing_config is not None and routerai_provider(existing_config) is not None
-    config_can_be_managed = (not config_path.exists()) or previous_config is not None or compatible_existing
+    additive_existing = can_add_routerai_provider(existing_config)
+    config_can_be_managed = (
+        (not config_path.exists())
+        or previous_config is not None
+        or compatible_existing
+        or additive_existing
+    )
 
     manifest_credential, manifest_mode = _credential_from_manifest(manifest, config_dir)
     api_key_file: Path | None = None
     credential_mode: str | None = None
     if existing_nonfile_credential:
-        # Existing credential semantics are authoritative.  Do not inspect or migrate
+        # Existing credential semantics are authoritative. Do not inspect or migrate
         # the value and do not create a parallel placeholder.
         pass
     elif existing_file_ref:
@@ -168,7 +174,11 @@ def main(argv: list[str] | None = None) -> int:
         api_key_file = manifest_credential
         credential_mode = manifest_mode or "external-file"
     elif config_can_be_managed and config_parse_error is None:
-        if args.credential_dir:
+        legacy_key = stash_dir / "api-key.txt"
+        if legacy_key.is_file():
+            api_key_file = legacy_key.resolve()
+            credential_mode = "legacy-existing-file"
+        elif args.credential_dir:
             api_key_file = credential_dir / "routerai-api-key.txt"
             credential_mode = "managed-path"
         else:
@@ -182,13 +192,18 @@ def main(argv: list[str] | None = None) -> int:
         elif config_parse_error:
             detail = f"cannot determine credential because existing config is not safely mergeable: {config_parse_error}"
         else:
-            detail = "existing config is not a compatible RouterAI config; no unused placeholder created"
+            detail = "existing config is not safely compatible with RouterAI migration; no unused placeholder created"
         reporter.add("RouterAI credential", STATE_CONFLICT, detail)
     elif api_key_file.exists():
         if api_key_file.is_file():
-            mode_detail = "external file referenced by config" if credential_mode == "external-file" else "existing credential file"
+            if credential_mode == "external-file":
+                mode_detail = "external file referenced by config"
+            elif credential_mode == "legacy-existing-file":
+                mode_detail = "existing legacy credential file selected without moving bytes"
+            else:
+                mode_detail = "existing credential file"
             reporter.add("RouterAI credential", STATE_OK, f"{mode_detail}; bytes preserved: {api_key_file}")
-            if not args.check and credential_mode != "external-file" and os.name != "nt":
+            if not args.check and credential_mode not in {"external-file", "legacy-existing-file"} and os.name != "nt":
                 os.chmod(api_key_file, 0o600)
         else:
             reporter.add("RouterAI credential", STATE_CONFLICT, f"path exists but is not a regular file: {api_key_file}")
