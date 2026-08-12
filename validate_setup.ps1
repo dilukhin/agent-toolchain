@@ -106,19 +106,19 @@ try {
     "user skill must survive" | Set-Content -LiteralPath (Join-Path $skillsDir "custom-user\SKILL.md") -Encoding UTF8
     "BMAD-like user skill must survive" | Set-Content -LiteralPath (Join-Path $skillsDir "bmad-user-skill\SKILL.md") -Encoding UTF8
 
-    $setupArgs = @(
-        "-ConfigDir", $configDir,
-        "-StashDir", $stashDir,
-        "-SkillsDir", $skillsDir,
-        "-StateDir", $stateDir,
-        "-ProjectsDir", $projectsDir,
-        "-SkipPackageInstall",
-        "-SkipDependencyInstall",
-        "-SshRelayUrl", $sshRemote,
-        "-AgentSafeUrl", $safeRemote
-    )
+    $setupParams = @{
+        ConfigDir = $configDir
+        StashDir = $stashDir
+        SkillsDir = $skillsDir
+        StateDir = $stateDir
+        ProjectsDir = $projectsDir
+        SkipPackageInstall = $true
+        SkipDependencyInstall = $true
+        SshRelayUrl = $sshRemote
+        AgentSafeUrl = $safeRemote
+    }
 
-    & (Join-Path $root "setup_windows.ps1") @setupArgs
+    & (Join-Path $root "setup_windows.ps1") @setupParams
     if ($LASTEXITCODE -ne 0) { throw "isolated Windows setup failed" }
     if ((Get-FileHash -LiteralPath $keyFile -Algorithm SHA256).Hash -ne $keyBefore) { throw "Existing API key bytes changed." }
     if (-not (Test-Path -LiteralPath (Join-Path $skillsDir "custom-user\SKILL.md"))) { throw "Unknown user skill was removed." }
@@ -132,14 +132,14 @@ try {
     Write-Host "PASS isolated Windows install + ownership boundaries"
 
     $before = Get-TreeSnapshot -Path $home
-    & (Join-Path $root "setup_windows.ps1") @setupArgs
+    & (Join-Path $root "setup_windows.ps1") @setupParams
     if ($LASTEXITCODE -ne 0) { throw "repeated Windows setup failed" }
     $after = Get-TreeSnapshot -Path $home
     if ($before -ne $after) { throw "Repeated Windows setup changed file bytes." }
     Write-Host "PASS repeated Windows setup is idempotent"
 
     $beforeCheck = Get-TreeSnapshot -Path $home
-    & (Join-Path $root "setup_windows.ps1") @setupArgs -Check
+    & (Join-Path $root "setup_windows.ps1") @setupParams -Check
     if ($LASTEXITCODE -ne 0) { throw "Windows --check failed in clean state" }
     $afterCheck = Get-TreeSnapshot -Path $home
     if ($beforeCheck -ne $afterCheck) { throw "Windows --check changed file bytes." }
