@@ -112,6 +112,13 @@ def _npm_latest_version(npm: str, package: str) -> str | None:
         return None
 
 
+def _resolve_npm_target(npm: str, package: str, configured: object) -> str | None:
+    policy = str(configured or "latest").strip()
+    if policy.lower() == "latest":
+        return _npm_latest_version(npm, package)
+    return policy
+
+
 def reconcile_npm(config_dir: Path, config: dict[str, Any], reporter: Reporter,
                   check: bool, skip: bool) -> None:
     if skip:
@@ -140,16 +147,27 @@ def reconcile_npm(config_dir: Path, config: dict[str, Any], reporter: Reporter,
             elif _npm_global_version(npm, cli_package) != latest_cli:
                 reporter.add("OpenCode CLI validation", STATE_CONFLICT, "npm install completed but target version is not active")
 
-    target = str(config["dependencies"]["@opencode-ai/plugin"])
+    plugin_package = "@opencode-ai/plugin"
+    configured = config["dependencies"].get(plugin_package, "latest")
+    target = _resolve_npm_target(npm, plugin_package, configured)
+    if target is None:
+        reporter.add("OpenCode plugin", STATE_CONFLICT,
+                     f"cannot resolve npm target for {plugin_package} policy {configured!r}")
+        return
+
     package_json = config_dir / "node_modules" / "@opencode-ai" / "plugin" / "package.json"
     current = installed_version(package_json)
     if current == target:
-        reporter.add("OpenCode plugin", STATE_OK, target)
+        suffix = " (npm latest)" if str(configured).lower() == "latest" else ""
+        reporter.add("OpenCode plugin", STATE_OK, target + suffix)
         return
     reporter.add("OpenCode plugin", STATE_MISSING if current is None else STATE_OUTDATED,
                  f"target {target}, installed {current or 'none'}")
     if not check:
         config_dir.mkdir(parents=True, exist_ok=True)
-        cp = run([npm, "install", "--prefix", str(config_dir), "--save-exact", f"@opencode-ai/plugin@{target}"])
+        cp = run([npm, "install", "--prefix", str(config_dir), "--save-exact", f"{plugin_package}@{target}"])
         if cp.returncode != 0:
             reporter.add("OpenCode plugin install", STATE_CONFLICT, cp.stderr.strip()[-400:])
+        elif installed_version(package_json) != target:
+            reporter.add("OpenCode plugin validation", STATE_CONFLICT,
+                         "npm install completed but target plugin version is not active")
