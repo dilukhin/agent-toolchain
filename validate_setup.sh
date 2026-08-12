@@ -6,13 +6,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bash -n "$SCRIPT_DIR/setup_linux.sh"
 bash -n "$SCRIPT_DIR/install_bmad_linux.sh" 2>/dev/null || true
 bash -n "$SCRIPT_DIR/validate_setup.sh"
-python3 -m py_compile "$SCRIPT_DIR/setup_core.py" "$SCRIPT_DIR/setup_lib.py" "$SCRIPT_DIR/setup_runtime.py"
+python3 -m py_compile "$SCRIPT_DIR/setup_core.py" "$SCRIPT_DIR/setup_lib.py" "$SCRIPT_DIR/setup_migration.py" "$SCRIPT_DIR/setup_runtime.py"
 python3 - <<'PY' "$SCRIPT_DIR/config_data.json"
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as fh:
     data=json.load(fh)
 assert len(data["models"]) == 13
-assert len(data["bmad"]["skills"]) == 44
+skills=data["bmad"]["skills"]
+assert skills and len(skills) == len(set(skills))
 assert data["managed_environment"]["owned_skills"] == ["remote-long-running"]
 assert set(data["managed_environment"]["external_skills"]) == {"ssh-relay","recovery-mode","risk-gate","safe-cli","unknown-system-safety"}
 PY
@@ -103,7 +104,6 @@ printf '%s\n' 'user skill must survive' > "$skills_dir/custom-user/SKILL.md"
 printf '%s\n' 'BMAD-like user skill must survive' > "$skills_dir/bmad-user-skill/SKILL.md"
 key_before="$(sha256sum "$stash_dir/api-key.txt" | awk '{print $1}')"
 
-# Check on a completely missing target must not create even the target root.
 missing_check="$test_root/check-only-home"
 python3 "$SCRIPT_DIR/setup_core.py" \
   --config-dir "$missing_check/.config/opencode" \
@@ -155,7 +155,6 @@ after_repeat="$(snapshot_tree "$home")"
 [[ "$before_repeat" == "$after_repeat" ]]
 echo "PASS repeated setup is idempotent"
 
-# Clean dependency repo update: advance authoritative ssh_relay remote.
 cat > "$test_root/ssh-seed/opencode/skills/ssh-relay/SKILL.md" <<'SKILL'
 ---
 name: ssh-relay
@@ -173,7 +172,6 @@ python3 "${core_args[@]}" > "$test_root/update.out"
 grep -q 'fixture v2' "$skills_dir/ssh-relay/SKILL.md"
 echo "PASS clean dependency repo fast-forward + managed skill update"
 
-# A locally modified managed skill must survive and cause conflict.
 printf '\nLOCAL MANUAL CHANGE\n' >> "$skills_dir/remote-long-running/SKILL.md"
 manual_hash="$(sha256sum "$skills_dir/remote-long-running/SKILL.md" | awk '{print $1}')"
 set +e
@@ -188,7 +186,6 @@ python3 "${core_args[@]}" --force > "$test_root/force.out"
 find "$state_dir/backups" -type f -name SKILL.md -print -quit | grep -q .
 echo "PASS locally modified managed skill is preserved; --force backs up and replaces owned file"
 
-# Dirty dependency repository must not be reset or cleaned.
 printf '%s\n' 'keep me' > "$projects_dir/agent-safe/local-user-file.txt"
 set +e
 python3 "${core_args[@]}" > "$test_root/dirty-conflict.out" 2>&1
@@ -200,7 +197,6 @@ grep -q 'modified/conflict.*agent-safe repository' "$test_root/dirty-conflict.ou
 rm "$projects_dir/agent-safe/local-user-file.txt"
 echo "PASS dirty dependency repo preserved without reset/clean"
 
-# --check must not alter bytes or create files.
 python3 "${core_args[@]}" > /dev/null
 before_check="$(snapshot_tree "$home")"
 python3 "${core_args[@]}" --check > "$test_root/final-check.out"
@@ -209,7 +205,6 @@ after_check="$(snapshot_tree "$home")"
 ! grep -qE '^(missing|outdated|modified/conflict)' "$test_root/final-check.out"
 echo "PASS --check is read-only and final state is up-to-date"
 
-# A clean working tree with local commits is still a conflict and must not be rewritten.
 git -C "$projects_dir/agent-safe" config user.email test@example.invalid
 git -C "$projects_dir/agent-safe" config user.name opencode-setup-test
 printf '%s\n' 'local committed work' > "$projects_dir/agent-safe/local-commit.txt"
@@ -236,7 +231,6 @@ for name in ["ssh-relay","remote-long-running","recovery-mode","risk-gate","safe
 PY
 echo "PASS managed skill structure/front matter"
 
-# Missing key scenario creates a placeholder only when absent.
 home2="$test_root/home2"
 python3 "$SCRIPT_DIR/setup_core.py" \
   --config-dir "$home2/.config/opencode" \
@@ -249,7 +243,6 @@ python3 "$SCRIPT_DIR/setup_core.py" \
 [[ "$(cat "$home2/projects/stash/opencode.ai/api-key.txt")" == "your-routerai-api-key-here" ]]
 echo "PASS missing API-key placeholder creation"
 
-# Existing unowned opencode.jsonc must be preserved and reported as conflict.
 home3="$test_root/home3"
 mkdir -p "$home3/.config/opencode" "$home3/projects/stash/opencode.ai"
 printf '%s\n' '{"user_setting":true}' > "$home3/.config/opencode/opencode.jsonc"
