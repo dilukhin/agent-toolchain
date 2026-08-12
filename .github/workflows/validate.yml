@@ -12,6 +12,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v5
         with:
           node-version: 20.12.2
@@ -23,8 +25,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v5
         with:
           node-version: 20.12.2
+      - name: Validate diff whitespace
+        run: git diff --check HEAD^ HEAD
       - name: Validate Linux setup and BMAD
         run: bash ./validate_setup.sh --bmad
