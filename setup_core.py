@@ -138,17 +138,23 @@ def main(argv: list[str] | None = None) -> int:
     config_path = config_dir / "opencode.jsonc"
     existing_config = None
     config_parse_error = None
+    existing_has_jsonc_features = False
     existing_file_ref = None
     existing_nonfile_credential = False
     if config_path.is_file():
-        existing_config, config_parse_error, _ = parse_jsonc_object(config_path.read_bytes())
+        existing_config, config_parse_error, existing_has_jsonc_features = parse_jsonc_object(config_path.read_bytes())
         if existing_config is not None:
             existing_file_ref = routerai_file_credential(existing_config)
             existing_nonfile_credential = _has_nonfile_routerai_credential(existing_config)
 
     previous_config = manifest["managed_files"].get("OpenCode config")
     existing_provider = existing_config.get("provider") if isinstance(existing_config, dict) else None
-    compatible_existing = existing_config is not None and isinstance(existing_provider, dict)
+    existing_routerai = routerai_provider(existing_config) if isinstance(existing_config, dict) else None
+    compatible_existing = (
+        existing_config is not None
+        and isinstance(existing_provider, dict)
+        and (existing_routerai is not None or not existing_has_jsonc_features)
+    )
     config_can_be_managed = (not config_path.exists()) or previous_config is not None or compatible_existing
 
     manifest_credential, manifest_mode = _credential_from_manifest(manifest, config_dir)
@@ -182,6 +188,8 @@ def main(argv: list[str] | None = None) -> int:
             detail = "existing RouterAI apiKey is not a {file:...} reference; preserved without reading or creating a placeholder"
         elif config_parse_error:
             detail = f"cannot determine credential because existing config is not safely mergeable: {config_parse_error}"
+        elif existing_config is not None and existing_routerai is None and existing_has_jsonc_features:
+            detail = "existing config has another provider but contains comments/trailing commas; no credential created until config can be migrated safely"
         else:
             detail = "existing config is not safely adoptable for RouterAI; no unused placeholder created"
         reporter.add("RouterAI credential", STATE_CONFLICT, detail)
