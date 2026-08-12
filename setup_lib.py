@@ -574,7 +574,9 @@ def normalize_repo_url(value: str) -> str:
 
 
 def _benign_untracked(path: str) -> bool:
-    normalized = path.replace("\\", "/").lstrip("./")
+    normalized = path.replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
     return normalized.startswith(".agent-safety/") or normalized.lower().endswith(".md")
 
 
