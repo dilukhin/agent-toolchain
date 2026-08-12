@@ -17,6 +17,11 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 20.12.2
+      - name: Install BMAD runtime prerequisite
+        shell: powershell
+        run: |
+          py -3 -m pip install uv
+          uv --version
       - name: Validate migration regressions
         shell: powershell
         run: py -3 .\tests\run_migration_ci.py
@@ -43,17 +48,12 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 20.12.2
+      - name: Install BMAD runtime prerequisite
+        run: |
+          python3 -m pip install uv
+          uv --version
       - name: Validate diff whitespace
         run: git diff --check HEAD^ HEAD
-      - name: Report BMAD 6.11.0 registry metadata
-        shell: bash
-        run: |
-          version="$(npm view bmad-method version)"
-          integrity="$(npm view bmad-method@6.11.0 dist.integrity)"
-          printf 'BMAD registry latest: %s\n' "$version"
-          printf 'BMAD 6.11.0 integrity: %s\n' "$integrity"
-          printf '::notice title=BMAD registry latest::%s\n' "$version"
-          printf '::notice title=BMAD 6.11.0 integrity::%s\n' "$integrity"
       - name: Validate migration regressions
         run: python3 ./tests/run_migration_ci.py
       - name: Validate Linux setup and BMAD
