@@ -154,6 +154,9 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "BMAD repeated install failed" }
         Write-Host "PASS isolated BMAD install and repeated install"
     }
+} catch {
+    Write-Host "::error title=Windows setup validation::$($_.Exception.Message)"
+    throw
 } finally {
     if (Test-Path -LiteralPath $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force }
 }
