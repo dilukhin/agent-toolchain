@@ -3,10 +3,15 @@ from __future__ import annotations
 import io
 import sys
 import unittest
+from pathlib import Path
+
+TESTS_DIR = Path(__file__).resolve().parent
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
 
 def main() -> int:
-    suite = unittest.defaultTestLoader.loadTestsFromName("tests.test_setup_migration")
+    suite = unittest.defaultTestLoader.loadTestsFromName("test_setup_migration")
     stream = io.StringIO()
     result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
     output = stream.getvalue()
