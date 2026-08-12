@@ -92,12 +92,12 @@ try {
     $sshRemote = New-FixtureRemote -Kind "ssh" -Branch "main"
     $safeRemote = New-FixtureRemote -Kind "safe" -Branch "master"
 
-    $home = Join-Path $testRoot "home"
-    $configDir = Join-Path $home ".config\opencode"
-    $stashDir = Join-Path $home "projects\stash\opencode.ai"
-    $skillsDir = Join-Path $home ".agents\skills"
-    $stateDir = Join-Path $home "state"
-    $projectsDir = Join-Path $home "projects"
+    $testHome = Join-Path $testRoot "home"
+    $configDir = Join-Path $testHome ".config\opencode"
+    $stashDir = Join-Path $testHome "projects\stash\opencode.ai"
+    $skillsDir = Join-Path $testHome ".agents\skills"
+    $stateDir = Join-Path $testHome "state"
+    $projectsDir = Join-Path $testHome "projects"
     New-Item -ItemType Directory -Path $stashDir, (Join-Path $skillsDir "custom-user"), (Join-Path $skillsDir "bmad-user-skill") -Force | Out-Null
 
     $keyFile = Join-Path $stashDir "api-key.txt"
@@ -131,17 +131,17 @@ try {
     if ((Get-Content -LiteralPath (Join-Path $configDir "AGENTS.md")).Count -gt 12) { throw "AGENTS.md is not compact." }
     Write-Host "PASS isolated Windows install + ownership boundaries"
 
-    $before = Get-TreeSnapshot -Path $home
+    $before = Get-TreeSnapshot -Path $testHome
     & (Join-Path $root "setup_windows.ps1") @setupParams
     if ($LASTEXITCODE -ne 0) { throw "repeated Windows setup failed" }
-    $after = Get-TreeSnapshot -Path $home
+    $after = Get-TreeSnapshot -Path $testHome
     if ($before -ne $after) { throw "Repeated Windows setup changed file bytes." }
     Write-Host "PASS repeated Windows setup is idempotent"
 
-    $beforeCheck = Get-TreeSnapshot -Path $home
+    $beforeCheck = Get-TreeSnapshot -Path $testHome
     & (Join-Path $root "setup_windows.ps1") @setupParams -Check
     if ($LASTEXITCODE -ne 0) { throw "Windows --check failed in clean state" }
-    $afterCheck = Get-TreeSnapshot -Path $home
+    $afterCheck = Get-TreeSnapshot -Path $testHome
     if ($beforeCheck -ne $afterCheck) { throw "Windows --check changed file bytes." }
     Write-Host "PASS Windows check mode is read-only"
 
