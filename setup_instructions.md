@@ -53,7 +53,7 @@ Projects:              ~/projects
 State/manifest:        ${XDG_STATE_HOME:-~/.local/state}/opencode_setup
 ```
 
-Canonical credential path относится только к fresh install. Если существующий `opencode.jsonc` уже ссылается через `{file:...}` на другой key, этот фактический путь сохраняется.
+Canonical credential path относится только к fresh install. Если существующий `opencode.jsonc` уже ссылается через `{file:...}` на другой key, этот фактический путь и точная текстовая ссылка сохраняются.
 
 ## 3. Владение и manifest
 
@@ -81,13 +81,15 @@ Setup сначала пытается распознать совместимы�
 
 1. разобрать JSON/JSONC;
 2. обнаружить существующий `options.apiKey`;
-3. если это `{file:...}`, сохранить этот путь;
+3. если это `{file:...}`, сохранить точную ссылку и использовать этот файл как фактический credential;
 4. сохранить неизвестные top-level settings, выбранные пользователем `model`/`small_model` и дополнительные model entries;
 5. добавить/обновить только managed RouterAI fields;
 6. сделать backup до первой семантической миграции;
 7. записать ownership metadata.
 
 Если файл содержит comments/trailing commas и для merge потребовалась бы перезапись с потерей форматирования, setup выдаёт `modified/conflict`. То же относится к config без распознаваемого `provider.routerai`. Полный произвольный файл не перезаписывается.
+
+Если существующий `apiKey` задан не через `{file:...}` (например, inline или другим механизмом), setup не читает и не переносит значение, не создаёт параллельный placeholder и оставляет config как `modified/conflict`.
 
 ## 5. RouterAI credential
 
@@ -103,8 +105,9 @@ canonical profile path для fresh install
 
 Поведение:
 
-- referenced external file существует → `up-to-date`, байты сохраняются, содержимое не выводится;
+- referenced external file существует → `up-to-date`, точная ссылка и байты сохраняются, содержимое не выводится;
 - referenced external file отсутствует → missing/conflict, **никакого второго placeholder в другом месте**;
+- existing non-file/inline `apiKey` → conflict, config сохраняется, значение не читается/не выводится, placeholder не создаётся;
 - fresh install → canonical `credentials/routerai-api-key.txt` с placeholder;
 - Linux managed credential → `0600`;
 - старый `stash/api-key.txt` остаётся legacy compatibility для старых прямых `setup_core.py` вызовов.
@@ -213,7 +216,7 @@ unknown-system-safety
 
 BMAD имеет другую политику: `pinned-tested`.
 
-Текущий штатный pin остаётся `bmad-method@6.8.0`, пока новая upstream-версия не прошла отдельное обновление integrity/contract и Windows/Linux install/reinstall validation. Это сознательно отличается от npm-latest политики runtime OpenCode.
+Штатный pin этой версии проекта — `bmad-method@6.10.0`. Для него зафиксированы npm integrity и ожидаемый контракт **46 skills**; install/reinstall проверяется на Windows и Linux. Следующая upstream-версия не становится штатной автоматически до такого же обновления integrity/contract и прохождения validators.
 
 ```powershell
 .\install_bmad_windows.ps1 C:\path\to\project
@@ -250,12 +253,13 @@ python3 -m unittest tests.test_setup_migration
 Migration regression tests покрывают:
 
 1. existing external `{file:...}` credential;
-2. сохранение key bytes и отсутствие параллельного placeholder;
-3. fresh canonical profile credential;
-4. safe RouterAI merge с пользовательскими settings/models;
-5. существующий AGENTS + managed block;
-6. benign `.agent-safety/**`/Markdown untracked;
-7. arbitrary untracked conflict.
+2. сохранение exact key reference/bytes и отсутствие параллельного placeholder;
+3. existing inline/non-file credential conflict без утечки/миграции;
+4. fresh canonical profile credential;
+5. safe RouterAI merge с пользовательскими settings/models;
+6. существующий AGENTS + managed block;
+7. benign `.agent-safety/**`/Markdown untracked;
+8. arbitrary untracked conflict.
 
 Полные validators дополнительно проверяют clean install, repeated setup, read-only check, fast-forward dependency update, local managed conflicts/backup, local commits, все 6 managed skills и BMAD install/reinstall.
 
