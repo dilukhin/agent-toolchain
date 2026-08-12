@@ -137,6 +137,32 @@ class ForeignProviderMigrationTests(unittest.TestCase):
             self.assertEqual(credential["path"], str(legacy.resolve()))
             self.assertNotIn("sha256", credential)
 
+    def test_format_sensitive_foreign_config_conflicts_without_creating_credential(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            config_dir = home / ".config" / "opencode"
+            stash_dir = home / "projects" / "stash" / "opencode.ai"
+            credential_dir = config_dir / "credentials"
+            config_dir.mkdir(parents=True)
+            config_path = config_dir / "opencode.jsonc"
+            before = b'''{
+              // keep this user comment
+              "provider": {
+                "qwen": {
+                  "options": {"baseURL": "https://portal.qwen.ai/v1"},
+                },
+              },
+            }\n'''
+            config_path.write_bytes(before)
+
+            cp = _run_core(home, config_dir, stash_dir, credential_dir)
+
+            self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
+            self.assertIn("contains comments/trailing commas", cp.stdout)
+            self.assertEqual(config_path.read_bytes(), before)
+            self.assertFalse((credential_dir / "routerai-api-key.txt").exists())
+            self.assertFalse((stash_dir / "api-key.txt").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
