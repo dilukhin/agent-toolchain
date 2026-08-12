@@ -147,7 +147,8 @@ def main(argv: list[str] | None = None) -> int:
             existing_nonfile_credential = _has_nonfile_routerai_credential(existing_config)
 
     previous_config = manifest["managed_files"].get("OpenCode config")
-    compatible_existing = existing_config is not None and routerai_provider(existing_config) is not None
+    existing_provider = existing_config.get("provider") if isinstance(existing_config, dict) else None
+    compatible_existing = existing_config is not None and isinstance(existing_provider, dict)
     config_can_be_managed = (not config_path.exists()) or previous_config is not None or compatible_existing
 
     manifest_credential, manifest_mode = _credential_from_manifest(manifest, config_dir)
@@ -182,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
         elif config_parse_error:
             detail = f"cannot determine credential because existing config is not safely mergeable: {config_parse_error}"
         else:
-            detail = "existing config is not a compatible RouterAI config; no unused placeholder created"
+            detail = "existing config is not safely adoptable for RouterAI; no unused placeholder created"
         reporter.add("RouterAI credential", STATE_CONFLICT, detail)
     elif api_key_file.exists():
         if api_key_file.is_file():
