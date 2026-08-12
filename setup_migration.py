@@ -1,6 +1,7 @@
 """Compatibility wrappers for migration-specific reconciliation rules."""
 from __future__ import annotations
 
+import copy
 import json
 import re
 from pathlib import Path
@@ -10,6 +11,9 @@ from setup_lib import (
     Reporter,
     STATE_CONFLICT,
     STATE_OK,
+    STATE_OUTDATED,
+    atomic_write,
+    backup_file,
     merge_routerai_config,
     parse_jsonc_object,
     reconcile_opencode_config as _reconcile_opencode_config,
@@ -65,11 +69,85 @@ def _format_sensitive_change(destination: Path, desired_data: bytes, previous: d
     return merge_error is None and merged is not None and merged != existing
 
 
+def _reconcile_missing_routerai(*, destination: Path, desired_data: bytes, source_label: str,
+                                manifest: dict[str, Any], reporter: Reporter, check: bool,
+                                state_dir: Path) -> bool | None:
+    """Add RouterAI beside existing providers without taking over unrelated config.
+
+    This applies only to an unowned, parseable config whose top-level ``provider`` is
+    already an object and does not contain ``routerai``. Existing providers and all
+    unrelated top-level fields are preserved exactly at the semantic level. We do not
+    inject top-level model/small_model defaults into an existing user config.
+    """
+    if not destination.is_file():
+        return None
+    previous = manifest.get("managed_files", {}).get("OpenCode config")
+    if previous is not None:
+        return None
+
+    current_data = destination.read_bytes()
+    existing, error, has_jsonc_features = parse_jsonc_object(current_data)
+    desired, desired_error, _ = parse_jsonc_object(desired_data)
+    if error or desired_error or existing is None or desired is None:
+        return None
+
+    providers = existing.get("provider")
+    desired_router = routerai_provider(desired)
+    if not isinstance(providers, dict) or "routerai" in providers or desired_router is None:
+        return None
+
+    if has_jsonc_features:
+        reporter.add(
+            "OpenCode config",
+            STATE_CONFLICT,
+            "existing config has another provider but contains comments/trailing commas; preserved to avoid formatting loss",
+        )
+        return False
+
+    merged = copy.deepcopy(existing)
+    merged["provider"]["routerai"] = copy.deepcopy(desired_router)
+    if "$schema" not in merged and "$schema" in desired:
+        merged["$schema"] = copy.deepcopy(desired["$schema"])
+
+    merged_data = (json.dumps(merged, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    reporter.add(
+        "OpenCode config",
+        STATE_OUTDATED,
+        "existing providers preserved; RouterAI can be added as a sibling provider",
+    )
+    if check:
+        return False
+
+    backup = backup_file(destination, state_dir, "OpenCode config")
+    atomic_write(destination, merged_data)
+    manifest["managed_files"]["OpenCode config"] = {
+        "path": str(destination),
+        "sha256": sha256_bytes(merged_data),
+        "source": source_label,
+        "mode": "merged-json",
+    }
+    reporter.add("OpenCode config migration", STATE_OK, f"existing providers preserved; backup: {backup}")
+    return True
+
+
 def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_label: str,
                               manifest: dict[str, Any], reporter: Reporter, check: bool,
                               force: bool, state_dir: Path) -> bool:
     """Reconcile config while preserving generated idempotency and exact file refs."""
     desired_data = _preserve_exact_external_reference(destination, desired_data)
+
+    missing_routerai = _reconcile_missing_routerai(
+        destination=destination,
+        desired_data=desired_data,
+        source_label=source_label,
+        manifest=manifest,
+        reporter=reporter,
+        check=check,
+        state_dir=state_dir,
+    )
+    if missing_routerai is not None:
+        return missing_routerai
+
     previous = manifest.get("managed_files", {}).get("OpenCode config")
     if _format_sensitive_change(destination, desired_data, previous):
         reporter.add(
