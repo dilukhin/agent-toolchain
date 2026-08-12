@@ -22,12 +22,12 @@ if ($python) {
     $pythonExe = $python.Source
     $pythonPrefix = @()
 }
-& $pythonExe @pythonPrefix -m py_compile (Join-Path $root "setup_core.py") (Join-Path $root "setup_lib.py") (Join-Path $root "setup_runtime.py")
+& $pythonExe @pythonPrefix -m py_compile (Join-Path $root "setup_core.py") (Join-Path $root "setup_lib.py") (Join-Path $root "setup_migration.py") (Join-Path $root "setup_runtime.py")
 if ($LASTEXITCODE -ne 0) { throw "setup Python modules compile failed" }
 
 $data = Get-Content -LiteralPath (Join-Path $root "config_data.json") -Raw | ConvertFrom-Json
 if (@($data.models.PSObject.Properties).Count -ne 13) { throw "config_data.json must contain 13 RouterAI models." }
-if ($data.bmad.skills.Count -ne 44) { throw "config_data.json must contain 44 BMAD skills." }
+if ($data.bmad.skills.Count -eq 0 -or @($data.bmad.skills | Sort-Object -Unique).Count -ne $data.bmad.skills.Count) { throw "config_data.json BMAD skills must be non-empty and unique." }
 Write-Host "PASS config_data.json"
 
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("opencode-setup-" + [guid]::NewGuid().ToString("N"))

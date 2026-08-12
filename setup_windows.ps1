@@ -1,6 +1,7 @@
 param(
     [string]$ConfigDir = "$env:USERPROFILE\.config\opencode",
     [string]$StashDir = "$env:USERPROFILE\projects\stash\opencode.ai",
+    [string]$CredentialDir = "",
     [string]$SkillsDir = "$env:USERPROFILE\.agents\skills",
     [string]$StateDir = "",
     [string]$ProjectsDir = "$env:USERPROFILE\projects",
@@ -14,6 +15,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if (-not $CredentialDir) {
+    $CredentialDir = Join-Path $ConfigDir "credentials"
+}
 if (-not $StateDir) {
     if ($env:LOCALAPPDATA) {
         $StateDir = Join-Path $env:LOCALAPPDATA "opencode_setup\state"
@@ -40,6 +44,7 @@ $argsCore = @(
     $core,
     "--config-dir", $ConfigDir,
     "--stash-dir", $StashDir,
+    "--credential-dir", $CredentialDir,
     "--skills-dir", $SkillsDir,
     "--state-dir", $StateDir,
     "--projects-dir", $ProjectsDir

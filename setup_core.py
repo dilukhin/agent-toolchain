@@ -17,12 +17,18 @@ from setup_lib import (
     STATE_OUTDATED,
     atomic_write,
     load_manifest,
+    parse_jsonc_object,
+    reconcile_agents_file,
     reconcile_file,
     reconcile_repo,
+    resolve_credential_path,
+    routerai_file_credential,
+    routerai_provider,
     save_manifest,
     sha256_bytes,
     validate_skill,
 )
+from setup_migration import reconcile_opencode_config
 from setup_runtime import ensure_agent_safe_runtime, ensure_ssh_relay_runtime, reconcile_npm
 
 LEGACY_AGENTS = """# Global OpenCode instructions
@@ -42,10 +48,13 @@ def render_config(template_path: Path, api_key_file: Path) -> bytes:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Reconcile managed OpenCode environment components safely.")
     p.add_argument("--check", action="store_true", help="report only; do not change files or repositories")
-    p.add_argument("--force", action="store_true", help="backup and replace locally modified files already tracked by manifest")
+    p.add_argument("--force", action="store_true", help="backup and replace locally modified managed content")
     p.add_argument("--repo-root", default=str(Path(__file__).resolve().parent))
     p.add_argument("--config-dir", required=True)
-    p.add_argument("--stash-dir", required=True)
+    p.add_argument("--stash-dir", required=True,
+                   help="legacy credential location for direct setup_core callers")
+    p.add_argument("--credential-dir",
+                   help="canonical credential directory for fresh installs; wrappers use <config-dir>/credentials")
     p.add_argument("--skills-dir", required=True)
     p.add_argument("--state-dir", required=True)
     p.add_argument("--projects-dir", required=True)
@@ -57,11 +66,53 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _credential_from_manifest(manifest: dict, config_dir: Path) -> tuple[Path | None, str | None]:
+    credentials = manifest.get("credentials")
+    if not isinstance(credentials, dict):
+        return None, None
+    routerai = credentials.get("routerai")
+    if not isinstance(routerai, dict):
+        return None, None
+    path = routerai.get("path")
+    mode = routerai.get("mode")
+    if not isinstance(path, str) or not path:
+        return None, None
+    return resolve_credential_path(path, config_dir), str(mode or "external-file")
+
+
+def _record_credential(manifest: dict, path: Path, mode: str) -> bool:
+    credentials = manifest.setdefault("credentials", {})
+    desired = {"provider": "routerai", "mode": mode, "path": str(path)}
+    if credentials.get("routerai") == desired:
+        return False
+    credentials["routerai"] = desired
+    return True
+
+
+def _has_nonfile_routerai_credential(config: dict | None) -> bool:
+    """Return True when an existing RouterAI apiKey is present but is not {file:...}.
+
+    Such values may be inline secrets or another credential mechanism.  The setup must
+    never print, migrate, or replace them automatically with a placeholder file.
+    """
+    if config is None:
+        return False
+    routerai = routerai_provider(config)
+    if routerai is None:
+        return False
+    options = routerai.get("options")
+    if not isinstance(options, dict) or "apiKey" not in options:
+        return False
+    return routerai_file_credential(config) is None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     repo_root = Path(args.repo_root).resolve()
     config_dir = Path(args.config_dir).expanduser().resolve()
     stash_dir = Path(args.stash_dir).expanduser().resolve()
+    credential_dir = (Path(args.credential_dir).expanduser().resolve()
+                      if args.credential_dir else stash_dir)
     skills_dir = Path(args.skills_dir).expanduser().resolve()
     state_dir = Path(args.state_dir).expanduser().resolve()
     projects_dir = Path(args.projects_dir).expanduser().resolve()
@@ -83,37 +134,94 @@ def main(argv: list[str] | None = None) -> int:
 
     reconcile_npm(config_dir, config, reporter, args.check, args.skip_package_install)
 
-    api_key_file = stash_dir / "api-key.txt"
-    if api_key_file.exists():
+    manifest_changed = False
+    config_path = config_dir / "opencode.jsonc"
+    existing_config = None
+    config_parse_error = None
+    existing_file_ref = None
+    existing_nonfile_credential = False
+    if config_path.is_file():
+        existing_config, config_parse_error, _ = parse_jsonc_object(config_path.read_bytes())
+        if existing_config is not None:
+            existing_file_ref = routerai_file_credential(existing_config)
+            existing_nonfile_credential = _has_nonfile_routerai_credential(existing_config)
+
+    previous_config = manifest["managed_files"].get("OpenCode config")
+    compatible_existing = existing_config is not None and routerai_provider(existing_config) is not None
+    config_can_be_managed = (not config_path.exists()) or previous_config is not None or compatible_existing
+
+    manifest_credential, manifest_mode = _credential_from_manifest(manifest, config_dir)
+    api_key_file: Path | None = None
+    credential_mode: str | None = None
+    if existing_nonfile_credential:
+        # Existing credential semantics are authoritative.  Do not inspect or migrate
+        # the value and do not create a parallel placeholder.
+        pass
+    elif existing_file_ref:
+        referenced = resolve_credential_path(existing_file_ref, config_dir)
+        api_key_file = referenced
+        if manifest_credential is not None and referenced == manifest_credential:
+            credential_mode = manifest_mode or "external-file"
+        else:
+            credential_mode = "external-file"
+    elif manifest_credential is not None:
+        api_key_file = manifest_credential
+        credential_mode = manifest_mode or "external-file"
+    elif config_can_be_managed and config_parse_error is None:
+        if args.credential_dir:
+            api_key_file = credential_dir / "routerai-api-key.txt"
+            credential_mode = "managed-path"
+        else:
+            # Compatibility for direct setup_core callers from the first reconciler generation.
+            api_key_file = stash_dir / "api-key.txt"
+            credential_mode = "legacy-managed-path"
+
+    if api_key_file is None:
+        if existing_nonfile_credential:
+            detail = "existing RouterAI apiKey is not a {file:...} reference; preserved without reading or creating a placeholder"
+        elif config_parse_error:
+            detail = f"cannot determine credential because existing config is not safely mergeable: {config_parse_error}"
+        else:
+            detail = "existing config is not a compatible RouterAI config; no unused placeholder created"
+        reporter.add("RouterAI credential", STATE_CONFLICT, detail)
+    elif api_key_file.exists():
         if api_key_file.is_file():
-            reporter.add("RouterAI api-key.txt", STATE_OK, "existing bytes preserved")
-            if not args.check and os.name != "nt":
+            mode_detail = "external file referenced by config" if credential_mode == "external-file" else "existing credential file"
+            reporter.add("RouterAI credential", STATE_OK, f"{mode_detail}; bytes preserved: {api_key_file}")
+            if not args.check and credential_mode != "external-file" and os.name != "nt":
                 os.chmod(api_key_file, 0o600)
         else:
-            reporter.add("RouterAI api-key.txt", STATE_CONFLICT, "path exists but is not a regular file")
+            reporter.add("RouterAI credential", STATE_CONFLICT, f"path exists but is not a regular file: {api_key_file}")
     else:
-        reporter.add("RouterAI api-key.txt", STATE_MISSING, str(api_key_file))
-        if not args.check:
-            api_key_file.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write(api_key_file, b"your-routerai-api-key-here\n")
-            if os.name != "nt":
-                os.chmod(api_key_file, 0o600)
+        if credential_mode == "external-file":
+            state = STATE_MISSING if args.check else STATE_CONFLICT
+            reporter.add("RouterAI credential", state,
+                         f"existing config references missing credential; no alternate placeholder created: {api_key_file}")
+        else:
+            reporter.add("RouterAI credential", STATE_MISSING, str(api_key_file))
+            if not args.check:
+                api_key_file.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write(api_key_file, b"your-routerai-api-key-here\n")
+                if os.name != "nt":
+                    os.chmod(api_key_file, 0o600)
 
-    manifest_changed = False
-    config_data = render_config(repo_root / "templates" / "opencode.jsonc", api_key_file)
-    manifest_changed |= reconcile_file(
-        component="OpenCode config",
-        destination=config_dir / "opencode.jsonc",
-        source_data=config_data,
-        source_label="opencode_setup:templates/opencode.jsonc",
-        manifest=manifest, reporter=reporter, check=args.check, force=args.force, state_dir=state_dir,
-    )
+    if api_key_file is not None and not args.check:
+        manifest_changed |= _record_credential(manifest, api_key_file, credential_mode or "external-file")
+
+    if api_key_file is not None:
+        config_data = render_config(repo_root / "templates" / "opencode.jsonc", api_key_file)
+        manifest_changed |= reconcile_opencode_config(
+            destination=config_path,
+            desired_data=config_data,
+            source_label="opencode_setup:managed-merge:templates/opencode.jsonc",
+            manifest=manifest, reporter=reporter, check=args.check, force=args.force, state_dir=state_dir,
+        )
+    else:
+        reporter.add("OpenCode config", STATE_CONFLICT, "preserved because RouterAI credential path is unresolved")
 
     agents_data = (repo_root / "templates" / "AGENTS.md").read_bytes()
-    manifest_changed |= reconcile_file(
-        component="global AGENTS.md",
-        destination=config_dir / "AGENTS.md",
-        source_data=agents_data,
+    manifest_changed |= reconcile_agents_file(
+        destination=config_dir / "AGENTS.md", template_data=agents_data,
         source_label="opencode_setup:templates/AGENTS.md",
         manifest=manifest, reporter=reporter, check=args.check, force=args.force, state_dir=state_dir,
         legacy_hashes=[sha256_bytes(LEGACY_AGENTS.encode("utf-8"))],
