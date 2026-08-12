@@ -33,11 +33,12 @@ $python = Get-Command py -ErrorAction SilentlyContinue
 $pythonPrefix = @()
 if ($python) {
     $pythonExe = $python.Source
-    $pythonPrefix = @("-3")
+    $pythonPrefix = @("-3", "-B")
 } else {
     $python = Get-Command python -ErrorAction SilentlyContinue
     if (-not $python) { throw "Python 3 is required to run opencode_setup." }
     $pythonExe = $python.Source
+    $pythonPrefix = @("-B")
 }
 
 $argsCore = @(
