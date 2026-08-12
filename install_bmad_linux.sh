@@ -18,6 +18,27 @@ node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if
   exit 1
 }
 
+command -v python3 >/dev/null 2>&1 || {
+  echo "BMAD $BMAD_VERSION requires Python 3.11 or newer." >&2
+  exit 1
+}
+python3 - <<'PY' || {
+import sys
+raise SystemExit(0 if sys.version_info >= (3, 11) else 1)
+PY
+  echo "BMAD $BMAD_VERSION requires Python 3.11 or newer (found $(python3 --version 2>&1))." >&2
+  exit 1
+}
+
+command -v uv >/dev/null 2>&1 || {
+  echo "BMAD $BMAD_VERSION requires uv for rendered executable skills. Install uv and retry." >&2
+  exit 1
+}
+uv --version >/dev/null 2>&1 || {
+  echo "uv is present but could not be executed." >&2
+  exit 1
+}
+
 if [[ -f "$MANIFEST_PATH" ]]; then
   BMAD_VERSION_REGEX="${BMAD_VERSION//./\\.}"
   if ! grep -Eq "^[[:space:]]*version:[[:space:]]*$BMAD_VERSION_REGEX[[:space:]]*$" "$MANIFEST_PATH"; then
