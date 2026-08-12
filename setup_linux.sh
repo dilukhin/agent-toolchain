@@ -39,4 +39,4 @@ else
   echo "=== OpenCode managed environment setup (Linux) ==="
 fi
 
-python3 "${args[@]}"
+python3 -B "${args[@]}"
