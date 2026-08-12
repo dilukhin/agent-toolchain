@@ -2,7 +2,7 @@
 
 ## 1. Рабочий цикл
 
-Setup не разделяется на install/update. Перед изменением окружения сначала выполняйте проверку, затем обычный reconcile и повторную проверку.
+Setup не разделяется на install/update. Перед изменением окружения выполняйте check, затем reconcile и повторный check.
 
 Windows:
 
@@ -22,122 +22,169 @@ Linux:
 
 Состояния:
 
-- `missing` — managed-компонент отсутствует;
-- `up-to-date` — соответствует источнику;
-- `outdated` — source/repository содержит более новое managed-состояние;
-- `modified/conflict` — безопасное автоматическое изменение запрещено.
+- `missing` — компонент отсутствует;
+- `up-to-date` — соответствует текущей политике/source;
+- `outdated` — безопасное обновление требуется;
+- `modified/conflict` — автоматическое изменение небезопасно.
 
-`--check`/`-Check` не создаёт каталоги, manifest, placeholder, backup, не делает `chmod`, clone/pull или package install.
+`--check`/`-Check` не создаёт каталоги, manifest, credentials/placeholders, backups, не делает clone/pull/chmod/package install.
 
 ## 2. Каталоги по умолчанию
 
 Windows:
 
 ```text
-OpenCode config: %USERPROFILE%\.config\opencode
-RouterAI key:    %USERPROFILE%\projects\stash\opencode.ai\api-key.txt
-Global skills:   %USERPROFILE%\.agents\skills
-Projects:        %USERPROFILE%\projects
-State/manifest:  %LOCALAPPDATA%\opencode_setup\state
+OpenCode config:       %USERPROFILE%\.config\opencode
+Fresh RouterAI key:    %USERPROFILE%\.config\opencode\credentials\routerai-api-key.txt
+Legacy credential dir: %USERPROFILE%\projects\stash\opencode.ai
+Global skills:         %USERPROFILE%\.agents\skills
+Projects:              %USERPROFILE%\projects
+State/manifest:        %LOCALAPPDATA%\opencode_setup\state
 ```
 
 Linux:
 
 ```text
-OpenCode config: ~/.config/opencode
-RouterAI key:    ~/projects/stash/opencode.ai/api-key.txt
-Global skills:   ~/.agents/skills
-Projects:        ~/projects
-State/manifest:  ${XDG_STATE_HOME:-~/.local/state}/opencode_setup
+OpenCode config:       ~/.config/opencode
+Fresh RouterAI key:    ~/.config/opencode/credentials/routerai-api-key.txt
+Legacy credential dir: ~/projects/stash/opencode.ai
+Global skills:         ~/.agents/skills
+Projects:              ~/projects
+State/manifest:        ${XDG_STATE_HOME:-~/.local/state}/opencode_setup
 ```
 
-Для изолированной проверки wrappers позволяют переопределить эти пути параметрами/переменными окружения. Рабочие validators всегда используют временный root.
+Canonical credential path относится только к fresh install. Если существующий `opencode.jsonc` уже ссылается через `{file:...}` на другой key, этот фактический путь сохраняется.
 
-## 3. Владение файлами
+## 3. Владение и manifest
 
-`manifest.json` хранит только managed-файлы и для каждого фиксирует destination, source и SHA-256 установленного содержимого. Это не package manager и не индекс всего HOME.
+`manifest.json` хранит managed content. Для обычных owned-файлов фиксируются path/source/SHA-256 установленного содержимого. Для RouterAI credential сохраняются только `provider`, `mode`, `path`: содержимое и SHA-256 секрета в manifest не записываются.
 
-Owned `opencode_setup`:
+Owned/managed:
 
-- `opencode.jsonc` после безопасного принятия в ownership;
-- глобальный `AGENTS.md`;
-- `remote-long-running/SKILL.md`.
-
-External authoritative sources:
-
-- `ssh-relay/SKILL.md` — `dilukhin/ssh_relay`;
-- `recovery-mode`, `risk-gate`, `safe-cli`, `unknown-system-safety` — `dilukhin/agent-safe`.
+- managed fields `opencode.jsonc` после безопасного принятия/migration;
+- whole generated `AGENTS.md` либо маркированный managed block в уже существующем пользовательском файле;
+- `remote-long-running/SKILL.md`;
+- external authoritative skill copies после установки.
 
 Unmanaged:
 
-- любые другие глобальные skills;
+- остальные global skills;
 - BMAD project-local skills;
-- пользовательские файлы, не записанные в manifest.
+- пользовательский текст вокруг managed block `AGENTS.md`;
+- внешний credential, на который уже ссылается пользовательский config.
 
-Unmanaged-файлы не удаляются. Совпадающий побайтово с authoritative source файл может быть принят в ownership без изменения его байтов.
+## 4. Существующий `opencode.jsonc`
 
-## 4. Конфликты и `--force`
+Setup сначала пытается распознать совместимый `provider.routerai`.
 
-Если managed-файл после установки изменён вручную, setup сравнивает текущий SHA-256 с manifest и останавливает обновление этого файла:
+Безопасная миграция:
+
+1. разобрать JSON/JSONC;
+2. обнаружить существующий `options.apiKey`;
+3. если это `{file:...}`, сохранить этот путь;
+4. сохранить неизвестные top-level settings, выбранные пользователем `model`/`small_model` и дополнительные model entries;
+5. добавить/обновить только managed RouterAI fields;
+6. сделать backup до первой семантической миграции;
+7. записать ownership metadata.
+
+Если файл содержит comments/trailing commas и для merge потребовалась бы перезапись с потерей форматирования, setup выдаёт `modified/conflict`. То же относится к config без распознаваемого `provider.routerai`. Полный произвольный файл не перезаписывается.
+
+## 5. RouterAI credential
+
+Приоритет выбора credential:
 
 ```text
-modified/conflict  skill remote-long-running  managed file was modified locally; preserved
+existing opencode.jsonc {file:...}
+        ↓
+credential metadata из manifest
+        ↓
+canonical profile path для fresh install
 ```
 
-Для сознательного возврата к authoritative версии допустим:
+Поведение:
 
-```powershell
-.\setup_windows.ps1 -Force
+- referenced external file существует → `up-to-date`, байты сохраняются, содержимое не выводится;
+- referenced external file отсутствует → missing/conflict, **никакого второго placeholder в другом месте**;
+- fresh install → canonical `credentials/routerai-api-key.txt` с placeholder;
+- Linux managed credential → `0600`;
+- старый `stash/api-key.txt` остаётся legacy compatibility для старых прямых `setup_core.py` вызовов.
+
+Нельзя выводить API key в diagnostics/logs.
+
+## 6. Глобальный `AGENTS.md`
+
+Если файла нет — создаётся штатный compact template.
+
+Если уже есть произвольный пользовательский файл — setup:
+
+- делает backup;
+- сохраняет существующий текст;
+- добавляет блок между:
+
+```text
+<!-- opencode_setup:managed:start -->
+...
+<!-- opencode_setup:managed:end -->
 ```
 
-```bash
-./setup_linux.sh --force
-```
+В последующих версиях обновляется только этот блок. Если пользователь вручную изменил сам managed block, обычный setup сообщает conflict. `--force` может заменить только управляемый блок после backup, не окружающий пользовательский текст.
 
-`Force` действует только на файл, который уже принадлежит manifest. Перед заменой создаётся backup в `<state>/backups/<timestamp>/...`. Он не применяется к unknown-файлам и не делает reset/clean dependency repositories.
+## 7. Dependency repositories
 
-## 5. Dependency repositories
+### Общая политика
+
+- отсутствует → clone ожидаемой branch;
+- tracked tree clean, без local commits, HEAD совпадает с origin → no-op;
+- tracked tree clean, без local commits, origin впереди и нет мешающих untracked → `git pull --ff-only`;
+- tracked modifications → conflict;
+- local commits → conflict;
+- non-benign untracked → conflict;
+- path существует, но не Git working copy → conflict;
+- никогда `reset`, `clean`, destructive checkout или rebase.
+
+Benign untracked разрешены **только** как локальные metadata, которые не являются частью source:
+
+- `.agent-safety/**`;
+- `*.md`.
+
+Если repository уже совпадает с origin, такие файлы не мешают использовать source/skills. Если origin отличается, setup не делает pull поверх них автоматически и сообщает conflict.
 
 ### ssh_relay
 
-Источник: `https://github.com/dilukhin/ssh_relay.git`, branch `main`.
-
-Default checkout:
+Источник `https://github.com/dilukhin/ssh_relay.git`, branch `main`.
 
 ```text
 Windows: %USERPROFILE%\projects\ssh_relay
 Linux:   ~/projects/ssh_relay
 ```
 
-Правила:
-
-- отсутствует → clone указанной branch;
-- clean и совпадает с origin → no-op;
-- clean и origin впереди → `git pull --ff-only`;
-- dirty/untracked, другой origin или branch → conflict; никаких `reset`/`clean`.
-
-После получения источника setup штатно устанавливает `paramiko` при необходимости и проверяет `ssh_relay.py --version`, `ssh_relay.py --help`, наличие `job`. Remote daemon/job setup не запускает.
+После получения usable source проверяются `paramiko`, `ssh_relay.py --version`, `--help`, наличие `job`. Daemon/remote job setup не запускает.
 
 ### agent-safe
 
-Источник: `https://github.com/dilukhin/agent-safe.git`, branch `master`.
-
-Default checkout:
+Источник `https://github.com/dilukhin/agent-safe.git`, branch `master`.
 
 ```text
 Windows: %USERPROFILE%\projects\agent-safe
 Linux:   ~/projects/agent-safe
 ```
 
-Политика repository та же. Runtime устанавливается штатным editable `pip install -e <repo>` и проверяется через `python -m agent_safe --help`. `opencode-bootstrap --apply` не нужен: централизованный setup сам владеет глобальным config/AGENTS и синхронизирует authoritative skills без второй конкурирующей записи этих файлов.
+Runtime: `python -m pip install -e <repo>` + `python -m agent_safe --help`.
 
-## 6. Skills
+Если default path уже существует, но **не является Git working copy**, setup его не удаляет и не клонирует поверх. Сначала вручную выясните назначение каталога. Если его нужно сохранить, безопасный recovery:
 
-Перед установкой каждого managed skill проверяется `SKILL.md`:
+1. закрыть процессы, которые могут его использовать;
+2. переименовать каталог в backup-name, например `agent-safe.pre-opencode-setup`;
+3. не удалять backup до проверки новой установки;
+4. повторить `setup -Check`, затем setup;
+5. проверить новый authoritative checkout/runtime/skills;
+6. только после этого разбирать/удалять backup вручную.
 
-- YAML front matter присутствует и закрыт;
-- `name` совпадает с именем каталога и имеет lowercase kebab-case;
-- `description` непустой и ограниченной длины.
+Автоматического destructive `--repair-dependencies` намеренно нет.
+
+## 8. Skills
+
+Перед установкой проверяются YAML front matter, `name` и `description`.
 
 Managed global skills:
 
@@ -150,24 +197,23 @@ safe-cli
 unknown-system-safety
 ```
 
-Иные каталоги в `.agents/skills` не перечисляются как owned и не очищаются.
+Другие каталоги `.agents/skills`, включая BMAD, не очищаются.
 
-## 7. RouterAI, `opencode.jsonc` и API key
+## 9. Npm-компоненты OpenCode
 
-Setup сохраняет существующую рабочую модель RouterAI: 13 model IDs, default `opencode/deepseek-v4-flash-free`, small model `opencode/gpt-5-nano`.
+`opencode-ai` и `@opencode-ai/plugin` имеют runtime policy `latest`:
 
-Секрет хранится во внешнем `api-key.txt`:
+- npm registry недоступен → conflict;
+- current == latest → настоящий no-op;
+- current != latest → install exact resolved latest и post-install validation.
 
-- отсутствует → создать placeholder;
-- существует → не читать для сравнения и не менять байты;
-- никогда не печатать содержимое;
-- Linux → права `0600` при обычном setup.
+Так plugin не остаётся на старом hardcoded pin только потому, что `opencode_setup` давно не обновлялся.
 
-Generated `opencode.jsonc` становится managed после записи manifest. Тогда upstream template можно безопасно обновлять, пока пользователь не изменил installed-файл вручную. Неизвестный существующий `opencode.jsonc`, не совпадающий с template и не tracked в manifest, сохраняется и даёт conflict вместо полного перезаписывания.
+## 10. BMAD
 
-## 8. BMAD
+BMAD имеет другую политику: `pinned-tested`.
 
-BMAD остаётся project-local и не является частью global skill reconciliation. Для подтверждённой версии `bmad-method@6.8.0` используются существующие wrappers:
+Текущий штатный pin остаётся `bmad-method@6.8.0`, пока новая upstream-версия не прошла отдельное обновление integrity/contract и Windows/Linux install/reinstall validation. Это сознательно отличается от npm-latest политики runtime OpenCode.
 
 ```powershell
 .\install_bmad_windows.ps1 C:\path\to\project
@@ -177,50 +223,52 @@ BMAD остаётся project-local и не является частью global
 ./install_bmad_linux.sh /path/to/project
 ```
 
-Они устанавливают `_bmad` и 44 skills в `<project>/.agents/skills`. Глобальный setup не удаляет такие каталоги и не заявляет BMAD global ownership.
+## 11. `--force`
 
-## 9. Безопасная разработческая проверка
+`Force` применяется только к уже managed content. Перед заменой создаётся backup в `<state>/backups/<timestamp>/...`.
 
-Не проверяйте новую реализацию первым запуском на рабочем HOME/APPDATA. Используйте:
+Он **не**:
+
+- забирает во владение arbitrary config;
+- чинит non-git dependency directory;
+- сбрасывает local commits;
+- делает reset/clean;
+- разрешает удаление unknown/BMAD skills.
+
+## 12. Разработческая проверка
 
 ```powershell
-.\validate_setup.ps1
+.\validate_setup.ps1 -TestBmad
+py -3 -m unittest tests.test_setup_migration
 ```
 
 ```bash
-./validate_setup.sh
+./validate_setup.sh --bmad
+python3 -m unittest tests.test_setup_migration
 ```
 
-Validators создают временные dependency remotes/worktrees и временный HOME-equivalent. Проверяются:
+Migration regression tests покрывают:
 
-1. clean install;
-2. повторный запуск без лишних изменений;
-3. update authoritative managed skill;
-4. сохранение unknown skill;
-5. сохранение BMAD-like skill;
-6. сохранение локально изменённого managed skill;
-7. `--force` только с backup owned-файла;
-8. побайтовое сохранение existing API key;
-9. clean dependency repo fast-forward;
-10. dirty dependency repo без reset/clean;
-11. `--check` без изменений;
-12. короткий `AGENTS.md`;
-13. наличие всех шести managed global skills;
-14. front matter skills;
-15. PowerShell/Bash/Python syntax и отсутствие очевидных секретов.
+1. existing external `{file:...}` credential;
+2. сохранение key bytes и отсутствие параллельного placeholder;
+3. fresh canonical profile credential;
+4. safe RouterAI merge с пользовательскими settings/models;
+5. существующий AGENTS + managed block;
+6. benign `.agent-safety/**`/Markdown untracked;
+7. arbitrary untracked conflict.
 
-GitHub Actions дополнительно выполняет полную Windows/Linux проверку и project-local BMAD install/reinstall в temporary target.
+Полные validators дополнительно проверяют clean install, repeated setup, read-only check, fast-forward dependency update, local managed conflicts/backup, local commits, все 6 managed skills и BMAD install/reinstall.
 
-## 10. Примеры результата
+## 13. Целевой реальный результат
 
-Первый install может показать `missing` для репозиториев и managed files — обычный setup их создаст. После успешного reconcile повторный `--check` должен показывать только `up-to-date`.
-
-При update clean `ssh_relay`/`agent-safe` fast-forward обновляется, затем меняются только соответствующие managed skills. При dirty repository setup сообщает conflict и оставляет локальные изменения нетронутыми.
-
-После применения реального окружения рекомендуемая последовательность всегда одна:
+После устранения действительно ручных конфликтов:
 
 ```text
 setup --check
 setup
 setup --check
+setup
+setup --check
 ```
+
+Второй обычный setup должен быть no-op. External key должен остаться на исходном пути, пользовательские config/AGENTS данные — сохраниться, unknown/BMAD skills — остаться, dependency repositories — не подвергаться destructive Git operations.
