@@ -89,6 +89,23 @@ def _record_credential(manifest: dict, path: Path, mode: str) -> bool:
     return True
 
 
+def _has_nonfile_routerai_credential(config: dict | None) -> bool:
+    """Return True when an existing RouterAI apiKey is present but is not {file:...}.
+
+    Such values may be inline secrets or another credential mechanism.  The setup must
+    never print, migrate, or replace them automatically with a placeholder file.
+    """
+    if config is None:
+        return False
+    routerai = routerai_provider(config)
+    if routerai is None:
+        return False
+    options = routerai.get("options")
+    if not isinstance(options, dict) or "apiKey" not in options:
+        return False
+    return routerai_file_credential(config) is None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     repo_root = Path(args.repo_root).resolve()
@@ -122,10 +139,12 @@ def main(argv: list[str] | None = None) -> int:
     existing_config = None
     config_parse_error = None
     existing_file_ref = None
+    existing_nonfile_credential = False
     if config_path.is_file():
         existing_config, config_parse_error, _ = parse_jsonc_object(config_path.read_bytes())
         if existing_config is not None:
             existing_file_ref = routerai_file_credential(existing_config)
+            existing_nonfile_credential = _has_nonfile_routerai_credential(existing_config)
 
     previous_config = manifest["managed_files"].get("OpenCode config")
     compatible_existing = existing_config is not None and routerai_provider(existing_config) is not None
@@ -134,7 +153,11 @@ def main(argv: list[str] | None = None) -> int:
     manifest_credential, manifest_mode = _credential_from_manifest(manifest, config_dir)
     api_key_file: Path | None = None
     credential_mode: str | None = None
-    if existing_file_ref:
+    if existing_nonfile_credential:
+        # Existing credential semantics are authoritative.  Do not inspect or migrate
+        # the value and do not create a parallel placeholder.
+        pass
+    elif existing_file_ref:
         referenced = resolve_credential_path(existing_file_ref, config_dir)
         api_key_file = referenced
         if manifest_credential is not None and referenced == manifest_credential:
@@ -154,9 +177,12 @@ def main(argv: list[str] | None = None) -> int:
             credential_mode = "legacy-managed-path"
 
     if api_key_file is None:
-        detail = (f"cannot determine credential because existing config is not safely mergeable: {config_parse_error}"
-                  if config_parse_error else
-                  "existing config is not a compatible RouterAI config; no unused placeholder created")
+        if existing_nonfile_credential:
+            detail = "existing RouterAI apiKey is not a {file:...} reference; preserved without reading or creating a placeholder"
+        elif config_parse_error:
+            detail = f"cannot determine credential because existing config is not safely mergeable: {config_parse_error}"
+        else:
+            detail = "existing config is not a compatible RouterAI config; no unused placeholder created"
         reporter.add("RouterAI credential", STATE_CONFLICT, detail)
     elif api_key_file.exists():
         if api_key_file.is_file():
