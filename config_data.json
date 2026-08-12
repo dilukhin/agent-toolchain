@@ -86,9 +86,19 @@
     "small_model": "opencode/gpt-5-nano"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "1.15.4"
+    "@opencode-ai/plugin": "1.15.4",
+    "bmad-method": "6.8.0"
   },
-  "bmad_skills": [
+  "bmad": {
+    "scope": "project-local",
+    "source": "https://www.npmjs.com/package/bmad-method",
+    "upstream": "https://github.com/bmad-code-org/BMAD-METHOD",
+    "version": "6.8.0",
+    "git_revision": "3bcd6c3cce6e381b759e23185b099081496567a5",
+    "npm_integrity": "sha512-RRkXdhrFJdnD7lIeR6OuacUDDPZA+0/k+kHmD+9Us7XQ5W6ptSAzxsS/SoNkNe37X0YHwQIyLyKGV9b3iXzWpw==",
+    "modules": ["core", "bmm"],
+    "tool": "opencode",
+    "skills": [
     "bmad-advanced-elicitation",
     "bmad-agent-analyst",
     "bmad-agent-architect",
@@ -132,8 +142,9 @@
     "bmad-sprint-status",
     "bmad-technical-research",
     "bmad-ux",
-    "bmad-validate-prd"
-  ],
+      "bmad-validate-prd"
+    ]
+  },
   "helper_tools": {
     "ssh_relay": {
       "version": "0.5.0",
@@ -149,8 +160,9 @@
   },
   "platform_specific": {
     "windows": {
-      "config_dir": "%APPDATA%\\opencode",
-      "agents_dir": "%USERPROFILE%\\.agents",
+      "config_dir": "%USERPROFILE%\\.config\\opencode",
+      "project_skills_dir": "<project>\\.agents\\skills",
+      "project_bmad_dir": "<project>\\_bmad",
       "stash_dir": "%USERPROFILE%\\projects\\stash\\opencode.ai",
       "python_cmd": "py",
       "powershell_encoding_fix": "$env:PYTHONIOENCODING = 'utf-8'; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8;",
@@ -158,7 +170,8 @@
     },
     "linux": {
       "config_dir": "~/.config/opencode",
-      "agents_dir": "~/.agents",
+      "project_skills_dir": "<project>/.agents/skills",
+      "project_bmad_dir": "<project>/_bmad",
       "stash_dir": "~/projects/stash/opencode.ai",
       "python_cmd": "python3",
       "session_files": "~/.local/share/ssh_relay/sessions/"

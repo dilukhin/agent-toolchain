@@ -1,114 +1,69 @@
 # opencode_setup
 
-**Воспроизводимая базовая настройка [OpenCode](https://opencode.ai) с кастомным провайдером RouterAI, глобальными инструкциями агента и документацией по рабочему окружению.**
+Воспроизводимая настройка OpenCode для Windows и Linux: RouterAI, безопасное внешнее хранение API-ключа и опциональный project-local BMAD.
 
-## О проекте
+## Что устанавливается
 
-Репозиторий предназначен для восстановления персональной рабочей конфигурации OpenCode на Windows и Linux/Debian.
+| Компонент | Версия и область |
+|---|---|
+| OpenCode CLI | актуальная npm-версия, global |
+| `@opencode-ai/plugin` | `1.15.4`, global OpenCode config |
+| RouterAI | 13 проверенных model IDs |
+| BMAD | `bmad-method@6.8.0`, optional, project-local |
 
-На текущем этапе автоматизированы:
+`@opencode-ai/plugin` предоставляет API для разработки плагинов OpenCode. Он не содержит и не устанавливает BMAD.
 
-- 🔌 **Кастомный провайдер RouterAI** — набор моделей через единый OpenAI-compatible API.
-- 🧠 **Глобальная память** — `AGENTS.md` с базовыми правилами агента на русском языке и сведениями о вспомогательных инструментах.
-- 🛠 **Скрипты настройки под Windows и Linux** — PowerShell и Bash.
-- ⚡ **Bootstrap-промпт** — вариант первичной настройки через самого OpenCode.
-- 🔐 **Внешнее хранение RouterAI API-ключа** — ключ не встраивается в `opencode.jsonc`.
+BMAD устанавливается только официальным `bmad-method@6.8.0`. В каждый выбранный проект создаются связанные каталоги `_bmad/` и `.agents/skills/` с 44 skills. OpenCode автоматически читает project-local `.agents/skills`; глобальная копия BMAD skills без соответствующего `_bmad` не является полноценной установкой.
 
-Также репозиторий содержит сведения о ранее использовавшемся наборе **BMAD-скиллов** и вспомогательных утилит `ssh_relay` и `bundle.py`.
+## Быстрый старт
 
-> Важно: текущие `setup_windows.ps1` и `setup_linux.sh` не восстанавливают BMAD-скиллы в `~/.agents/skills/` / `%USERPROFILE%\.agents\skills` и не клонируют `ssh_relay` или `bundle`. BMAD и вспомогательные утилиты пока документированы как часть целевой конфигурации; их воспроизводимая установка требует отдельной реализации и проверки по рабочим локальным примерам.
+Windows:
+
+```powershell
+.\setup_windows.ps1
+.\install_bmad_windows.ps1 C:\path\to\project  # optional
+```
+
+Linux:
+
+```bash
+./setup_linux.sh
+./install_bmad_linux.sh /path/to/project  # optional
+```
+
+Setup создает placeholder API-ключа только при отсутствии файла. Существующие `api-key.txt`, `opencode.jsonc` и `AGENTS.md` сохраняются. На Linux ключу всегда назначаются права `0600`.
+
+После изменения конфигурации полностью перезапустите OpenCode.
+
+## BMAD
+
+- Источник: [официальный npm-пакет](https://www.npmjs.com/package/bmad-method).
+- Upstream: [bmad-code-org/BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD).
+- Версия: `6.8.0`.
+- Upstream revision пакета: `3bcd6c3cce6e381b759e23185b099081496567a5`.
+- Модули: `core`, `bmm`.
+- Интеграция: `opencode`.
+- Skills: 44, точный список хранится в `config_data.json`.
+
+Installers проверяют опубликованный npm integrity, не заменяют неизвестную или другую версию BMAD и после установки запускают `validate_bmad.js`. Повторный запуск для управляемой версии `6.8.0` использует штатный quick-update официального installer.
 
 ## Файлы
 
 | Файл | Назначение |
-|------|------------|
-| `setup_windows.ps1` | Базовая автонастройка OpenCode для Windows |
-| `setup_linux.sh` | Базовая автонастройка OpenCode для Linux/Debian/Ubuntu |
-| `bootstrap_prompt.md` | Промпт для базовой настройки через OpenCode |
-| `setup_instructions.md` | Подробная инструкция и описание целевой конфигурации |
-| `config_data.json` | Справочные данные: модели, пути, зависимости и зафиксированный список BMAD-скиллов |
-| `SUMMARY.md` | Исторический отчёт о конфигурации, из которой создавался репозиторий |
-
-## Быстрый старт
-
-### Windows
-
-```powershell
-.\setup_windows.ps1
-```
-
-После первого запуска вставьте API-ключ RouterAI в файл:
-
-```text
-%USERPROFILE%\projects\stash\opencode.ai\api-key.txt
-```
-
-Повторный запуск setup-скрипта не должен заменять уже существующий ключ заглушкой.
-
-### Linux / Debian / Ubuntu
-
-```bash
-chmod +x setup_linux.sh
-./setup_linux.sh
-```
-
-После первого запуска вставьте API-ключ RouterAI в файл:
-
-```text
-~/projects/stash/opencode.ai/api-key.txt
-```
-
-Для файла ключа устанавливаются права `0600`. Повторный запуск setup-скрипта не должен заменять существующий ключ.
-
-### Настройка через OpenCode
-
-`bootstrap_prompt.md` содержит вариант настройки через агента. Он является инструкцией для агента, а не эквивалентом полностью воспроизводимой установки BMAD.
-
-## Что создают setup-скрипты
-
-1. Каталог конфигурации OpenCode.
-2. `opencode.jsonc` с провайдером RouterAI и зарегистрированными моделями.
-3. Внешний файл `api-key.txt` с заглушкой — только если файла ещё нет.
-4. Базовый `AGENTS.md`.
-5. `package.json` с зависимостью `@opencode-ai/plugin@1.15.4`.
-6. Глобальную установку `@opencode-ai/cli`.
-
-## Что пока не автоматизировано
-
-- восстановление BMAD-скиллов и проверка их состава;
-- перенос/установка конфигурации BMAD из реальных рабочих проектов;
-- установка `ssh_relay`;
-- установка `bundle.py`;
-- проверка полной эквивалентности новой установки исходному рабочему окружению.
-
-`config_data.json` содержит зафиксированные идентификаторы BMAD-скиллов, но наличие имени в этом списке **не означает**, что соответствующий skill устанавливается пакетом `@opencode-ai/plugin` или текущими setup-скриптами.
+|---|---|
+| `setup_windows.ps1`, `setup_linux.sh` | Базовая настройка OpenCode и RouterAI |
+| `install_bmad_windows.ps1`, `install_bmad_linux.sh` | Официальная project-local установка BMAD |
+| `validate_bmad.js` | Проверка версии, модулей, IDE и 44 IDs |
+| `validate_setup.ps1`, `validate_setup.sh` | Безопасные изолированные проверки setup |
+| `.github/workflows/validate.yml` | Полная Windows/Linux CI-проверка |
+| `config_data.json` | Машиночитаемый эталон моделей и BMAD |
+| `setup_instructions.md` | Подробная инструкция и политика повторной установки |
+| `bootstrap_prompt.md` | Короткие промпты для выполнения setup агентом |
+| `SUMMARY.md` | Аудит исходных расхождений и принятые решения |
 
 ## Требования
 
-- **Node.js 18+** и **npm**.
-- **Python 3.12+** — только для вспомогательных утилит, если они устанавливаются отдельно.
-- **Аккаунт RouterAI** и API-ключ.
-
-## Безопасность
-
-- API-ключ RouterAI хранится во внешнем файле и не должен попадать в Git.
-- `.gitignore` исключает `api-key.txt`, `stash/`, логи и временные файлы.
-- Перед публикацией изменений следует проверять отсутствие токенов, ключей и других секретов.
-
-## Целевое состояние
-
-После завершения BMAD-части репозиторий должен уметь воспроизводимо восстанавливать:
-
-1. OpenCode CLI и plugin-зависимости.
-2. RouterAI provider и набор моделей.
-3. Глобальный `AGENTS.md`.
-4. Реально используемые BMAD-скиллы из подтверждённого источника.
-5. При необходимости — `ssh_relay` и `bundle` отдельными опциями.
-6. Проверку установки без раскрытия секретов.
-
-## Ссылки
-
-- [OpenCode](https://opencode.ai)
-- [RouterAI](https://routerai.ru)
-- [ssh_relay](https://github.com/dilukhin/ssh_relay.git)
-- [bundle.py](https://github.com/dilukhin/bundle.git)
+- Node.js 18+ и npm для базового setup.
+- Node.js 20.12+ для BMAD `6.8.0`.
+- Аккаунт RouterAI и API-ключ.
+- Доступ к npm registry при установке.

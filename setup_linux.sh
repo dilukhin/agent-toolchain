@@ -1,40 +1,35 @@
-#!/bin/bash
-# Bash скрипт для настройки Opencode на Linux/Debian
+#!/usr/bin/env bash
+set -euo pipefail
 
-set -e
-
-echo "=== Opencode Setup Script for Linux/Debian ==="
-
-CONFIG_DIR="$HOME/.config/opencode"
-AGENTS_DIR="$HOME/.agents"
-STASH_DIR="$HOME/projects/stash/opencode.ai"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-# 1. Create directories
-echo "[1/6] Creating directories..."
-mkdir -p "$CONFIG_DIR" "$AGENTS_DIR" "$STASH_DIR"
-
-# 2. Install npm package
-echo "[2/6] Installing @opencode-ai/cli globally..."
-cd "$CONFIG_DIR"
-npm install -g @opencode-ai/cli 2>/dev/null || sudo npm install -g @opencode-ai/cli
-npm install --save-dev @opencode-ai/plugin@1.15.4
-
-# 3. Create API key file placeholder only if it does not exist
-echo "[3/6] Preparing API key file..."
+CONFIG_DIR="${OPENCODE_CONFIG_DIR:-$HOME/.config/opencode}"
+STASH_DIR="${OPENCODE_STASH_DIR:-$HOME/projects/stash/opencode.ai}"
 API_KEY_FILE="$STASH_DIR/api-key.txt"
-if [ ! -e "$API_KEY_FILE" ]; then
-  echo "your-routerai-api-key-here" > "$API_KEY_FILE"
-  echo "      Created: $API_KEY_FILE"
+CONFIG_FILE="$CONFIG_DIR/opencode.jsonc"
+AGENTS_FILE="$CONFIG_DIR/AGENTS.md"
+
+echo "=== OpenCode setup for Linux ==="
+mkdir -p "$CONFIG_DIR" "$STASH_DIR"
+
+if [[ "${OPENCODE_SETUP_SKIP_NPM:-0}" != "1" ]]; then
+  echo "Installing OpenCode CLI and @opencode-ai/plugin@1.15.4..."
+  if ! npm install -g @opencode-ai/cli; then
+    sudo npm install -g @opencode-ai/cli
+  fi
+  npm install --prefix "$CONFIG_DIR" --save-exact @opencode-ai/plugin@1.15.4
+fi
+
+if [[ -f "$API_KEY_FILE" ]]; then
+  echo "Preserved existing API key file: $API_KEY_FILE"
 else
-  echo "      Existing API key file preserved: $API_KEY_FILE"
+  printf '%s\n' 'your-routerai-api-key-here' > "$API_KEY_FILE"
+  echo "Created API key placeholder: $API_KEY_FILE"
 fi
 chmod 600 "$API_KEY_FILE"
 
-# 4. Generate opencode.jsonc
-echo "[4/6] Generating opencode.jsonc..."
-KEY_PATH=$(realpath "$API_KEY_FILE")
-cat > "$CONFIG_DIR/opencode.jsonc" << EOF
+if [[ -f "$CONFIG_FILE" ]]; then
+  echo "Preserved existing config: $CONFIG_FILE"
+else
+  cat > "$CONFIG_FILE" <<EOF
 {
   "\$schema": "https://opencode.ai/config.json",
   "provider": {
@@ -43,21 +38,22 @@ cat > "$CONFIG_DIR/opencode.jsonc" << EOF
       "name": "RouterAI",
       "options": {
         "baseURL": "https://routerai.ru/api/v1",
-        "apiKey": "{file:$KEY_PATH}"
+        "apiKey": "{file:$API_KEY_FILE}"
       },
       "models": {
-        "openai/gpt-4o": { "name": "OpenAI GPT-4o [expensive]" },
-        "openai/gpt-4o-mini": { "name": "OpenAI GPT-4o mini [cheap]" },
+        "openai/gpt-4o": { "name": "OpenAI GPT-4o" },
+        "openai/gpt-4o-mini": { "name": "OpenAI GPT-4o mini" },
         "deepseek/deepseek-chat": { "name": "DeepSeek Chat" },
         "anthropic/claude-opus-4.7": { "name": "Claude Opus 4.7" },
-        "qwen/qwen3.6-plus": { "name": "Qwen 3.6 Plus [main]" },
+        "qwen/qwen3.6-plus": { "name": "Qwen 3.6 Plus" },
         "deepseek/deepseek-v4-pro": { "name": "DeepSeek V4 Pro" },
         "minimax/minimax-m2.7": { "name": "MiniMax M2.7" },
-        "z-ai/glm-5": { "name": "GLM-5 [architect]" },
+        "z-ai/glm-5": { "name": "GLM-5" },
         "moonshotai/kimi-k2.5": { "name": "Kimi K2.5" },
+        "z-ai/glm-5-turbo": { "name": "GLM-5 Turbo" },
         "openai/gpt-5.2-codex": { "name": "GPT-5.2-Codex" },
-        "qwen/qwen3-coder-next": { "name": "Qwen Coder Next" },
-        "qwen/qwen3.5-122b-a10b": { "name": "Qwen 3.5 122B" }
+        "qwen/qwen3-coder-next": { "name": "Qwen 3 Coder Next" },
+        "qwen/qwen3.5-122b-a10b": { "name": "Qwen 3.5 122B A10B" }
       }
     }
   },
@@ -65,41 +61,21 @@ cat > "$CONFIG_DIR/opencode.jsonc" << EOF
   "small_model": "opencode/gpt-5-nano"
 }
 EOF
+  echo "Created config: $CONFIG_FILE"
+fi
 
-# 5. Create AGENTS.md
-echo "[5/6] Creating AGENTS.md..."
-cat > "$CONFIG_DIR/AGENTS.md" << 'EOF'
-# Глобальная память
+if [[ -f "$AGENTS_FILE" ]]; then
+  echo "Preserved existing instructions: $AGENTS_FILE"
+else
+  cat > "$AGENTS_FILE" <<'EOF'
+# Global OpenCode instructions
 
-Этот файл — глобальная память агента. Читается в начале каждой сессии.
-
-Сохранённые факты:
-- ssh_relay: Python 3.12+, paramiko, версия 0.5.0
-- bundle.py: https://github.com/dilukhin/bundle.git
-
-Правила:
-- Отвечай на русском, без воды, структурированно
-- Не сканируй node_modules, .git, кэши, логи
-- Никогда не exposed секреты, API-ключи, токены
-- Сохраняй прогресс рано при работе с документами
+- Never expose secrets, tokens, passwords, or API keys.
+- Do not scan .git, node_modules, build output, caches, or logs without a reason.
+- Prefer concise, structured answers.
 EOF
+  echo "Created instructions: $AGENTS_FILE"
+fi
 
-# 6. Create package.json
-echo "[6/6] Creating package.json..."
-cat > "$CONFIG_DIR/package.json" << 'EOF'
-{
-  "dependencies": {
-    "@opencode-ai/plugin": "1.15.4"
-  }
-}
-EOF
-npm install
-
-cd "$SCRIPT_DIR"
-
-echo ""
-echo "=== Setup Complete ==="
-echo "Config directory: $CONFIG_DIR"
-echo "Insert your RouterAI API key into this file if it still contains the placeholder:"
-echo "  $API_KEY_FILE"
-echo "Then run: opencode"
+echo "Setup complete. Add the RouterAI key to $API_KEY_FILE and restart OpenCode."
+echo "BMAD is optional and project-local; run ./install_bmad_linux.sh <project-path>."
