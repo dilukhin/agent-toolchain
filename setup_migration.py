@@ -22,17 +22,10 @@ from setup_lib import (
 )
 
 _FILE_REF_RE = re.compile(r"\{file:(.+)\}")
+_SIBLING_MODE = "merged-json-sibling-provider"
 
 
 def _preserve_exact_external_reference(destination: Path, desired_data: bytes) -> bytes:
-    """Keep the exact existing ``{file:...}`` string while merging managed fields.
-
-    Path resolution is useful for existence checks and manifest metadata, but Windows
-    can canonicalize an 8.3 path (for example ``RUNNER~1``) to a different textual
-    long path. A working user config must not be rewritten merely because both forms
-    point to the same credential file. If the textual reference already matches, keep
-    the original desired bytes so a generated config remains byte-for-byte idempotent.
-    """
     if not destination.is_file():
         return desired_data
     existing, error, _ = parse_jsonc_object(destination.read_bytes())
@@ -57,9 +50,23 @@ def _preserve_exact_external_reference(destination: Path, desired_data: bytes) -
     return (json.dumps(desired, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
 
 
+def _preserve_sibling_provider_policy(destination: Path, desired_data: bytes,
+                                      previous: dict[str, Any] | None) -> bytes:
+    """Do not introduce top-level model defaults after sibling-provider adoption."""
+    if not destination.is_file() or not previous or previous.get("mode") != _SIBLING_MODE:
+        return desired_data
+    existing, error, _ = parse_jsonc_object(destination.read_bytes())
+    desired, desired_error, _ = parse_jsonc_object(desired_data)
+    if error or desired_error or existing is None or desired is None:
+        return desired_data
+    for key in ("model", "small_model"):
+        if key not in existing:
+            desired.pop(key, None)
+    return (json.dumps(desired, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
 def _format_sensitive_change(destination: Path, desired_data: bytes, previous: dict[str, Any] | None) -> bool:
-    """Detect a managed JSONC update that would destroy comments/trailing commas."""
-    if not destination.is_file() or not previous or previous.get("mode") != "merged-json":
+    if not destination.is_file() or not previous or previous.get("mode") not in {"merged-json", _SIBLING_MODE}:
         return False
     existing, error, has_jsonc_features = parse_jsonc_object(destination.read_bytes())
     desired, desired_error, _ = parse_jsonc_object(desired_data)
@@ -72,13 +79,6 @@ def _format_sensitive_change(destination: Path, desired_data: bytes, previous: d
 def _reconcile_missing_routerai(*, destination: Path, desired_data: bytes, source_label: str,
                                 manifest: dict[str, Any], reporter: Reporter, check: bool,
                                 state_dir: Path) -> bool | None:
-    """Add RouterAI beside existing providers without taking over unrelated config.
-
-    This applies only to an unowned, parseable config whose top-level ``provider`` is
-    already an object and does not contain ``routerai``. Existing providers and all
-    unrelated top-level fields are preserved exactly at the semantic level. We do not
-    inject top-level model/small_model defaults into an existing user config.
-    """
     if not destination.is_file():
         return None
     previous = manifest.get("managed_files", {}).get("OpenCode config")
@@ -124,7 +124,7 @@ def _reconcile_missing_routerai(*, destination: Path, desired_data: bytes, sourc
         "path": str(destination),
         "sha256": sha256_bytes(merged_data),
         "source": source_label,
-        "mode": "merged-json",
+        "mode": _SIBLING_MODE,
     }
     reporter.add("OpenCode config migration", STATE_OK, f"existing providers preserved; backup: {backup}")
     return True
@@ -133,8 +133,9 @@ def _reconcile_missing_routerai(*, destination: Path, desired_data: bytes, sourc
 def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_label: str,
                               manifest: dict[str, Any], reporter: Reporter, check: bool,
                               force: bool, state_dir: Path) -> bool:
-    """Reconcile config while preserving generated idempotency and exact file refs."""
+    previous = manifest.get("managed_files", {}).get("OpenCode config")
     desired_data = _preserve_exact_external_reference(destination, desired_data)
+    desired_data = _preserve_sibling_provider_policy(destination, desired_data, previous)
 
     missing_routerai = _reconcile_missing_routerai(
         destination=destination,
@@ -148,7 +149,6 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
     if missing_routerai is not None:
         return missing_routerai
 
-    previous = manifest.get("managed_files", {}).get("OpenCode config")
     if _format_sensitive_change(destination, desired_data, previous):
         reporter.add(
             "OpenCode config",
@@ -156,7 +156,7 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
             "managed JSONC contains comments/trailing commas and needs semantic changes; preserved to avoid formatting loss",
         )
         return False
-    if destination.is_file() and previous and previous.get("mode") != "merged-json":
+    if destination.is_file() and previous and previous.get("mode") not in {"merged-json", _SIBLING_MODE}:
         current = destination.read_bytes()
         if previous.get("path") == str(destination) and previous.get("sha256") == sha256_bytes(current):
             if current == desired_data:
