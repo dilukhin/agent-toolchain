@@ -64,13 +64,13 @@ class ExistingQwenConfigTests(unittest.TestCase):
             config_path.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
 
             check = self._run_core(home, check=True)
-            self.assertEqual(check.returncode, 2, check.stdout + check.stderr)  # fixture dependency dirs intentionally conflict
+            self.assertEqual(check.returncode, 2, check.stdout + check.stderr)
             self.assertNotIn("existing config is not safely adoptable for RouterAI", check.stdout)
             self.assertIn("RouterAI can be added as a sibling provider", check.stdout)
             self.assertFalse((config_dir / "credentials" / "routerai-api-key.txt").exists())
 
             apply = self._run_core(home)
-            self.assertEqual(apply.returncode, 2, apply.stdout + apply.stderr)  # dependency conflicts are expected in fixture
+            self.assertEqual(apply.returncode, 2, apply.stdout + apply.stderr)
 
             merged = json.loads(config_path.read_text(encoding="utf-8"))
             self.assertEqual(merged["provider"]["qwen"], original_qwen)
@@ -113,6 +113,7 @@ class ExistingQwenConfigTests(unittest.TestCase):
             self.assertEqual(cp.returncode, 2)
             self.assertIn("comments/trailing commas", cp.stdout)
             self.assertEqual(config_path.read_bytes(), original)
+            self.assertFalse((config_dir / "credentials" / "routerai-api-key.txt").exists())
 
 
 if __name__ == "__main__":
