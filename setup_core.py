@@ -138,17 +138,18 @@ def main(argv: list[str] | None = None) -> int:
     config_path = config_dir / "opencode.jsonc"
     existing_config = None
     config_parse_error = None
+    existing_has_jsonc_features = False
     existing_file_ref = None
     existing_nonfile_credential = False
     if config_path.is_file():
-        existing_config, config_parse_error, _ = parse_jsonc_object(config_path.read_bytes())
+        existing_config, config_parse_error, existing_has_jsonc_features = parse_jsonc_object(config_path.read_bytes())
         if existing_config is not None:
             existing_file_ref = routerai_file_credential(existing_config)
             existing_nonfile_credential = _has_nonfile_routerai_credential(existing_config)
 
     previous_config = manifest["managed_files"].get("OpenCode config")
     compatible_existing = existing_config is not None and routerai_provider(existing_config) is not None
-    additive_existing = can_add_routerai_provider(existing_config)
+    additive_existing = can_add_routerai_provider(existing_config) and not existing_has_jsonc_features
     config_can_be_managed = (
         (not config_path.exists())
         or previous_config is not None
@@ -191,6 +192,8 @@ def main(argv: list[str] | None = None) -> int:
             detail = "existing RouterAI apiKey is not a {file:...} reference; preserved without reading or creating a placeholder"
         elif config_parse_error:
             detail = f"cannot determine credential because existing config is not safely mergeable: {config_parse_error}"
+        elif existing_has_jsonc_features and can_add_routerai_provider(existing_config):
+            detail = "existing config uses other providers but contains comments/trailing commas; no credential created before safe migration"
         else:
             detail = "existing config is not safely compatible with RouterAI migration; no unused placeholder created"
         reporter.add("RouterAI credential", STATE_CONFLICT, detail)
