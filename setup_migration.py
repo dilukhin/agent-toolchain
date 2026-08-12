@@ -24,7 +24,8 @@ def _preserve_exact_external_reference(destination: Path, desired_data: bytes) -
     Path resolution is useful for existence checks and manifest metadata, but Windows
     can canonicalize an 8.3 path (for example ``RUNNER~1``) to a different textual
     long path. A working user config must not be rewritten merely because both forms
-    point to the same credential file.
+    point to the same credential file. If the textual reference already matches, keep
+    the original desired bytes so a generated config remains byte-for-byte idempotent.
     """
     if not destination.is_file():
         return desired_data
@@ -41,7 +42,10 @@ def _preserve_exact_external_reference(destination: Path, desired_data: bytes) -
     if not isinstance(existing_options, dict) or not isinstance(desired_options, dict):
         return desired_data
     current_ref = existing_options.get("apiKey")
+    target_ref = desired_options.get("apiKey")
     if not isinstance(current_ref, str) or _FILE_REF_RE.fullmatch(current_ref.strip()) is None:
+        return desired_data
+    if target_ref == current_ref:
         return desired_data
     desired_options["apiKey"] = current_ref
     return (json.dumps(desired, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
