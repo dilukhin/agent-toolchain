@@ -19,7 +19,15 @@ jobs:
           node-version: 20.12.2
       - name: Validate migration regressions
         shell: powershell
-        run: py -3 -m unittest tests.test_setup_migration
+        run: |
+          $output = (& py -3 -m unittest -v tests.test_setup_migration 2>&1 | Out-String)
+          $rc = $LASTEXITCODE
+          Write-Host $output
+          if ($rc -ne 0) {
+            $annotation = $output.Replace('%','%25').Replace("`r",'').Replace("`n",'%0A')
+            Write-Host "::error title=Migration regression::$annotation"
+            exit $rc
+          }
       - name: Validate Windows setup and BMAD
         shell: powershell
         run: .\validate_setup.ps1 -TestBmad
@@ -36,6 +44,19 @@ jobs:
       - name: Validate diff whitespace
         run: git diff --check HEAD^ HEAD
       - name: Validate migration regressions
-        run: python3 -m unittest tests.test_setup_migration
+        shell: bash
+        run: |
+          set +e
+          output="$(python3 -m unittest -v tests.test_setup_migration 2>&1)"
+          rc=$?
+          set -e
+          printf '%s\n' "$output"
+          if [[ $rc -ne 0 ]]; then
+            annotation="${output//'%'/'%25'}"
+            annotation="${annotation//$'\r'/}"
+            annotation="${annotation//$'\n'/'%0A'}"
+            printf '::error title=Migration regression::%s\n' "$annotation"
+            exit "$rc"
+          fi
       - name: Validate Linux setup and BMAD
         run: bash ./validate_setup.sh --bmad
