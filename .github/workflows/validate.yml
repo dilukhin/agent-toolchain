@@ -35,6 +35,12 @@ jobs:
           node-version: 20.12.2
       - name: Validate diff whitespace
         run: git diff --check HEAD^ HEAD
+      - name: Report BMAD 6.10.0 registry integrity
+        shell: bash
+        run: |
+          integrity="$(npm view bmad-method@6.10.0 dist.integrity)"
+          printf 'BMAD 6.10.0 integrity: %s\n' "$integrity"
+          printf '::notice title=BMAD 6.10.0 integrity::%s\n' "$integrity"
       - name: Validate migration regressions
         run: python3 ./tests/run_migration_ci.py
       - name: Validate Linux setup and BMAD
