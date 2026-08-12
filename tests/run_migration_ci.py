@@ -11,7 +11,7 @@ if str(TESTS_DIR) not in sys.path:
 
 
 def main() -> int:
-    suite = unittest.defaultTestLoader.discover(str(TESTS_DIR), pattern="test_setup_migration*.py")
+    suite = unittest.defaultTestLoader.discover(str(TESTS_DIR), pattern="test_setup_*.py")
     stream = io.StringIO()
     result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
     output = stream.getvalue()
@@ -19,7 +19,7 @@ def main() -> int:
     if result.wasSuccessful():
         return 0
     annotation = output.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
-    print(f"::error title=Migration regression::{annotation}")
+    print(f"::error title=Setup regression::{annotation}")
     return 1
 
 
