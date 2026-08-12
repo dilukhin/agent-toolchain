@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BMAD_VERSION="6.8.0"
-EXPECTED_INTEGRITY="sha512-RRkXdhrFJdnD7lIeR6OuacUDDPZA+0/k+kHmD+9Us7XQ5W6ptSAzxsS/SoNkNe37X0YHwQIyLyKGV9b3iXzWpw=="
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BMAD_VERSION="$(node -p "require('$SCRIPT_DIR/config_data.json').bmad.version")"
+EXPECTED_INTEGRITY="$(node -p "require('$SCRIPT_DIR/config_data.json').bmad.npm_integrity")"
 PROJECT_PATH="$(realpath "${1:-.}")"
 MANIFEST_PATH="$PROJECT_PATH/_bmad/_config/manifest.yaml"
 SKILLS_PATH="$PROJECT_PATH/.agents/skills"
@@ -19,7 +19,8 @@ node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if
 }
 
 if [[ -f "$MANIFEST_PATH" ]]; then
-  if ! grep -Eq '^[[:space:]]*version:[[:space:]]*6\.8\.0[[:space:]]*$' "$MANIFEST_PATH"; then
+  BMAD_VERSION_REGEX="${BMAD_VERSION//./\\.}"
+  if ! grep -Eq "^[[:space:]]*version:[[:space:]]*$BMAD_VERSION_REGEX[[:space:]]*$" "$MANIFEST_PATH"; then
     echo "Existing BMAD is not version $BMAD_VERSION. It was preserved; update it manually before retrying." >&2
     exit 1
   fi
