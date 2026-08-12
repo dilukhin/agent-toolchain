@@ -214,9 +214,9 @@ unknown-system-safety
 
 ## 10. BMAD
 
-BMAD имеет другую политику: `pinned-tested`.
+BMAD имеет отдельную политику `pinned-tested`.
 
-Штатный pin этой версии проекта — `bmad-method@6.10.0`. Для него зафиксированы npm integrity и ожидаемый контракт **46 skills**; install/reinstall проверяется на Windows и Linux. Следующая upstream-версия не становится штатной автоматически до такого же обновления integrity/contract и прохождения validators.
+Штатный pin этой версии проекта — `bmad-method@6.11.0`. Для него зафиксированы npm integrity, upstream release commit и ожидаемый контракт **49 skills**; install/reinstall проверяется на Windows и Linux. Для BMAD 6.11 нужны Node.js 20.12+, Python 3.11+ и `uv`; installers проверяют эти prerequisites до изменения проекта. Следующая upstream-версия не становится штатной автоматически до такого же обновления integrity/contract и прохождения validators.
 
 ```powershell
 .\install_bmad_windows.ps1 C:\path\to\project
