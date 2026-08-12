@@ -20,7 +20,6 @@ from setup_lib import (
     parse_jsonc_object,
     reconcile_agents_file,
     reconcile_file,
-    reconcile_opencode_config,
     reconcile_repo,
     resolve_credential_path,
     routerai_file_credential,
@@ -29,6 +28,7 @@ from setup_lib import (
     sha256_bytes,
     validate_skill,
 )
+from setup_migration import reconcile_opencode_config
 from setup_runtime import ensure_agent_safe_runtime, ensure_ssh_relay_runtime, reconcile_npm
 
 LEGACY_AGENTS = """# Global OpenCode instructions
