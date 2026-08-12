@@ -86,7 +86,7 @@
     "small_model": "opencode/gpt-5-nano"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "1.15.4",
+    "@opencode-ai/plugin": "latest",
     "bmad-method": "6.8.0",
     "opencode-cli-package": "opencode-ai"
   },
@@ -95,6 +95,7 @@
     "source": "https://www.npmjs.com/package/bmad-method",
     "upstream": "https://github.com/bmad-code-org/BMAD-METHOD",
     "version": "6.8.0",
+    "update_policy": "pinned-tested",
     "git_revision": "3bcd6c3cce6e381b759e23185b099081496567a5",
     "npm_integrity": "sha512-RRkXdhrFJdnD7lIeR6OuacUDDPZA+0/k+kHmD+9Us7XQ5W6ptSAzxsS/SoNkNe37X0YHwQIyLyKGV9b3iXzWpw==",
     "modules": [
@@ -207,6 +208,7 @@
   "platform_specific": {
     "windows": {
       "config_dir": "%USERPROFILE%\\.config\\opencode",
+      "credential_dir": "%USERPROFILE%\\.config\\opencode\\credentials",
       "global_skills_dir": "%USERPROFILE%\\.agents\\skills",
       "project_skills_dir": "<project>\\.agents\\skills",
       "project_bmad_dir": "<project>\\_bmad",
@@ -218,6 +220,7 @@
     },
     "linux": {
       "config_dir": "~/.config/opencode",
+      "credential_dir": "~/.config/opencode/credentials",
       "global_skills_dir": "~/.agents/skills",
       "project_skills_dir": "<project>/.agents/skills",
       "project_bmad_dir": "<project>/_bmad",
