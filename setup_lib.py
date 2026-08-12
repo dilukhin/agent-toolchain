@@ -216,16 +216,34 @@ def inspect_repo(path: Path, expected_url: str, branch: str) -> tuple[str, str]:
         return STATE_CONFLICT, "git status failed"
     if dirty.stdout.strip():
         return STATE_CONFLICT, "working copy has local/untracked changes; no reset/clean performed"
+
     head = run(["git", "rev-parse", "HEAD"], cwd=path)
-    remote = run(["git", "ls-remote", "--exit-code", "origin", f"refs/heads/{branch}"], cwd=path)
     if head.returncode != 0:
         return STATE_CONFLICT, "cannot resolve local HEAD"
+    head_sha = head.stdout.strip()
+
+    tracking = run(["git", "rev-parse", "--verify", f"refs/remotes/origin/{branch}"], cwd=path)
+    if tracking.returncode == 0:
+        relation = run(["git", "rev-list", "--left-right", "--count",
+                        f"HEAD...refs/remotes/origin/{branch}"], cwd=path)
+        if relation.returncode != 0:
+            return STATE_CONFLICT, "cannot compare local branch with its tracking ref"
+        try:
+            local_only, tracked_only = (int(x) for x in relation.stdout.split())
+        except ValueError:
+            return STATE_CONFLICT, "unexpected git rev-list output"
+        if local_only:
+            return STATE_CONFLICT, "clean working copy contains local commits; no reset/rebase performed"
+        if tracked_only:
+            return STATE_OUTDATED, f"local {head_sha[:12]} is behind recorded origin/{branch}"
+
+    remote = run(["git", "ls-remote", "--exit-code", "origin", f"refs/heads/{branch}"], cwd=path)
     if remote.returncode != 0 or not remote.stdout.strip():
         return STATE_CONFLICT, "clean working copy, but origin cannot be queried safely"
     remote_sha = remote.stdout.split()[0]
-    if head.stdout.strip() == remote_sha:
-        return STATE_OK, head.stdout.strip()[:12]
-    return STATE_OUTDATED, f"local {head.stdout.strip()[:12]} != origin {remote_sha[:12]}"
+    if head_sha == remote_sha:
+        return STATE_OK, head_sha[:12]
+    return STATE_OUTDATED, f"local {head_sha[:12]} != origin {remote_sha[:12]}"
 
 
 def reconcile_repo(*, component: str, path: Path, url: str, branch: str,

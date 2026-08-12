@@ -36,26 +36,49 @@ def ensure_ssh_relay_runtime(repo: Path, python_exe: str, reporter: Reporter,
                      STATE_OK, version.stdout.strip() or "validated")
 
 
+def _module_origin(python_exe: str, module: str) -> Path | None:
+    code = ("import pathlib, " + module + "; "
+            + "print(pathlib.Path(" + module + ".__file__).resolve())")
+    cp = run([python_exe, "-c", code])
+    if cp.returncode != 0 or not cp.stdout.strip():
+        return None
+    try:
+        return Path(cp.stdout.strip()).resolve()
+    except OSError:
+        return None
+
+
 def ensure_agent_safe_runtime(repo: Path, python_exe: str, reporter: Reporter,
                               check: bool, skip_install: bool) -> None:
     if skip_install:
         reporter.add("agent-safe runtime", STATE_OK, "dependency install/validation skipped")
         return
-    imported = run([python_exe, "-c", "import agent_safe"])
-    if imported.returncode != 0:
-        reporter.add("agent-safe runtime", STATE_MISSING, "editable package is not installed")
+
+    repo_resolved = repo.resolve()
+    origin = _module_origin(python_exe, "agent_safe")
+    managed_import = origin is not None and origin.is_relative_to(repo_resolved)
+    if not managed_import:
+        state = STATE_MISSING if origin is None else STATE_OUTDATED
+        detail = "editable package is not installed" if origin is None else f"import resolves outside managed repo: {origin}"
+        reporter.add("agent-safe runtime", state, detail)
         if check:
             return
         install = run([python_exe, "-m", "pip", "install", "-e", str(repo)])
         if install.returncode != 0:
             reporter.add("agent-safe runtime install", STATE_CONFLICT, install.stderr.strip()[-400:])
             return
+        origin = _module_origin(python_exe, "agent_safe")
+        if origin is None or not origin.is_relative_to(repo_resolved):
+            reporter.add("agent-safe runtime validation", STATE_CONFLICT,
+                         "editable install completed but import is not sourced from managed repository")
+            return
+
     help_cp = run([python_exe, "-m", "agent_safe", "--help"])
     if help_cp.returncode != 0:
         reporter.add("agent-safe runtime validation", STATE_CONFLICT, "python -m agent_safe --help failed")
     else:
-        reporter.add("agent-safe runtime" if imported.returncode == 0 else "agent-safe runtime validation",
-                     STATE_OK, "safe CLI import/help validated")
+        reporter.add("agent-safe runtime" if managed_import else "agent-safe runtime validation",
+                     STATE_OK, "managed editable import/help validated")
 
 
 def installed_version(package_json: Path) -> str | None:
@@ -63,6 +86,29 @@ def installed_version(package_json: Path) -> str | None:
         value = json.loads(package_json.read_text(encoding="utf-8")).get("version")
         return value if isinstance(value, str) else None
     except Exception:
+        return None
+
+
+def _npm_global_version(npm: str, package: str) -> str | None:
+    cp = run([npm, "list", "-g", "--depth=0", "--json", package])
+    if not cp.stdout.strip():
+        return None
+    try:
+        data = json.loads(cp.stdout)
+        value = data.get("dependencies", {}).get(package, {}).get("version")
+        return value if isinstance(value, str) else None
+    except (json.JSONDecodeError, AttributeError):
+        return None
+
+
+def _npm_latest_version(npm: str, package: str) -> str | None:
+    cp = run([npm, "view", package, "version", "--json"])
+    if cp.returncode != 0 or not cp.stdout.strip():
+        return None
+    try:
+        value = json.loads(cp.stdout)
+        return value if isinstance(value, str) and value else None
+    except json.JSONDecodeError:
         return None
 
 
@@ -75,19 +121,24 @@ def reconcile_npm(config_dir: Path, config: dict[str, Any], reporter: Reporter,
     if not npm:
         reporter.add("OpenCode npm packages", STATE_CONFLICT, "npm is not available")
         return
-    if shutil.which("opencode") is None:
-        reporter.add("OpenCode CLI", STATE_MISSING, "@opencode-ai/cli")
+
+    cli_package = str(config["dependencies"].get("opencode-cli-package", "opencode-ai"))
+    current_cli = _npm_global_version(npm, cli_package)
+    latest_cli = _npm_latest_version(npm, cli_package)
+    if latest_cli is None:
+        reporter.add("OpenCode CLI", STATE_CONFLICT, f"cannot query npm registry for {cli_package}")
+    elif current_cli == latest_cli:
+        reporter.add("OpenCode CLI", STATE_OK, f"{cli_package}@{current_cli}")
+    else:
+        state = STATE_MISSING if current_cli is None else STATE_OUTDATED
+        reporter.add("OpenCode CLI", state,
+                     f"target {latest_cli}, installed {current_cli or 'none'}")
         if not check:
-            cp = run([npm, "install", "-g", "@opencode-ai/cli"])
+            cp = run([npm, "install", "-g", f"{cli_package}@{latest_cli}"])
             if cp.returncode != 0:
                 reporter.add("OpenCode CLI install", STATE_CONFLICT, cp.stderr.strip()[-400:])
-    else:
-        reporter.add("OpenCode CLI", STATE_OK if check else STATE_OUTDATED,
-                     "installed" if check else "refresh to current npm release")
-        if not check:
-            cp = run([npm, "install", "-g", "@opencode-ai/cli"])
-            if cp.returncode != 0:
-                reporter.add("OpenCode CLI update", STATE_CONFLICT, cp.stderr.strip()[-400:])
+            elif _npm_global_version(npm, cli_package) != latest_cli:
+                reporter.add("OpenCode CLI validation", STATE_CONFLICT, "npm install completed but target version is not active")
 
     target = str(config["dependencies"]["@opencode-ai/plugin"])
     package_json = config_dir / "node_modules" / "@opencode-ai" / "plugin" / "package.json"

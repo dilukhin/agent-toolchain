@@ -18,6 +18,34 @@ assert set(data["managed_environment"]["external_skills"]) == {"ssh-relay","reco
 PY
 echo "PASS syntax/config_data"
 
+python3 - <<'PY_NPM' "$SCRIPT_DIR"
+import importlib.util, json, pathlib, subprocess, sys, tempfile
+root = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(root))
+spec = importlib.util.spec_from_file_location("setup_runtime_test", root / "setup_runtime.py")
+mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+commands = []
+def fake_run(cmd, cwd=None, env=None):
+    commands.append(cmd)
+    if len(cmd) > 1 and cmd[1] == "list":
+        return subprocess.CompletedProcess(cmd, 0, json.dumps({"dependencies":{"opencode-ai":{"version":"1.2.3"}}}), "")
+    if len(cmd) > 1 and cmd[1] == "view":
+        return subprocess.CompletedProcess(cmd, 0, json.dumps("1.2.3"), "")
+    raise AssertionError(f"unexpected command: {cmd}")
+mod.run = fake_run
+mod.shutil.which = lambda name: "/fake/npm" if name == "npm" else None
+with tempfile.TemporaryDirectory() as td:
+    cfg = pathlib.Path(td)
+    pkg = cfg / "node_modules" / "@opencode-ai" / "plugin" / "package.json"
+    pkg.parent.mkdir(parents=True)
+    pkg.write_text(json.dumps({"version":"1.15.4"}), encoding="utf-8")
+    reporter = mod.Reporter()
+    mod.reconcile_npm(cfg, {"dependencies":{"opencode-cli-package":"opencode-ai","@opencode-ai/plugin":"1.15.4"}}, reporter, check=False, skip=False)
+    assert all(r.state == mod.STATE_OK for r in reporter.results), reporter.results
+    assert not any("install" in cmd for cmd in commands), commands
+PY_NPM
+echo "PASS up-to-date npm components are no-op"
+
 test_root="$(mktemp -d)"
 trap 'rm -rf "$test_root"' EXIT
 
@@ -180,6 +208,22 @@ after_check="$(snapshot_tree "$home")"
 [[ "$before_check" == "$after_check" ]]
 ! grep -qE '^(missing|outdated|modified/conflict)' "$test_root/final-check.out"
 echo "PASS --check is read-only and final state is up-to-date"
+
+# A clean working tree with local commits is still a conflict and must not be rewritten.
+git -C "$projects_dir/agent-safe" config user.email test@example.invalid
+git -C "$projects_dir/agent-safe" config user.name opencode-setup-test
+printf '%s\n' 'local committed work' > "$projects_dir/agent-safe/local-commit.txt"
+git -C "$projects_dir/agent-safe" add local-commit.txt
+git -C "$projects_dir/agent-safe" commit -qm local-work
+local_head="$(git -C "$projects_dir/agent-safe" rev-parse HEAD)"
+set +e
+python3 "${core_args[@]}" > "$test_root/local-commit-conflict.out" 2>&1
+rc=$?
+set -e
+[[ $rc -eq 2 ]]
+[[ "$local_head" == "$(git -C "$projects_dir/agent-safe" rev-parse HEAD)" ]]
+grep -q 'modified/conflict.*agent-safe repository.*local commits' "$test_root/local-commit-conflict.out"
+echo "PASS clean dependency repo with local commits is preserved as conflict"
 
 python3 - <<'PY' "$SCRIPT_DIR" "$skills_dir"
 import importlib.util, pathlib, sys
