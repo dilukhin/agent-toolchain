@@ -1,69 +1,125 @@
 # opencode_setup
 
-Воспроизводимая настройка OpenCode для Windows и Linux: RouterAI, безопасное внешнее хранение API-ключа и опциональный project-local BMAD.
-
-## Что устанавливается
-
-| Компонент | Версия и область |
-|---|---|
-| OpenCode CLI | актуальная npm-версия, global |
-| `@opencode-ai/plugin` | `1.15.4`, global OpenCode config |
-| RouterAI | 13 проверенных model IDs |
-| BMAD | `bmad-method@6.8.0`, optional, project-local |
-
-`@opencode-ai/plugin` предоставляет API для разработки плагинов OpenCode. Он не содержит и не устанавливает BMAD.
-
-BMAD устанавливается только официальным `bmad-method@6.8.0`. В каждый выбранный проект создаются связанные каталоги `_bmad/` и `.agents/skills/` с 44 skills. OpenCode автоматически читает project-local `.agents/skills`; глобальная копия BMAD skills без соответствующего `_bmad` не является полноценной установкой.
+`opencode_setup` — воспроизводимая настройка и безопасное обновление рабочего окружения OpenCode на Windows и Linux. Обычный setup является идемпотентным reconciler: устанавливает отсутствующие управляемые компоненты, обновляет устаревшие и не уничтожает неизвестные или локально изменённые данные.
 
 ## Быстрый старт
 
 Windows:
 
 ```powershell
+.\setup_windows.ps1 -Check
 .\setup_windows.ps1
-.\install_bmad_windows.ps1 C:\path\to\project  # optional
+.\setup_windows.ps1 -Check
 ```
 
 Linux:
 
 ```bash
+./setup_linux.sh --check
 ./setup_linux.sh
-./install_bmad_linux.sh /path/to/project  # optional
+./setup_linux.sh --check
 ```
 
-Setup создает placeholder API-ключа только при отсутствии файла. Существующие `api-key.txt`, `opencode.jsonc` и `AGENTS.md` сохраняются. На Linux ключу всегда назначаются права `0600`.
+`--check`/`-Check` ничего не изменяет и показывает состояние компонентов: `missing`, `up-to-date`, `outdated`, `modified/conflict`.
 
-После изменения конфигурации полностью перезапустите OpenCode.
+## Что управляется
+
+| Компонент | Источник истины | Целевое размещение |
+|---|---|---|
+| RouterAI/OpenCode config | `templates/opencode.jsonc` | `~/.config/opencode/opencode.jsonc` |
+| глобальный `AGENTS.md` | `templates/AGENTS.md` | `~/.config/opencode/AGENTS.md` |
+| `remote-long-running` | `opencode_setup/skills/remote-long-running` | `~/.agents/skills/remote-long-running` |
+| `ssh-relay` | `dilukhin/ssh_relay` | `~/.agents/skills/ssh-relay` |
+| `recovery-mode`, `risk-gate`, `safe-cli`, `unknown-system-safety` | `dilukhin/agent-safe` | `~/.agents/skills/<name>` |
+| локальная рабочая копия `ssh_relay` | `dilukhin/ssh_relay`, branch `main` | `~/projects/ssh_relay` |
+| локальная рабочая копия `agent-safe` | `dilukhin/agent-safe`, branch `master` | `~/projects/agent-safe` |
+| OpenCode CLI / plugin | npm | global CLI / OpenCode config |
+
+В Windows `~` в таблице соответствует `%USERPROFILE%`. Глобальный каталог skills — `%USERPROFILE%\.agents\skills`; в Linux — `$HOME/.agents/skills`.
+
+## Модель install/update
+
+Отдельных режимов `install` и `update` нет. Один и тот же setup определяет состояние автоматически:
+
+```text
+нет компонента                         -> установить
+managed-компонент отстал от источника -> обновить
+компонент актуален                    -> ничего не менять
+managed-файл изменён вручную          -> conflict, сохранить файл
+dependency repo dirty                 -> conflict, без reset/clean
+неизвестный skill                     -> не трогать
+```
+
+Clean dependency repository обновляется только fast-forward. Setup никогда не делает `git reset` или `git clean` в `ssh_relay`/`agent-safe`.
+
+## Владение и конфликты
+
+Setup владеет только явно перечисленными файлами. После успешной установки их путь, source и SHA-256 фиксируются в компактном `manifest.json`:
+
+- Windows: `%LOCALAPPDATA%\opencode_setup\state\manifest.json`;
+- Linux: `${XDG_STATE_HOME:-$HOME/.local/state}/opencode_setup/manifest.json`.
+
+Весь `.agents/skills` не считается принадлежащим setup. Пользовательские, BMAD и другие неизвестные skills не удаляются и не перезаписываются.
+
+Если tracked managed-файл изменён вручную, обычный setup сообщает `modified/conflict` и сохраняет его. `--force`/`-Force` разрешён только для уже tracked managed-файлов: перед заменой создаётся backup в state directory. Он не разрешает destructive reset репозиториев и не даёт права перезаписывать неизвестный файл.
+
+## ssh_relay и agent-safe
+
+`ssh_relay` является authoritative source для `ssh-relay/SKILL.md`. Setup клонирует или fast-forward обновляет его рабочую копию, устанавливает `paramiko` штатным `pip`, проверяет `ssh_relay.py --version`, `--help` и наличие `job`. Реальная удалённая задача setup не запускается.
+
+`agent-safe` является authoritative source для четырёх skills. Рабочая копия устанавливается editable-командой `python -m pip install -e <repo>` и проверяется через `python -m agent_safe --help`. Setup синхронизирует только его authoritative skill-файлы и не дублирует их тексты.
+
+## remote-long-running и глобальный AGENTS.md
+
+`remote-long-running` загружается по необходимости для длительных сборок, CMake/CTest, интеграционных/нагрузочных тестов и других процессов, которые могут пережить transport timeout. Для удалённых длительных процессов он маршрутизирует работу через `ssh_relay job`; большие file transfers — через специализированные `upload`/`download` команды relay.
+
+Глобальный `AGENTS.md` намеренно короткий: общие правила секретов и маршрутизация на `ssh-relay`, `remote-long-running` и agent-safe skills. Подробности навыков туда не копируются.
+
+## RouterAI и API key
+
+Сохраняется текущая рабочая RouterAI-конфигурация с 13 model IDs и default `opencode/deepseek-v4-flash-free`. Setup не выполняет полный пересмотр RouterAI.
+
+API key хранится отдельно в `~/projects/stash/opencode.ai/api-key.txt`. Если файла нет, создаётся placeholder. Если файл существует, его байты никогда не заменяются placeholder и содержимое не выводится. В Linux применяются права `0600`.
+
+`opencode.jsonc` после принятия setup в ownership обновляется по manifest. Неизвестный существующий config не перезаписывается автоматически: это `modified/conflict`, пока пользователь явно не мигрирует его.
 
 ## BMAD
 
-- Источник: [официальный npm-пакет](https://www.npmjs.com/package/bmad-method).
-- Upstream: [bmad-code-org/BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD).
-- Версия: `6.8.0`.
-- Upstream revision пакета: `3bcd6c3cce6e381b759e23185b099081496567a5`.
-- Модули: `core`, `bmm`.
-- Интеграция: `opencode`.
-- Skills: 44, точный список хранится в `config_data.json`.
+Project-local BMAD остаётся отдельной, уже воспроизводимой установкой `bmad-method@6.8.0`:
 
-Installers проверяют опубликованный npm integrity, не заменяют неизвестную или другую версию BMAD и после установки запускают `validate_bmad.js`. Повторный запуск для управляемой версии `6.8.0` использует штатный quick-update официального installer.
+```powershell
+.\install_bmad_windows.ps1 C:\path\to\project
+```
 
-## Файлы
+```bash
+./install_bmad_linux.sh /path/to/project
+```
+
+BMAD создаёт `<project>/_bmad` и `<project>/.agents/skills`. Обычный глобальный setup эти skills не удаляет и не перезаписывает.
+
+## Проверка разработки
+
+Новый setup сначала тестируется только во временном HOME/APPDATA:
+
+```powershell
+.\validate_setup.ps1
+```
+
+```bash
+./validate_setup.sh
+```
+
+Полный CI также запускает project-local BMAD validation. Тесты покрывают clean install, идемпотентность, update managed skill, сохранение unknown/BMAD skills и API key, конфликт ручной правки, `--force` с backup, clean/dirty dependency repos и read-only `--check`.
+
+## Основные файлы
 
 | Файл | Назначение |
 |---|---|
-| `setup_windows.ps1`, `setup_linux.sh` | Базовая настройка OpenCode и RouterAI |
-| `install_bmad_windows.ps1`, `install_bmad_linux.sh` | Официальная project-local установка BMAD |
-| `validate_bmad.js` | Проверка версии, модулей, IDE и 44 IDs |
-| `validate_setup.ps1`, `validate_setup.sh` | Безопасные изолированные проверки setup |
-| `.github/workflows/validate.yml` | Полная Windows/Linux CI-проверка |
-| `config_data.json` | Машиночитаемый эталон моделей и BMAD |
-| `setup_instructions.md` | Подробная инструкция и политика повторной установки |
-| `bootstrap_prompt.md` | Короткие промпты для выполнения setup агентом |
-| `SUMMARY.md` | Аудит исходных расхождений и принятые решения |
-
-## Требования
-
-- Node.js 18+ и npm для базового setup.
-- Node.js 20.12+ для BMAD `6.8.0`.
-- Аккаунт RouterAI и API-ключ.
-- Доступ к npm registry при установке.
+| `setup_core.py`, `setup_lib.py`, `setup_runtime.py` | общий reconciler, ownership/git и runtime checks Windows/Linux |
+| `setup_windows.ps1`, `setup_linux.sh` | платформенные wrappers |
+| `templates/` | owned OpenCode config и короткий `AGENTS.md` |
+| `skills/remote-long-running/SKILL.md` | общий skill длительных операций |
+| `config_data.json` | модели, BMAD и декларация managed environment |
+| `validate_setup.ps1`, `validate_setup.sh` | изолированные проверки |
+| `setup_instructions.md` | подробная эксплуатационная инструкция |
+| `bootstrap_prompt.md` | короткий вход для агента |

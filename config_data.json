@@ -87,7 +87,8 @@
   },
   "dependencies": {
     "@opencode-ai/plugin": "1.15.4",
-    "bmad-method": "6.8.0"
+    "bmad-method": "6.8.0",
+    "opencode-cli-package": "opencode-ai"
   },
   "bmad": {
     "scope": "project-local",
@@ -96,61 +97,106 @@
     "version": "6.8.0",
     "git_revision": "3bcd6c3cce6e381b759e23185b099081496567a5",
     "npm_integrity": "sha512-RRkXdhrFJdnD7lIeR6OuacUDDPZA+0/k+kHmD+9Us7XQ5W6ptSAzxsS/SoNkNe37X0YHwQIyLyKGV9b3iXzWpw==",
-    "modules": ["core", "bmm"],
+    "modules": [
+      "core",
+      "bmm"
+    ],
     "tool": "opencode",
     "skills": [
-    "bmad-advanced-elicitation",
-    "bmad-agent-analyst",
-    "bmad-agent-architect",
-    "bmad-agent-dev",
-    "bmad-agent-pm",
-    "bmad-agent-tech-writer",
-    "bmad-agent-ux-designer",
-    "bmad-brainstorming",
-    "bmad-check-implementation-readiness",
-    "bmad-checkpoint-preview",
-    "bmad-code-review",
-    "bmad-correct-course",
-    "bmad-create-architecture",
-    "bmad-create-epics-and-stories",
-    "bmad-create-prd",
-    "bmad-create-story",
-    "bmad-customize",
-    "bmad-dev-story",
-    "bmad-document-project",
-    "bmad-domain-research",
-    "bmad-edit-prd",
-    "bmad-editorial-review-prose",
-    "bmad-editorial-review-structure",
-    "bmad-generate-project-context",
-    "bmad-help",
-    "bmad-index-docs",
-    "bmad-investigate",
-    "bmad-market-research",
-    "bmad-party-mode",
-    "bmad-prd",
-    "bmad-prfaq",
-    "bmad-product-brief",
-    "bmad-qa-generate-e2e-tests",
-    "bmad-quick-dev",
-    "bmad-retrospective",
-    "bmad-review-adversarial-general",
-    "bmad-review-edge-case-hunter",
-    "bmad-shard-doc",
-    "bmad-spec",
-    "bmad-sprint-planning",
-    "bmad-sprint-status",
-    "bmad-technical-research",
-    "bmad-ux",
+      "bmad-advanced-elicitation",
+      "bmad-agent-analyst",
+      "bmad-agent-architect",
+      "bmad-agent-dev",
+      "bmad-agent-pm",
+      "bmad-agent-tech-writer",
+      "bmad-agent-ux-designer",
+      "bmad-brainstorming",
+      "bmad-check-implementation-readiness",
+      "bmad-checkpoint-preview",
+      "bmad-code-review",
+      "bmad-correct-course",
+      "bmad-create-architecture",
+      "bmad-create-epics-and-stories",
+      "bmad-create-prd",
+      "bmad-create-story",
+      "bmad-customize",
+      "bmad-dev-story",
+      "bmad-document-project",
+      "bmad-domain-research",
+      "bmad-edit-prd",
+      "bmad-editorial-review-prose",
+      "bmad-editorial-review-structure",
+      "bmad-generate-project-context",
+      "bmad-help",
+      "bmad-index-docs",
+      "bmad-investigate",
+      "bmad-market-research",
+      "bmad-party-mode",
+      "bmad-prd",
+      "bmad-prfaq",
+      "bmad-product-brief",
+      "bmad-qa-generate-e2e-tests",
+      "bmad-quick-dev",
+      "bmad-retrospective",
+      "bmad-review-adversarial-general",
+      "bmad-review-edge-case-hunter",
+      "bmad-shard-doc",
+      "bmad-spec",
+      "bmad-sprint-planning",
+      "bmad-sprint-status",
+      "bmad-technical-research",
+      "bmad-ux",
       "bmad-validate-prd"
     ]
   },
+  "managed_environment": {
+    "manifest_schema": 1,
+    "global_skills_dir": "~/.agents/skills",
+    "owned_skills": [
+      "remote-long-running"
+    ],
+    "external_skills": [
+      "ssh-relay",
+      "recovery-mode",
+      "risk-gate",
+      "safe-cli",
+      "unknown-system-safety"
+    ],
+    "dependencies": {
+      "ssh_relay": {
+        "repo": "https://github.com/dilukhin/ssh_relay.git",
+        "branch": "main",
+        "directory": "ssh_relay",
+        "skill": "opencode/skills/ssh-relay/SKILL.md"
+      },
+      "agent_safe": {
+        "repo": "https://github.com/dilukhin/agent-safe.git",
+        "branch": "master",
+        "directory": "agent-safe",
+        "skills": {
+          "recovery-mode": "opencode/skills/recovery-mode/SKILL.md",
+          "risk-gate": "opencode/skills/risk-gate/SKILL.md",
+          "safe-cli": "opencode/skills/safe-cli/SKILL.md",
+          "unknown-system-safety": "opencode/skills/unknown-system-safety/SKILL.md"
+        }
+      }
+    }
+  },
   "helper_tools": {
     "ssh_relay": {
-      "version": "0.5.0",
       "location_hint": "~/projects/ssh_relay/",
-      "dependencies": ["Python 3.12+", "paramiko"],
+      "dependencies": [
+        "Python 3.12+",
+        "paramiko"
+      ],
       "github_repo": "https://github.com/dilukhin/ssh_relay.git"
+    },
+    "agent_safe": {
+      "location_hint": "~/projects/agent-safe/",
+      "dependencies": [
+        "Python 3.10+"
+      ],
+      "github_repo": "https://github.com/dilukhin/agent-safe.git"
     },
     "bundle": {
       "location_hint": "~/projects/bundle/",
@@ -161,20 +207,25 @@
   "platform_specific": {
     "windows": {
       "config_dir": "%USERPROFILE%\\.config\\opencode",
+      "global_skills_dir": "%USERPROFILE%\\.agents\\skills",
       "project_skills_dir": "<project>\\.agents\\skills",
       "project_bmad_dir": "<project>\\_bmad",
       "stash_dir": "%USERPROFILE%\\projects\\stash\\opencode.ai",
-      "python_cmd": "py",
-      "powershell_encoding_fix": "$env:PYTHONIOENCODING = 'utf-8'; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8;",
-      "session_files": "%LOCALAPPDATA%\\ssh_relay\\sessions\\"
+      "projects_dir": "%USERPROFILE%\\projects",
+      "python_cmd": "py -3",
+      "session_files": "%LOCALAPPDATA%\\ssh_relay\\sessions\\",
+      "state_dir": "%LOCALAPPDATA%\\opencode_setup\\state"
     },
     "linux": {
       "config_dir": "~/.config/opencode",
+      "global_skills_dir": "~/.agents/skills",
       "project_skills_dir": "<project>/.agents/skills",
       "project_bmad_dir": "<project>/_bmad",
       "stash_dir": "~/projects/stash/opencode.ai",
+      "projects_dir": "~/projects",
       "python_cmd": "python3",
-      "session_files": "~/.local/share/ssh_relay/sessions/"
+      "session_files": "~/.local/share/ssh_relay/sessions/",
+      "state_dir": "${XDG_STATE_HOME:-~/.local/state}/opencode_setup"
     }
   }
 }
