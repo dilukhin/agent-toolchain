@@ -17,6 +17,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 20.12.2
+      - name: Validate migration regressions
+        shell: powershell
+        run: py -3 -m unittest tests.test_setup_migration
       - name: Validate Windows setup and BMAD
         shell: powershell
         run: .\validate_setup.ps1 -TestBmad
@@ -32,5 +35,7 @@ jobs:
           node-version: 20.12.2
       - name: Validate diff whitespace
         run: git diff --check HEAD^ HEAD
+      - name: Validate migration regressions
+        run: python3 -m unittest tests.test_setup_migration
       - name: Validate Linux setup and BMAD
         run: bash ./validate_setup.sh --bmad
