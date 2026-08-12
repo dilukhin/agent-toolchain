@@ -119,7 +119,7 @@ OpenCode CLI (`opencode-ai`) и `@opencode-ai/plugin` используют npm `
 
 ## BMAD
 
-BMAD остаётся project-local и имеет отдельную политику **pinned-tested**. Штатный pin этой версии проекта — `bmad-method@6.10.0` с проверенным npm integrity и контрактом **46 skills**. Новая upstream-версия не становится штатной автоматически, пока не обновлены integrity/expected contract и не пройдены Windows/Linux install/reinstall validators.
+BMAD остаётся project-local и имеет отдельную политику **pinned-tested**. Штатный pin этой версии проекта — `bmad-method@6.11.0` с проверенным npm integrity, upstream release commit и контрактом **49 skills**. Для BMAD 6.11 также проверяются runtime prerequisites: Node.js 20.12+, Python 3.11+ и `uv`. Новая upstream-версия не становится штатной автоматически, пока не обновлены integrity/expected contract и не пройдены Windows/Linux install/reinstall validators.
 
 ```powershell
 .\install_bmad_windows.ps1 C:\path\to\project
