@@ -33,12 +33,13 @@ class ExistingQwenConfigTests(unittest.TestCase):
             cmd.append("--check")
         return subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    def test_existing_qwen_provider_is_preserved_and_routerai_added(self) -> None:
+    def test_existing_qwen_provider_is_preserved_and_routerai_added_idempotently(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             home = Path(td) / "home"
             config_dir = home / ".config" / "opencode"
             config_dir.mkdir(parents=True)
             config_path = config_dir / "opencode.jsonc"
+            manifest_path = home / "state" / "manifest.json"
 
             existing = {
                 "$schema": "https://opencode.ai/config.json",
@@ -66,11 +67,11 @@ class ExistingQwenConfigTests(unittest.TestCase):
             check = self._run_core(home, check=True)
             self.assertEqual(check.returncode, 2, check.stdout + check.stderr)
             self.assertNotIn("existing config is not safely adoptable for RouterAI", check.stdout)
-            self.assertIn("RouterAI can be added as a sibling provider", check.stdout)
+            self.assertIn("соседним provider", check.stdout)
             self.assertFalse((config_dir / "credentials" / "routerai-api-key.txt").exists())
 
-            apply = self._run_core(home)
-            self.assertEqual(apply.returncode, 2, apply.stdout + apply.stderr)
+            first = self._run_core(home)
+            self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
 
             merged = json.loads(config_path.read_text(encoding="utf-8"))
             self.assertEqual(merged["provider"]["qwen"], original_qwen)
@@ -79,6 +80,7 @@ class ExistingQwenConfigTests(unittest.TestCase):
             self.assertIn("routerai", merged["provider"])
             self.assertNotIn("model", merged)
             self.assertNotIn("small_model", merged)
+            self.assertEqual(merged["autoupdate"], "notify")
 
             canonical = config_dir / "credentials" / "routerai-api-key.txt"
             self.assertTrue(canonical.is_file())
@@ -87,10 +89,29 @@ class ExistingQwenConfigTests(unittest.TestCase):
                 "{file:" + str(canonical.resolve()) + "}",
             )
 
-            before_second = config_path.read_bytes()
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest["managed_files"]["OpenCode config"]["mode"],
+                "merged-json-sibling-provider",
+            )
+            stable_config = config_path.read_bytes()
+            stable_manifest = manifest_path.read_bytes()
+
+            # Второй apply раньше не менял config, но деградировал manifest mode.
             second = self._run_core(home)
             self.assertEqual(second.returncode, 2, second.stdout + second.stderr)
-            self.assertEqual(config_path.read_bytes(), before_second)
+            self.assertEqual(config_path.read_bytes(), stable_config)
+            self.assertEqual(manifest_path.read_bytes(), stable_manifest)
+
+            # Третий apply проявлял latent bug и добавлял model/small_model.
+            third = self._run_core(home)
+            self.assertEqual(third.returncode, 2, third.stdout + third.stderr)
+            self.assertEqual(config_path.read_bytes(), stable_config)
+            self.assertEqual(manifest_path.read_bytes(), stable_manifest)
+            final = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertNotIn("model", final)
+            self.assertNotIn("small_model", final)
+            self.assertEqual(final["autoupdate"], "notify")
 
     def test_qwen_jsonc_with_comments_remains_conflict(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -111,7 +132,7 @@ class ExistingQwenConfigTests(unittest.TestCase):
 
             cp = self._run_core(home)
             self.assertEqual(cp.returncode, 2)
-            self.assertIn("comments/trailing commas", cp.stdout)
+            self.assertIn("JSONC", cp.stdout)
             self.assertEqual(config_path.read_bytes(), original)
             self.assertFalse((config_dir / "credentials" / "routerai-api-key.txt").exists())
 
