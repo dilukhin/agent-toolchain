@@ -16,6 +16,7 @@ from setup_lib import (
     STATE_OK,
     STATE_OUTDATED,
     atomic_write,
+    inspect_repo,
     load_manifest,
     parse_jsonc_object,
     reconcile_agents_file,
@@ -24,6 +25,7 @@ from setup_lib import (
     resolve_credential_path,
     routerai_file_credential,
     routerai_provider,
+    run,
     save_manifest,
     sha256_bytes,
     validate_skill,
@@ -37,6 +39,8 @@ LEGACY_AGENTS = """# Global OpenCode instructions
 - Do not scan .git, node_modules, build output, caches, or logs without a reason.
 - Prefer concise, structured answers.
 """
+
+_AGENT_SAFE_LEGACY_EGG_INFO_PREFIX = "src/agent_safe.egg-info/"
 
 
 def render_config(template_path: Path, api_key_file: Path) -> bytes:
@@ -104,6 +108,89 @@ def _has_nonfile_routerai_credential(config: dict | None) -> bool:
     if not isinstance(options, dict) or "apiKey" not in options:
         return False
     return routerai_file_credential(config) is None
+
+
+def _agent_safe_legacy_metadata_only(path: Path) -> bool:
+    """Recognize only the setuptools metadata created by the legacy editable install.
+
+    This is intentionally dependency-specific.  Any tracked change or any other
+    untracked path keeps the normal strict repository conflict behavior.
+    """
+    if not (path / ".git").exists():
+        return False
+    env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
+    status = run(["git", "status", "--porcelain=v1", "--untracked-files=all"], cwd=path, env=env)
+    if status.returncode != 0:
+        return False
+    saw_legacy_metadata = False
+    for line in status.stdout.splitlines():
+        if line.startswith("?? "):
+            normalized = line[3:].replace("\\", "/")
+            if normalized.startswith(_AGENT_SAFE_LEGACY_EGG_INFO_PREFIX):
+                saw_legacy_metadata = True
+                continue
+        if line.strip():
+            return False
+    return saw_legacy_metadata
+
+
+def _agent_safe_remote_differs(path: Path, branch: str) -> bool:
+    local = run(["git", "rev-parse", "HEAD"], cwd=path)
+    remote = run(["git", "ls-remote", "--exit-code", "origin", f"refs/heads/{branch}"], cwd=path)
+    if local.returncode != 0 or remote.returncode != 0 or not remote.stdout.strip():
+        return False
+    return local.stdout.strip() != remote.stdout.split()[0]
+
+
+def reconcile_agent_safe_repo(*, component: str, path: Path, url: str, branch: str,
+                              reporter: Reporter, check: bool) -> tuple[bool, str]:
+    """Recover the one legacy self-conflict caused by editable-install egg-info.
+
+    Older opencode_setup versions installed agent-safe editable before agent-safe ignored
+    ``*.egg-info/``.  That left ``src/agent_safe.egg-info/`` untracked, which then blocked
+    the normal safe updater.  If and only if this generated directory is the entire
+    working-tree delta and upstream differs, allow a read-only ``outdated`` result or a
+    single ff-only pull.  No files are deleted; normal strict reconciliation runs again
+    immediately after the pull.
+    """
+    state, _ = inspect_repo(path, url, branch)
+    legacy_recovery = (
+        state == STATE_CONFLICT
+        and _agent_safe_legacy_metadata_only(path)
+        and _agent_safe_remote_differs(path, branch)
+    )
+    if not legacy_recovery:
+        return reconcile_repo(
+            component=component, path=path, url=url, branch=branch,
+            reporter=reporter, check=check,
+        )
+
+    if check:
+        reporter.add(
+            component,
+            STATE_OUTDATED,
+            "legacy editable-install egg-info is the only local artifact; ff-only update can recover without deleting files",
+        )
+        return True, STATE_OUTDATED
+
+    pull = run(["git", "pull", "--ff-only", "origin", branch], cwd=path)
+    if pull.returncode != 0:
+        reporter.add(
+            component + " recovery",
+            STATE_CONFLICT,
+            "ff-only recovery update failed; repository and generated metadata preserved",
+        )
+        return False, STATE_CONFLICT
+
+    reporter.add(
+        component + " recovery",
+        STATE_OK,
+        "applied ff-only upstream update; legacy generated metadata was not deleted",
+    )
+    return reconcile_repo(
+        component=component, path=path, url=url, branch=branch,
+        reporter=reporter, check=False,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -260,7 +347,7 @@ def main(argv: list[str] | None = None) -> int:
             component="ssh_relay repository", path=ssh_repo, url=ssh_url,
             branch=ssh_spec["branch"], reporter=reporter, check=args.check,
         )
-        safe_usable, safe_repo_state = reconcile_repo(
+        safe_usable, safe_repo_state = reconcile_agent_safe_repo(
             component="agent-safe repository", path=safe_repo, url=safe_url,
             branch=safe_spec["branch"], reporter=reporter, check=args.check,
         )
