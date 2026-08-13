@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bash -n "$SCRIPT_DIR/setup_linux.sh"
 bash -n "$SCRIPT_DIR/install_bmad_linux.sh" 2>/dev/null || true
 bash -n "$SCRIPT_DIR/validate_setup.sh"
-python3 -m py_compile "$SCRIPT_DIR/setup_core.py" "$SCRIPT_DIR/setup_lib.py" "$SCRIPT_DIR/setup_migration.py" "$SCRIPT_DIR/setup_runtime.py"
+python3 -m py_compile "$SCRIPT_DIR/setup_core.py" "$SCRIPT_DIR/setup_lib.py" "$SCRIPT_DIR/setup_migration.py" "$SCRIPT_DIR/setup_runtime.py" "$SCRIPT_DIR/setup_inventory.py"
 python3 - <<'PY' "$SCRIPT_DIR/config_data.json"
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as fh:
@@ -20,7 +20,7 @@ PY
 echo "PASS syntax/config_data"
 
 python3 - <<'PY_NPM' "$SCRIPT_DIR"
-import importlib.util, json, pathlib, subprocess, sys, tempfile
+import importlib.util, json, pathlib, subprocess, sys, tempfile, types
 root = pathlib.Path(sys.argv[1])
 sys.path.insert(0, str(root))
 spec = importlib.util.spec_from_file_location("setup_runtime_test", root / "setup_runtime.py")
@@ -35,6 +35,11 @@ def fake_run(cmd, cwd=None, env=None):
     raise AssertionError(f"unexpected command: {cmd}")
 mod.run = fake_run
 mod.shutil.which = lambda name: "/fake/npm" if name == "npm" else None
+mod.report_common_tool_inventory = lambda reporter: None
+mod.executable_inventory = lambda command: [
+    types.SimpleNamespace(path=pathlib.Path("/fake/npm/opencode"), version="1.2.3", manager="npm", active=True)
+] if command == "opencode" else []
+mod._known_opencode_managers = lambda npm: {"npm": "1.2.3"}
 with tempfile.TemporaryDirectory() as td:
     cfg = pathlib.Path(td)
     pkg = cfg / "node_modules" / "@opencode-ai" / "plugin" / "package.json"

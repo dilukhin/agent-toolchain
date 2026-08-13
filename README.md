@@ -34,7 +34,8 @@ Linux:
 | `recovery-mode`, `risk-gate`, `safe-cli`, `unknown-system-safety` | `dilukhin/agent-safe` | `~/.agents/skills/<name>` |
 | `ssh_relay` checkout | `dilukhin/ssh_relay`, `main` | `~/projects/ssh_relay` |
 | `agent-safe` checkout | `dilukhin/agent-safe`, `master` | `~/projects/agent-safe` |
-| OpenCode CLI / plugin | npm | global CLI / OpenCode config |
+| OpenCode CLI | обнаруженный владеющий менеджер; для fresh install — npm | активный executable в `PATH` |
+| `@opencode-ai/plugin` | npm `latest` | OpenCode config directory |
 
 В Windows `~` соответствует `%USERPROFILE%`. Старый `~/projects/stash/opencode.ai` сохраняется как legacy/внешнее размещение credential, но не является canonical path для новой установки.
 
@@ -69,7 +70,11 @@ Setup владеет только явно управляемым содержи
 
 Если уже есть совместимый `provider.routerai`, setup сначала разбирает config и сохраняет пользовательские поля, выбранную пользователем model/small_model и дополнительные model entries. Управляемые RouterAI fields добавляются/обновляются минимальным semantic merge с backup перед первой миграцией.
 
-Если существующий JSONC использует комментарии/trailing commas и для миграции пришлось бы переформатировать файл, setup предпочитает `modified/conflict`, а не уничтожение авторского форматирования. Произвольный config без распознаваемого `provider.routerai` также сохраняется как conflict.
+Если существующий config содержит другой provider (например, Qwen) и не использует JSONC-комментарии/trailing commas, RouterAI добавляется соседним provider. Такой режим сохраняется в ownership manifest и на последующих apply не навязывает отсутствующие у пользователя top-level `model`/`small_model`.
+
+Управляемая политика обновления OpenCode — `autoupdate: "notify"`: OpenCode сообщает о новой версии, но не меняет installation сам. Менеджер-владелец и рекомендуемая команда обновления показываются setup при инвентаризации CLI.
+
+Если существующий JSONC использует комментарии/trailing commas и для миграции пришлось бы переформатировать файл, setup предпочитает `modified/conflict`, а не уничтожение авторского форматирования.
 
 Если существующий `apiKey` задан не через `{file:...}` (например, inline или другим механизмом), setup не читает и не переносит значение, не создаёт параллельный placeholder и оставляет config как `modified/conflict` для явного решения пользователя.
 
@@ -109,9 +114,23 @@ Legacy `~/projects/stash/opencode.ai/api-key.txt` остаётся поддер�
 
 Если default path уже существует, но не является Git working copy, setup **не удаляет и не заменяет его**. Это `modified/conflict`. Сначала пользователь должен определить назначение/ценность каталога; безопасный вариант — переименовать его вручную в backup-name и повторить setup, после чего reconciler сможет clone authoritative repository. Автоматический destructive repair намеренно отсутствует.
 
-## OpenCode npm versions
+## Владение версиями ПО и дубли
 
-OpenCode CLI (`opencode-ai`) и `@opencode-ai/plugin` используют npm `latest` при каждом reconcile: актуальная версия является no-op, устаревшая обновляется и проверяется после install. Ошибка доступа к registry является conflict, а не поводом гадать версию.
+Перед изменением OpenCode CLI setup инвентаризирует все физические `opencode` в `PATH`, определяет активный экземпляр, фактическую версию и известный менеджер установки. Если одновременно видны несколько экземпляров, setup сообщает все пути/версии и останавливает автоматическое изменение CLI: пользователь выбирает, какую установку оставить, а какие удалить через их менеджеры или изолировать от общего `PATH`.
+
+Если виден один OpenCode, но дополнительная package-manager установка изолирована от `PATH`, она отмечается как предупреждение и может быть оставлена, если изоляция намеренная. Если фактическая версия active executable расходится с metadata менеджера, setup сообщает об этом отдельно и ничего не исправляет автоматически.
+
+Для существующей однозначной установки её менеджер сохраняется владельцем. Например, Chocolatey-установка не вызывает установку второй npm-копии. Для нового компьютера без OpenCode текущий bootstrap по-прежнему использует npm.
+
+В отчёте показывается рекомендуемая команда обновления, когда она известна: например `choco upgrade opencode -y` или `npm install -g opencode-ai@latest`.
+
+Та же read-only проверка дублей применяется к Git, Python, Node.js/npm и `uv`. Для этих общих инструментов наличие нескольких версий пока является предупреждением, а не автоматическим конфликтом: несколько Python или version-manager shims могут быть намеренными.
+
+Подробная политика: [`docs/software_ownership_policy_ru.md`](docs/software_ownership_policy_ru.md).
+
+## OpenCode plugin versions
+
+`@opencode-ai/plugin` использует npm `latest` при каждом reconcile: актуальная версия является no-op, устаревшая обновляется и проверяется после install. Ошибка доступа к registry является conflict, а не поводом гадать версию.
 
 ## remote-long-running и глобальный AGENTS.md
 
@@ -141,7 +160,7 @@ BMAD создаёт `<project>/_bmad` и `<project>/.agents/skills`. Глоба�
 ./validate_setup.sh --bmad
 ```
 
-Дополнительный regression suite `tests/test_setup_migration.py` проверяет сценарии, найденные на реальной существующей машине: external `{file:...}` credential без лишнего placeholder, сохранение exact file reference, inline credential conflict, fresh canonical credential, safe merge RouterAI config, managed block AGENTS и benign/unsafe untracked dependency paths.
+Regression suite `tests/test_setup_*.py` проверяет сценарии, найденные на реальных существующих машинах: external `{file:...}` credential без лишнего placeholder, сохранение exact file reference, inline credential conflict, fresh canonical credential, sibling-provider Qwen migration, многократную идемпотентность manifest/config, managed block AGENTS, benign/unsafe untracked dependency paths, agent-safe egg-info self-healing и ownership/duplicate-policy OpenCode.
 
 GitHub Actions выполняет regression suite и полные Windows/Linux validators.
 
@@ -151,13 +170,14 @@ GitHub Actions выполняет regression suite и полные Windows/Linux
 |---|---|
 | `setup_core.py` | orchestration и credential discovery |
 | `setup_lib.py` | ownership, JSONC/AGENTS migration, Git reconciliation |
-| `setup_migration.py` | совместимость/idempotency migration ownership |
-| `setup_runtime.py` | npm/Python runtime checks |
+| `setup_migration.py` | совместимость/idempotency migration ownership и `autoupdate` policy |
+| `setup_runtime.py` | OpenCode/npm/Python runtime checks и ownership manager policy |
+| `setup_inventory.py` | read-only inventory executable/дублирующихся установок |
 | `setup_windows.ps1`, `setup_linux.sh` | платформенные wrappers |
 | `templates/` | RouterAI managed fields и OpenCode instructions |
 | `skills/remote-long-running/SKILL.md` | общий skill длительных операций |
 | `config_data.json` | модели, version policies, BMAD и managed environment |
-| `tests/test_setup_migration.py` | migration regression tests |
+| `tests/test_setup_*.py` | migration/runtime regression tests |
 | `validate_setup.ps1`, `validate_setup.sh` | изолированные full validators |
 | `setup_instructions.md` | подробная эксплуатационная инструкция |
 | `bootstrap_prompt.md` | короткий вход для агента |

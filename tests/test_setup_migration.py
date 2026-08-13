@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -85,7 +86,9 @@ class CoreMigrationTests(unittest.TestCase):
             "--projects-dir", str(projects),
             "--skip-package-install", "--skip-dependency-install",
         ]
-        return subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+        return subprocess.run(cmd, text=True, encoding="utf-8", env=env,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     def test_existing_external_credential_is_preserved_without_parallel_placeholder(self) -> None:
         with tempfile.TemporaryDirectory() as td:
