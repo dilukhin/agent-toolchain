@@ -21,9 +21,12 @@ def _windows_names(command: str) -> list[str]:
     if Path(command).suffix:
         return [command]
     pathext = os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")
-    names = [command]
-    names.extend(command + ext.lower() for ext in pathext if ext)
-    names.extend(command + ext.upper() for ext in pathext if ext)
+    names: list[str] = []
+    for ext in pathext:
+        if not ext:
+            continue
+        names.append(command + ext.lower())
+        names.append(command + ext.upper())
     return names
 
 
