@@ -132,7 +132,7 @@ class ExistingQwenConfigTests(unittest.TestCase):
 
             cp = self._run_core(home)
             self.assertEqual(cp.returncode, 2)
-            self.assertIn("JSONC", cp.stdout)
+            self.assertIn("comments/trailing commas", cp.stdout)
             self.assertEqual(config_path.read_bytes(), original)
             self.assertFalse((config_dir / "credentials" / "routerai-api-key.txt").exists())
 
