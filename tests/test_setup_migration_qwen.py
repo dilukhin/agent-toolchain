@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -31,7 +32,9 @@ class ExistingQwenConfigTests(unittest.TestCase):
         ]
         if check:
             cmd.append("--check")
-        return subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+        return subprocess.run(cmd, text=True, encoding="utf-8", env=env,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     def test_existing_qwen_provider_is_preserved_and_routerai_added_idempotently(self) -> None:
         with tempfile.TemporaryDirectory() as td:
