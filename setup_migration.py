@@ -263,4 +263,5 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
         force=force,
         state_dir=state_dir,
     )
-    return changed or _restore_sibling_mode(manifest, previous, check)
+    restored_mode = _restore_sibling_mode(manifest, previous, check)
+    return changed or restored_mode
