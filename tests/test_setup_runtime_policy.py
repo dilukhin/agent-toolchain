@@ -134,7 +134,7 @@ class OpenCodeOwnershipTests(unittest.TestCase):
 
         duplicate = [r for r in reporter.results if r.component == "OpenCode: дублирующиеся установки"]
         self.assertEqual(duplicate[-1].state, runtime.STATE_CONFLICT)
-        self.assertIn("choco uninstall opencode", duplicate[-1].detail)
+        self.assertNotIn("choco uninstall opencode", duplicate[-1].detail)
         self.assertIn("npm uninstall -g opencode-ai", duplicate[-1].detail)
         self.assertFalse(commands)
 
