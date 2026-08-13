@@ -6,7 +6,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from setup_lib import Reporter, STATE_OK, STATE_WARNING, run
+from setup_lib import Reporter, STATE_OK, run
 
 
 @dataclass(frozen=True)
@@ -145,7 +145,7 @@ def report_common_tool_inventory(reporter: Reporter) -> None:
             continue
         detail = "; ".join(_short_instance(item) for item in items)
         detail += ". " + duplicate_recommendation(display, items)
-        reporter.add(f"Инвентаризация {display}", STATE_WARNING, detail)
+        reporter.add(f"ПРЕДУПРЕЖДЕНИЕ: дублирование {display}", STATE_OK, detail)
 
 
 def render_instances(items: list[ExecutableInstance]) -> str:
