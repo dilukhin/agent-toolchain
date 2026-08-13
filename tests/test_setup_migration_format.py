@@ -72,7 +72,7 @@ class FormatSensitiveJsoncTests(unittest.TestCase):
             self.assertFalse(changed)
             self.assertEqual(config.read_bytes(), original)
             self.assertTrue(any(r.state == STATE_CONFLICT for r in reporter.results))
-            self.assertTrue(any("formatting loss" in r.detail for r in reporter.results))
+            self.assertTrue(any("потери форматирования" in r.detail for r in reporter.results))
 
 
 if __name__ == "__main__":
