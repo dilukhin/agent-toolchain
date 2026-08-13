@@ -27,7 +27,7 @@ if (-not $StateDir) {
 }
 
 $core = Join-Path $PSScriptRoot "setup_core.py"
-if (-not (Test-Path -LiteralPath $core)) { throw "setup_core.py not found: $core" }
+if (-not (Test-Path -LiteralPath $core)) { throw "Не найден setup_core.py: $core" }
 
 $python = Get-Command py -ErrorAction SilentlyContinue
 $pythonPrefix = @()
@@ -36,7 +36,7 @@ if ($python) {
     $pythonPrefix = @("-3", "-B")
 } else {
     $python = Get-Command python -ErrorAction SilentlyContinue
-    if (-not $python) { throw "Python 3 is required to run opencode_setup." }
+    if (-not $python) { throw "Для запуска opencode_setup требуется Python 3." }
     $pythonExe = $python.Source
     $pythonPrefix = @("-B")
 }
@@ -57,8 +57,23 @@ if ($SkipDependencyInstall) { $argsCore += "--skip-dependency-install" }
 if ($SshRelayUrl) { $argsCore += @("--ssh-relay-url", $SshRelayUrl) }
 if ($AgentSafeUrl) { $argsCore += @("--agent-safe-url", $AgentSafeUrl) }
 
-Write-Host "=== OpenCode managed environment setup (Windows) ===" -ForegroundColor Cyan
-if ($Check) { Write-Host "Check mode: no files or repositories will be changed." -ForegroundColor Yellow }
+Write-Host "=== Настройка управляемого окружения OpenCode (Windows) ===" -ForegroundColor Cyan
+if ($Check) { Write-Host "Режим проверки: файлы и репозитории изменяться не будут." -ForegroundColor Yellow }
 
-& $pythonExe @pythonPrefix @argsCore
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+$oldPythonUtf8 = $env:PYTHONUTF8
+$oldPythonIoEncoding = $env:PYTHONIOENCODING
+$exitCode = 0
+try {
+    # Русские диагностические сообщения должны одинаково работать в консоли и при capture через pipe.
+    $env:PYTHONUTF8 = "1"
+    $env:PYTHONIOENCODING = "utf-8"
+    & $pythonExe @pythonPrefix @argsCore
+    $exitCode = $LASTEXITCODE
+} finally {
+    if ($null -eq $oldPythonUtf8) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue }
+    else { $env:PYTHONUTF8 = $oldPythonUtf8 }
+    if ($null -eq $oldPythonIoEncoding) { Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue }
+    else { $env:PYTHONIOENCODING = $oldPythonIoEncoding }
+}
+
+if ($exitCode -ne 0) { exit $exitCode }
