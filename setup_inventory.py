@@ -57,8 +57,18 @@ def command_paths(command: str) -> list[Path]:
     return found
 
 
-def infer_manager(path: Path) -> str:
+def _looks_like_node_installer_npm(path: Path) -> bool:
     value = str(path).replace("\\", "/").lower()
+    return (
+        value.endswith("/nodejs/npm.cmd")
+        and ("/program files/nodejs/" in value or "/program files (x86)/nodejs/" in value)
+    )
+
+
+def infer_manager(path: Path, *, command: str | None = None) -> str:
+    value = str(path).replace("\\", "/").lower()
+    if command == "npm" and _looks_like_node_installer_npm(path):
+        return "node-bundled"
     if "chocolatey" in value or "/choco/" in value:
         return "choco"
     if "/scoop/" in value:
@@ -104,7 +114,7 @@ def executable_inventory(command: str, *, version_args: tuple[str, ...] = ("--ve
             ExecutableInstance(
                 path=path,
                 version=_version_for(path, version_args),
-                manager=infer_manager(path),
+                manager=infer_manager(path, command=command),
                 active=is_active,
             )
         )
@@ -115,18 +125,61 @@ def executable_inventory(command: str, *, version_args: tuple[str, ...] = ("--ve
     return result
 
 
+def _manager_label(manager: str) -> str:
+    if manager == "node-bundled":
+        return "в составе Node.js"
+    if manager == "unknown":
+        return "менеджер не определён"
+    return manager
+
+
 def _short_instance(item: ExecutableInstance) -> str:
     role = "активный" if item.active else "затенённый"
     version = item.version or "версия не определена"
-    manager = item.manager if item.manager != "unknown" else "менеджер не определён"
-    return f"{role}: {item.path} ({version}; {manager})"
+    return f"{role}: {item.path} ({version}; {_manager_label(item.manager)})"
+
+
+def _is_layered_windows_npm(items: list[ExecutableInstance]) -> bool:
+    if len(items) != 2:
+        return False
+    managers = {item.manager for item in items}
+    return managers == {"npm", "node-bundled"}
+
+
+def _npm_layered_recommendation(items: list[ExecutableInstance]) -> str:
+    active = next((item for item in items if item.active), items[0])
+    versions = {item.version for item in items if item.version}
+    version_detail = (
+        "Обе копии имеют одну версию. "
+        if len(versions) == 1
+        else "Версии копий различаются; фактически запускается активная версия из PATH. "
+    )
+    if active.manager == "npm":
+        return (
+            "Допустимая layered-схема Windows: активный npm установлен в пользовательский global prefix, "
+            "а затенённый npm поставляется вместе с Node.js. "
+            + version_detail
+            + "Не удаляйте npm.cmd из каталога Node.js вручную. Если пользовательский npm установлен намеренно, "
+            "обе копии можно оставить; активный npm обновляется через `npm install npm@latest -g`, "
+            "а bundled-копия — вместе с Node.js."
+        )
+    return (
+        "Допустимая layered-схема Windows: активен npm, поставляемый вместе с Node.js, а пользовательская "
+        "global-копия npm затенена. "
+        + version_detail
+        + "Не удаляйте npm.cmd из каталога Node.js вручную. Если пользовательская global-копия создана намеренно, "
+        "её можно оставить; иначе сначала определите её происхождение и меняйте установку штатным npm-механизмом, "
+        "а не удалением файлов из PATH."
+    )
 
 
 def duplicate_recommendation(display_name: str, items: list[ExecutableInstance]) -> str:
     active = next((item for item in items if item.active), items[0] if items else None)
     if active is None:
         return ""
-    manager = active.manager if active.manager != "unknown" else "текущего владельца"
+    if display_name == "npm" and _is_layered_windows_npm(items):
+        return _npm_layered_recommendation(items)
+    manager = _manager_label(active.manager) if active.manager != "unknown" else "текущего владельца"
     return (
         f"Рекомендация: оставить активный экземпляр {display_name} под управлением {manager}; "
         "остальные глобальные экземпляры удалить через их собственный менеджер либо изолировать от общего PATH."
