@@ -3,19 +3,13 @@ from __future__ import annotations
 
 import copy
 import json
-import os
 from pathlib import Path
 from typing import Any
 
+from setup_lib import atomic_write
+
 MANIFEST_SCHEMA = 2
 LEGACY_MANIFEST_SCHEMA = 1
-
-
-def _atomic_write(path: Path, data: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".opencode-setup.tmp")
-    tmp.write_bytes(data)
-    os.replace(tmp, path)
 
 
 def empty_manifest() -> dict[str, Any]:
@@ -103,4 +97,4 @@ def save_manifest(path: Path, manifest: dict[str, Any]) -> None:
     if error:
         raise ValueError(error)
     payload = json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    _atomic_write(path, payload.encode("utf-8"))
+    atomic_write(path, payload.encode("utf-8"))
