@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -93,6 +94,15 @@ class ToolSpecTests(unittest.TestCase):
 
     def test_empty_tool_registry_is_valid_foundation(self) -> None:
         parsed, error = parse_tool_specs({"tool_spec_schema": TOOL_SPEC_SCHEMA, "tools": {}})
+        self.assertIsNone(error)
+        self.assertEqual(parsed, {})
+
+    def test_repository_config_uses_current_tool_spec_schema(self) -> None:
+        data = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
+        env = data["managed_environment"]
+        self.assertEqual(env["manifest_schema"], 2)
+        self.assertEqual(env["tool_spec_schema"], TOOL_SPEC_SCHEMA)
+        parsed, error = parse_tool_specs(env)
         self.assertIsNone(error)
         self.assertEqual(parsed, {})
 
