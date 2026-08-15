@@ -11,7 +11,7 @@ if str(TESTS_DIR) not in sys.path:
 
 
 def main() -> int:
-    suite = unittest.defaultTestLoader.discover(str(TESTS_DIR), pattern="test_setup_*.py")
+    suite = unittest.defaultTestLoader.discover(str(TESTS_DIR), pattern="test_*.py")
     stream = io.StringIO()
     result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
     output = stream.getvalue()
