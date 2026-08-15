@@ -54,17 +54,19 @@
 
 `tools` намеренно пуст до подключения первого реального managed tool.
 
-Один ToolSpec описывает:
+Один ToolSpec schema 1 описывает:
 
-- `source`: `git`, `builtin`, `package` или `release`;
+- `source`: только `git` или `builtin`;
 - `runtime`;
 - `update_policy`: `latest`, `pinned-tested` или `bundled-with-setup`;
 - `entrypoints`;
 - `health_contract` как безопасные argv-проверки;
 - `platforms`;
-- для соответствующих source: `repo`, `ref`, `project_directory`.
+- для `git`: `repo`, `ref`, `project_directory`.
 
 Для `pinned-tested` обязательна явная `ref`. Для `git` обязательны repository и project directory. Один публичный entrypoint не может принадлежать двум ToolSpec одновременно.
+
+`package` и `release` намеренно **не объявлены поддерживаемыми source type в schema 1**: их нужно добавлять вместе с точным deploy/update/checksum contract, а не заранее создавать ложное обещание поддержки.
 
 Registry валидируется при каждом запуске setup до mutations. Ошибка schema/spec является conflict и останавливает reconciliation.
 
