@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 TOOL_SPEC_SCHEMA = 1
-VALID_SOURCES = {"git", "builtin", "package", "release"}
+VALID_SOURCES = {"git", "builtin"}
 VALID_UPDATE_POLICIES = {"latest", "pinned-tested", "bundled-with-setup"}
 VALID_RUNTIMES = {"python-venv", "python", "go-binary", "binary", "external"}
 VALID_PLATFORMS = {"windows", "linux"}
@@ -95,8 +95,8 @@ def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
     repo = raw.get("repo")
     ref = raw.get("ref")
     project_directory = raw.get("project_directory")
-    if source in {"git", "release"} and not _nonempty_string(repo):
-        return None, f"ToolSpec {name!r}: source {source!r} requires repo"
+    if source == "git" and not _nonempty_string(repo):
+        return None, f"ToolSpec {name!r}: git source requires repo"
     if update_policy == "pinned-tested" and not _nonempty_string(ref):
         return None, f"ToolSpec {name!r}: pinned-tested requires an explicit ref"
     if source == "git" and not _nonempty_string(project_directory):
