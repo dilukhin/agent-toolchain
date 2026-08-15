@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import sys
 import unittest
 from pathlib import Path
 
-from setup_inventory import ExecutableInstance, duplicate_recommendation, infer_manager, render_instances
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from setup_inventory import ExecutableInstance, duplicate_recommendation, infer_manager, render_instances  # noqa: E402
 
 
 class WindowsNpmLayeredInventoryTests(unittest.TestCase):
