@@ -156,7 +156,9 @@
     ]
   },
   "managed_environment": {
-    "manifest_schema": 1,
+    "manifest_schema": 2,
+    "tool_spec_schema": 1,
+    "tools": {},
     "global_skills_dir": "~/.agents/skills",
     "owned_skills": [
       "remote-long-running"

@@ -16,7 +16,6 @@ from setup_lib import (
     STATE_OK,
     STATE_OUTDATED,
     inspect_repo,
-    load_manifest,
     parse_jsonc_object,
     reconcile_agents_file,
     reconcile_file,
@@ -25,12 +24,13 @@ from setup_lib import (
     routerai_file_credential,
     routerai_provider,
     run,
-    save_manifest,
     sha256_bytes,
     validate_skill,
 )
+from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
 from setup_migration import reconcile_opencode_config
 from setup_runtime import ensure_agent_safe_runtime, ensure_ssh_relay_runtime, reconcile_npm
+from setup_tools import parse_tool_specs
 
 LEGACY_AGENTS = """# Global OpenCode instructions
 
@@ -230,15 +230,42 @@ def main(argv: list[str] | None = None) -> int:
     safe_url = args.agent_safe_url or os.environ.get("OPENCODE_SETUP_AGENT_SAFE_URL") or safe_spec["repo"]
 
     reporter = Reporter()
-    manifest, manifest_error = load_manifest(manifest_path)
+    if env_cfg.get("manifest_schema") != MANIFEST_SCHEMA:
+        reporter.add(
+            "manifest schema policy",
+            STATE_CONFLICT,
+            f"config_data.json requires manifest schema {env_cfg.get('manifest_schema')!r}; runtime supports {MANIFEST_SCHEMA}",
+        )
+        reporter.render()
+        return 2
+    _tool_specs, tool_spec_error = parse_tool_specs(env_cfg)
+    if tool_spec_error:
+        reporter.add("ToolSpec registry", STATE_CONFLICT, tool_spec_error)
+        reporter.render()
+        return 2
+
+    manifest, manifest_error, manifest_migration_pending = load_manifest(manifest_path)
     if manifest_error:
         reporter.add("ownership manifest", STATE_CONFLICT, manifest_error)
         reporter.render()
         return 2
+    if manifest_migration_pending:
+        if args.check:
+            reporter.add(
+                "ownership manifest schema",
+                STATE_OUTDATED,
+                "schema 1 распознана; обычный apply мигрирует manifest в schema 2 без удаления существующих metadata",
+            )
+        else:
+            reporter.add(
+                "ownership manifest schema",
+                STATE_OK,
+                "schema 1 мигрирована в памяти в schema 2; результат будет сохранён после reconciliation",
+            )
 
     reconcile_npm(config_dir, config, reporter, args.check, args.skip_package_install)
 
-    manifest_changed = False
+    manifest_changed = manifest_migration_pending
     config_path = config_dir / "opencode.jsonc"
     existing_config = None
     config_parse_error = None
