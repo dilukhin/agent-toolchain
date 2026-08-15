@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -83,6 +85,74 @@ class ManifestV2Tests(unittest.TestCase):
             _manifest, error, pending = load_manifest(path)
             self.assertFalse(pending)
             self.assertIn("unsupported", error or "")
+
+    def test_setup_check_is_read_only_and_apply_persists_v2(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            state_dir = home / "state"
+            state_dir.mkdir(parents=True)
+            manifest_path = state_dir / "manifest.json"
+            legacy = {"schema": 1, "managed_files": {}, "credentials": {}}
+            original = (json.dumps(legacy, indent=2) + "\n").encode("utf-8")
+            manifest_path.write_bytes(original)
+            projects = home / "projects"
+            (projects / "ssh_relay").mkdir(parents=True)
+            (projects / "agent-safe").mkdir(parents=True)
+
+            base_cmd = [
+                sys.executable,
+                str(ROOT / "setup_core.py"),
+                "--repo-root", str(ROOT),
+                "--config-dir", str(home / ".config" / "opencode"),
+                "--stash-dir", str(home / "stash"),
+                "--credential-dir", str(home / ".config" / "opencode" / "credentials"),
+                "--skills-dir", str(home / ".agents" / "skills"),
+                "--state-dir", str(state_dir),
+                "--projects-dir", str(projects),
+                "--skip-package-install",
+                "--skip-dependency-install",
+            ]
+            env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+
+            check = subprocess.run(
+                [*base_cmd, "--check"],
+                text=True,
+                encoding="utf-8",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(check.returncode, 2, check.stdout + check.stderr)
+            self.assertEqual(manifest_path.read_bytes(), original)
+            self.assertIn("ownership manifest schema", check.stdout)
+            self.assertIn("outdated", check.stdout)
+
+            apply = subprocess.run(
+                base_cmd,
+                text=True,
+                encoding="utf-8",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(apply.returncode, 2, apply.stdout + apply.stderr)
+            migrated = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(migrated["schema"], 2)
+            self.assertIn("managed_tools", migrated)
+            self.assertIn("managed_path_entries", migrated)
+            after_first_apply = manifest_path.read_bytes()
+
+            second = subprocess.run(
+                base_cmd,
+                text=True,
+                encoding="utf-8",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(second.returncode, 2, second.stdout + second.stderr)
+            self.assertEqual(manifest_path.read_bytes(), after_first_apply)
+            self.assertNotIn("ownership manifest schema", second.stdout)
 
 
 if __name__ == "__main__":
