@@ -181,8 +181,9 @@ class CoreMigrationTests(unittest.TestCase):
             cp = self._run_core(home, config_dir, stash_dir, credential_dir)
             self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
             canonical = credential_dir / "routerai-api-key.txt"
-            self.assertTrue(canonical.is_file())
+            self.assertFalse(canonical.exists())
             self.assertFalse((stash_dir / "api-key.txt").exists())
+            self.assertIn("ключ RouterAI не настроен", cp.stdout)
             generated = json.loads((config_dir / "opencode.jsonc").read_text(encoding="utf-8"))
             self.assertEqual(generated["provider"]["routerai"]["options"]["apiKey"], "{file:" + str(canonical.resolve()) + "}")
 

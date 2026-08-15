@@ -86,7 +86,8 @@ class ExistingQwenConfigTests(unittest.TestCase):
             self.assertEqual(merged["autoupdate"], "notify")
 
             canonical = config_dir / "credentials" / "routerai-api-key.txt"
-            self.assertTrue(canonical.is_file())
+            self.assertFalse(canonical.exists())
+            self.assertIn("ключ RouterAI не настроен", first.stdout)
             self.assertEqual(
                 merged["provider"]["routerai"]["options"]["apiKey"],
                 "{file:" + str(canonical.resolve()) + "}",

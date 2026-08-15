@@ -34,23 +34,23 @@ Linux:
 Windows:
 
 ```text
-OpenCode config:       %USERPROFILE%\.config\opencode
-Fresh RouterAI key:    %USERPROFILE%\.config\opencode\credentials\routerai-api-key.txt
-Legacy credential dir: %USERPROFILE%\projects\stash\opencode.ai
-Global skills:         %USERPROFILE%\.agents\skills
-Projects:              %USERPROFILE%\projects
-State/manifest:        %LOCALAPPDATA%\opencode_setup\state
+OpenCode config:          %USERPROFILE%\.config\opencode
+Canonical RouterAI key:  %USERPROFILE%\.config\opencode\credentials\routerai-api-key.txt
+Legacy credential dir:    %USERPROFILE%\projects\stash\opencode.ai
+Global skills:            %USERPROFILE%\.agents\skills
+Projects:                 %USERPROFILE%\projects
+State/manifest:           %LOCALAPPDATA%\opencode_setup\state
 ```
 
 Linux:
 
 ```text
-OpenCode config:       ~/.config/opencode
-Fresh RouterAI key:    ~/.config/opencode/credentials/routerai-api-key.txt
-Legacy credential dir: ~/projects/stash/opencode.ai
-Global skills:         ~/.agents/skills
-Projects:              ~/projects
-State/manifest:        ${XDG_STATE_HOME:-~/.local/state}/opencode_setup
+OpenCode config:          ~/.config/opencode
+Canonical RouterAI key:  ~/.config/opencode/credentials/routerai-api-key.txt
+Legacy credential dir:    ~/projects/stash/opencode.ai
+Global skills:            ~/.agents/skills
+Projects:                 ~/projects
+State/manifest:           ${XDG_STATE_HOME:-~/.local/state}/opencode_setup
 ```
 
 Canonical credential path относится только к fresh install. Если существующий `opencode.jsonc` уже ссылается через `{file:...}` на другой key, этот фактический путь и точная текстовая ссылка сохраняются.
@@ -105,14 +105,16 @@ canonical profile path для fresh install
 
 Поведение:
 
-- referenced external file существует → `up-to-date`, точная ссылка и байты сохраняются, содержимое не выводится;
+- referenced external file существует → `up-to-date`, точная ссылка и байты сохраняются, содержимое не читается и не выводится;
 - referenced external file отсутствует → missing/conflict, **никакого второго placeholder в другом месте**;
 - existing non-file/inline `apiKey` → conflict, config сохраняется, значение не читается/не выводится, placeholder не создаётся;
-- fresh install → canonical `credentials/routerai-api-key.txt` с placeholder;
-- Linux managed credential → `0600`;
+- fresh install → canonical path записывается в config/manifest, но key-файл не создаётся; до ручного provisioning состояние credential остаётся `missing`;
+- точный placeholder, созданный предыдущей версией `opencode_setup` в доказанно managed credential path, считается `missing`, сохраняется без перезаписи и должен быть вручную заменён реальным RouterAI API key;
+- внешний credential не читается даже для проверки на legacy-placeholder;
+- Linux managed credential получает `0600` после появления реального файла;
 - старый `stash/api-key.txt` остаётся legacy compatibility для старых прямых `setup_core.py` вызовов.
 
-Нельзя выводить API key в diagnostics/logs.
+Setup не создаёт fake secret, чтобы наличие файла не выглядело доказательством настроенного RouterAI. API key нельзя выводить в diagnostics/logs.
 
 ## 6. Глобальный `AGENTS.md`
 
@@ -242,24 +244,25 @@ BMAD имеет отдельную политику `pinned-tested`.
 
 ```powershell
 .\validate_setup.ps1 -TestBmad
-py -3 -m unittest tests.test_setup_migration
+py -3 .\tests\run_migration_ci.py
 ```
 
 ```bash
 ./validate_setup.sh --bmad
-python3 -m unittest tests.test_setup_migration
+python3 ./tests/run_migration_ci.py
 ```
 
 Migration regression tests покрывают:
 
-1. existing external `{file:...}` credential;
+1. existing external `{file:...}` credential без инспекции содержимого;
 2. сохранение exact key reference/bytes и отсутствие параллельного placeholder;
 3. existing inline/non-file credential conflict без утечки/миграции;
-4. fresh canonical profile credential;
-5. safe RouterAI merge с пользовательскими settings/models;
-6. существующий AGENTS + managed block;
-7. benign `.agent-safety/**`/Markdown untracked;
-8. arbitrary untracked conflict.
+4. fresh canonical profile credential path без fake key-файла;
+5. legacy managed placeholder как `missing` и переход к `up-to-date` после ручного provisioning;
+6. safe RouterAI merge с пользовательскими settings/models;
+7. существующий AGENTS + managed block;
+8. benign `.agent-safety/**`/Markdown untracked;
+9. arbitrary untracked conflict.
 
 Полные validators дополнительно проверяют clean install, repeated setup, read-only check, fast-forward dependency update, local managed conflicts/backup, local commits, все 6 managed skills и BMAD install/reinstall.
 
@@ -275,4 +278,4 @@ setup
 setup --check
 ```
 
-Второй обычный setup должен быть no-op. External key должен остаться на исходном пути, пользовательские config/AGENTS данные — сохраниться, unknown/BMAD skills — остаться, dependency repositories — не подвергаться destructive Git operations.
+Второй обычный setup должен быть no-op. External key должен остаться на исходном пути, пользовательские config/AGENTS данные — сохраниться, unknown/BMAD skills — остаться, dependency repositories — не подвергаться destructive Git operations. Если RouterAI credential ещё не provisioned, повторный setup остаётся byte-idempotent, но check продолжает сообщать `missing`, пока пользователь не создаст реальный key-файл по указанному пути.
