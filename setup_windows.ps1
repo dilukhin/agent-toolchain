@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$ConfigDir = "$env:USERPROFILE\.config\opencode",
     [string]$StashDir = "$env:USERPROFILE\projects\stash\opencode.ai",
     [string]$CredentialDir = "",
