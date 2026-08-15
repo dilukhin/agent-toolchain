@@ -15,7 +15,6 @@ from setup_lib import (
     STATE_MISSING,
     STATE_OK,
     STATE_OUTDATED,
-    atomic_write,
     inspect_repo,
     load_manifest,
     parse_jsonc_object,
@@ -41,6 +40,8 @@ LEGACY_AGENTS = """# Global OpenCode instructions
 """
 
 _AGENT_SAFE_LEGACY_EGG_INFO_PREFIX = "src/agent_safe.egg-info/"
+_ROUTERAI_LEGACY_PLACEHOLDER = b"your-routerai-api-key-here\n"
+_MANAGED_CREDENTIAL_MODES = frozenset({"managed-path", "legacy-managed-path"})
 
 
 def render_config(template_path: Path, api_key_file: Path) -> bytes:
@@ -108,6 +109,22 @@ def _has_nonfile_routerai_credential(config: dict | None) -> bool:
     if not isinstance(options, dict) or "apiKey" not in options:
         return False
     return routerai_file_credential(config) is None
+
+
+def _managed_credential_is_legacy_placeholder(path: Path, mode: str | None) -> bool:
+    """Recognize only the exact placeholder written by older opencode_setup versions.
+
+    External credential files are never inspected. For setup-managed paths, read at
+    most one byte beyond the known placeholder length so a real credential is not read
+    in full merely to classify this legacy state.
+    """
+    if mode not in _MANAGED_CREDENTIAL_MODES or path.is_symlink():
+        return False
+    try:
+        with path.open("rb") as stream:
+            return stream.read(len(_ROUTERAI_LEGACY_PLACEHOLDER) + 1) == _ROUTERAI_LEGACY_PLACEHOLDER
+    except OSError:
+        return False
 
 
 def _agent_safe_legacy_metadata_only(path: Path) -> bool:
@@ -282,10 +299,17 @@ def main(argv: list[str] | None = None) -> int:
         reporter.add("RouterAI credential", STATE_CONFLICT, detail)
     elif api_key_file.exists():
         if api_key_file.is_file():
-            mode_detail = "external file referenced by config" if credential_mode == "external-file" else "existing credential file"
-            reporter.add("RouterAI credential", STATE_OK, f"{mode_detail}; bytes preserved: {api_key_file}")
-            if not args.check and credential_mode != "external-file" and os.name != "nt":
-                os.chmod(api_key_file, 0o600)
+            if _managed_credential_is_legacy_placeholder(api_key_file, credential_mode):
+                reporter.add(
+                    "RouterAI credential",
+                    STATE_MISSING,
+                    f"служебная заглушка предыдущей версии не является API key; запишите реальный ключ RouterAI: {api_key_file}",
+                )
+            else:
+                mode_detail = "external file referenced by config" if credential_mode == "external-file" else "existing credential file"
+                reporter.add("RouterAI credential", STATE_OK, f"{mode_detail}; bytes preserved: {api_key_file}")
+                if not args.check and credential_mode != "external-file" and os.name != "nt":
+                    os.chmod(api_key_file, 0o600)
         else:
             reporter.add("RouterAI credential", STATE_CONFLICT, f"path exists but is not a regular file: {api_key_file}")
     else:
@@ -294,12 +318,11 @@ def main(argv: list[str] | None = None) -> int:
             reporter.add("RouterAI credential", state,
                          f"existing config references missing credential; no alternate placeholder created: {api_key_file}")
         else:
-            reporter.add("RouterAI credential", STATE_MISSING, str(api_key_file))
-            if not args.check:
-                api_key_file.parent.mkdir(parents=True, exist_ok=True)
-                atomic_write(api_key_file, b"your-routerai-api-key-here\n")
-                if os.name != "nt":
-                    os.chmod(api_key_file, 0o600)
+            reporter.add(
+                "RouterAI credential",
+                STATE_MISSING,
+                f"ключ RouterAI не настроен; запишите реальный API key по canonical path: {api_key_file}",
+            )
 
     if api_key_file is not None and not args.check:
         manifest_changed |= _record_credential(manifest, api_key_file, credential_mode or "external-file")

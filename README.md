@@ -27,7 +27,7 @@ Linux:
 | Компонент | Источник истины | Целевое размещение |
 |---|---|---|
 | RouterAI/OpenCode managed fields | `templates/opencode.jsonc` | `~/.config/opencode/opencode.jsonc` |
-| RouterAI credential для новой установки | runtime discovery / canonical path | `~/.config/opencode/credentials/routerai-api-key.txt` |
+| RouterAI credential path для новой установки | runtime discovery / canonical path | `~/.config/opencode/credentials/routerai-api-key.txt` |
 | глобальные инструкции OpenCode | `templates/AGENTS.md` | `~/.config/opencode/AGENTS.md` |
 | `remote-long-running` | `opencode_setup/skills/remote-long-running` | `~/.agents/skills/remote-long-running` |
 | `ssh-relay` | `dilukhin/ssh_relay` | `~/.agents/skills/ssh-relay` |
@@ -93,16 +93,18 @@ Windows: %USERPROFILE%\.config\opencode\credentials\routerai-api-key.txt
 Linux:   ~/.config/opencode/credentials/routerai-api-key.txt
 ```
 
-Но существующая рабочая установка важнее default path. Если `opencode.jsonc` уже содержит `apiKey: "{file:...}"`, setup считает этот путь фактическим credential path, сохраняет точную текстовую ссылку и сам файл как внешний и не создаёт параллельный placeholder в canonical/legacy location.
+Но существующая рабочая установка важнее default path. Если `opencode.jsonc` уже содержит `apiKey: "{file:...}"`, setup считает этот путь фактическим credential path, сохраняет точную текстовую ссылку и сам файл как внешний. Содержимое внешнего credential setup не читает и не классифицирует.
 
 Правила:
 
 - config ссылается на существующий внешний key → сохранить ссылку и байты, содержимое не читать/не печатать;
-- config ссылается на отсутствующий key → сообщить missing/conflict, не создавать другой key с другим именем;
+- config ссылается на отсутствующий внешний key → сообщить missing/conflict, не создавать другой key с другим именем;
 - config содержит non-file/inline `apiKey` → сохранить config как conflict, не читать/не выводить значение и не создавать placeholder;
-- fresh install → создать canonical credential placeholder и ссылку на него;
+- fresh install → записать canonical credential path в config/manifest, но **не создавать fake/placeholder key-файл**; до ручного provisioning credential остаётся `missing`;
+- точный legacy-placeholder, созданный старой версией setup в доказанно managed credential path, распознаётся как `missing`, сохраняется без перезаписи и должен быть заменён пользователем реальным API key;
+- внешний credential никогда не проверяется на совпадение с legacy-placeholder;
 - credential metadata в manifest содержит provider/mode/path, но не secret и не SHA-256 секрета;
-- Linux managed credential получает `0600`.
+- Linux managed credential получает `0600` только после появления реального файла.
 
 Legacy `~/projects/stash/opencode.ai/api-key.txt` остаётся поддержан для старых прямых вызовов `setup_core.py`, но wrappers для новых установок используют profile credential directory.
 
@@ -160,7 +162,7 @@ BMAD создаёт `<project>/_bmad` и `<project>/.agents/skills`. Глоба�
 ./validate_setup.sh --bmad
 ```
 
-Regression suite `tests/test_setup_*.py` проверяет сценарии, найденные на реальных существующих машинах: external `{file:...}` credential без лишнего placeholder, сохранение exact file reference, inline credential conflict, fresh canonical credential, sibling-provider Qwen migration, многократную идемпотентность manifest/config, managed block AGENTS, benign/unsafe untracked dependency paths, agent-safe egg-info self-healing и ownership/duplicate-policy OpenCode.
+Regression suite `tests/test_setup_*.py` проверяет сценарии, найденные на реальных существующих машинах: external `{file:...}` credential без инспекции содержимого, сохранение exact file reference, inline credential conflict, fresh canonical credential path без fake key-файла, legacy managed placeholder как `missing`, sibling-provider Qwen migration, многократную идемпотентность manifest/config, managed block AGENTS, benign/unsafe untracked dependency paths, agent-safe egg-info self-healing и ownership/duplicate-policy OpenCode.
 
 GitHub Actions выполняет regression suite и полные Windows/Linux validators.
 
