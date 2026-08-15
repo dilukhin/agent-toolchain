@@ -25,6 +25,9 @@ jobs:
           if (-not $scripts) { throw "Cannot resolve Python scripts directory for uv." }
           $scripts | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           & (Join-Path $scripts "uv.exe") --version
+      - name: Validate Python modules compile
+        shell: powershell
+        run: py -3 -m py_compile .\setup_core.py .\setup_lib.py .\setup_manifest.py .\setup_migration.py .\setup_runtime.py .\setup_inventory.py .\setup_tools.py
       - name: Validate Windows PowerShell 5.1 wrapper
         shell: powershell
         run: |
@@ -92,6 +95,8 @@ jobs:
           uv --version
       - name: Validate diff whitespace
         run: git diff --check HEAD^ HEAD
+      - name: Validate Python modules compile
+        run: python3 -m py_compile ./setup_core.py ./setup_lib.py ./setup_manifest.py ./setup_migration.py ./setup_runtime.py ./setup_inventory.py ./setup_tools.py
       - name: Validate migration regressions
         run: python3 ./tests/run_migration_ci.py
       - name: Validate Linux setup and BMAD
