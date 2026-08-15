@@ -244,9 +244,16 @@ python3 "$SCRIPT_DIR/setup_core.py" \
   --state-dir "$home2/.local/state/opencode_setup" \
   --projects-dir "$home2/projects" \
   --skip-package-install --skip-dependency-install \
-  --ssh-relay-url "$ssh_remote" --agent-safe-url "$safe_remote" > /dev/null
-[[ "$(cat "$home2/projects/stash/opencode.ai/api-key.txt")" == "your-routerai-api-key-here" ]]
-echo "PASS missing API-key placeholder creation"
+  --ssh-relay-url "$ssh_remote" --agent-safe-url "$safe_remote" > "$test_root/missing-key.out"
+[[ ! -e "$home2/projects/stash/opencode.ai/api-key.txt" ]]
+grep -q 'missing.*RouterAI credential.*ключ RouterAI не настроен' "$test_root/missing-key.out"
+python3 - <<'PY_KEY' "$home2/.config/opencode/opencode.jsonc" "$home2/projects/stash/opencode.ai/api-key.txt"
+import json, pathlib, sys
+config = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+expected = "{file:" + str(pathlib.Path(sys.argv[2]).resolve()) + "}"
+assert config["provider"]["routerai"]["options"]["apiKey"] == expected
+PY_KEY
+echo "PASS missing API key remains unprovisioned without fake file"
 
 home3="$test_root/home3"
 mkdir -p "$home3/.config/opencode" "$home3/projects/stash/opencode.ai"
