@@ -259,8 +259,7 @@ home3="$test_root/home3"
 mkdir -p "$home3/.config/opencode" "$home3/projects/stash/opencode.ai"
 printf '%s\n' '{"user_setting":true}' > "$home3/.config/opencode/opencode.jsonc"
 printf '%s' 'existing-key' > "$home3/projects/stash/opencode.ai/api-key.txt"
-config_before="$(sha256sum "$home3/.config/opencode/opencode.jsonc" | awk '{print $1}')"
-set +e
+key3_before="$(sha256sum "$home3/projects/stash/opencode.ai/api-key.txt" | awk '{print $1}')"
 python3 "$SCRIPT_DIR/setup_core.py" \
   --config-dir "$home3/.config/opencode" \
   --stash-dir "$home3/projects/stash/opencode.ai" \
@@ -268,13 +267,19 @@ python3 "$SCRIPT_DIR/setup_core.py" \
   --state-dir "$home3/.local/state/opencode_setup" \
   --projects-dir "$home3/projects" \
   --skip-package-install --skip-dependency-install \
-  --ssh-relay-url "$ssh_remote" --agent-safe-url "$safe_remote" > "$test_root/unowned-config.out" 2>&1
-rc=$?
-set -e
-[[ $rc -eq 2 ]]
-[[ "$config_before" == "$(sha256sum "$home3/.config/opencode/opencode.jsonc" | awk '{print $1}')" ]]
-grep -q 'modified/conflict.*OpenCode config' "$test_root/unowned-config.out"
-echo "PASS existing unowned OpenCode config is preserved as conflict"
+  --ssh-relay-url "$ssh_remote" --agent-safe-url "$safe_remote" > "$test_root/plain-config-migration.out" 2>&1
+[[ "$key3_before" == "$(sha256sum "$home3/projects/stash/opencode.ai/api-key.txt" | awk '{print $1}')" ]]
+python3 - <<'PY_PLAIN' "$home3/.config/opencode/opencode.jsonc" "$home3/projects/stash/opencode.ai/api-key.txt"
+import json, pathlib, sys
+config = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+expected = "{file:" + str(pathlib.Path(sys.argv[2]).resolve()) + "}"
+assert config["user_setting"] is True
+assert config["provider"]["routerai"]["options"]["apiKey"] == expected
+PY_PLAIN
+find "$home3/.local/state/opencode_setup/backups" -type f -name opencode.jsonc -print -quit | grep -q .
+grep -q 'up-to-date.*RouterAI credential' "$test_root/plain-config-migration.out"
+grep -q 'OpenCode config migration.*up-to-date' "$test_root/plain-config-migration.out"
+echo "PASS existing plain OpenCode config is safely migrated with backup and credential preservation"
 
 if grep -RInE --exclude='validate_setup.sh' --exclude='*.md' -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|sk-[A-Za-z0-9_-]{24,}|gh[pousr]_[A-Za-z0-9]{20,}' "$SCRIPT_DIR"; then
   echo "Possible secret material found" >&2
