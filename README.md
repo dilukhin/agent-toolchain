@@ -70,7 +70,7 @@ Setup владеет только явно управляемым содержи
 
 Если уже есть совместимый `provider.routerai`, setup сначала разбирает config и сохраняет пользовательские поля, выбранную пользователем model/small_model и дополнительные model entries. Управляемые RouterAI fields добавляются/обновляются минимальным semantic merge с backup перед первой миграцией.
 
-Если существующий config содержит другой provider (например, Qwen) и не использует JSONC-комментарии/trailing commas, RouterAI добавляется соседним provider. Такой режим сохраняется в ownership manifest и на последующих apply не навязывает отсутствующие у пользователя top-level `model`/`small_model`.
+Если существующий config содержит другой provider (например, Qwen) и не использует JSONC-комментарии/trailing commas, RouterAI добавляется соседним provider. Обычный JSON-config без секции `provider` обрабатывается так же: существующие поля сохраняются, а `provider.routerai` добавляется с backup. Такой режим сохраняется в ownership manifest и на последующих apply не навязывает отсутствующие у пользователя top-level `model`/`small_model`.
 
 Управляемая политика обновления OpenCode — `autoupdate: "notify"`: OpenCode сообщает о новой версии, но не меняет installation сам. Менеджер-владелец и рекомендуемая команда обновления показываются setup при инвентаризации CLI.
 
@@ -122,7 +122,7 @@ Legacy `~/projects/stash/opencode.ai/api-key.txt` остаётся поддер�
 
 Если виден один OpenCode, но дополнительная package-manager установка изолирована от `PATH`, она отмечается как предупреждение и может быть оставлена, если изоляция намеренная. Если фактическая версия active executable расходится с metadata менеджера, setup сообщает об этом отдельно и ничего не исправляет автоматически.
 
-Для существующей однозначной установки её менеджер сохраняется владельцем. Например, Chocolatey-установка не вызывает установку второй npm-копии. Для нового компьютера без OpenCode текущий bootstrap по-прежнему использует npm.
+Для существующей однозначной установки её менеджер сохраняется владельцем. Например, Chocolatey-установка не вызывает установку второй npm-копии. Официальная standalone-установка из install script в `~/.opencode/bin` или `~/.local/bin` распознаётся как `curl`-installation и не требует наличия npm; рекомендуемая команда обновления для неё — `opencode upgrade --method curl`. Для нового компьютера без OpenCode текущий bootstrap по-прежнему использует npm.
 
 В отчёте показывается рекомендуемая команда обновления, когда она известна: например `choco upgrade opencode -y` или `npm install -g opencode-ai@latest`.
 
@@ -132,7 +132,7 @@ Legacy `~/projects/stash/opencode.ai/api-key.txt` остаётся поддер�
 
 ## OpenCode plugin versions
 
-`@opencode-ai/plugin` использует npm `latest` при каждом reconcile: актуальная версия является no-op, устаревшая обновляется и проверяется после install. Ошибка доступа к registry является conflict, а не поводом гадать версию.
+Если npm доступен, `@opencode-ai/plugin` сохраняет прежнюю политику npm `latest`: актуальная версия является no-op, устаревшая обновляется и проверяется после install. Для уже установленного standalone OpenCode отсутствие npm не считается конфликтом: OpenCode умеет устанавливать config-scoped dependency через свой Bun runtime при загрузке config, поэтому setup не требует Node/npm только ради принятия такой установки.
 
 ## remote-long-running и глобальный AGENTS.md
 

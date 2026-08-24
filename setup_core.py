@@ -281,9 +281,11 @@ def main(argv: list[str] | None = None) -> int:
     previous_config = manifest["managed_files"].get("OpenCode config")
     existing_provider = existing_config.get("provider") if isinstance(existing_config, dict) else None
     existing_routerai = routerai_provider(existing_config) if isinstance(existing_config, dict) else None
+    existing_provider_present = isinstance(existing_config, dict) and "provider" in existing_config
+    compatible_provider_shape = not existing_provider_present or isinstance(existing_provider, dict)
     compatible_existing = (
         existing_config is not None
-        and isinstance(existing_provider, dict)
+        and compatible_provider_shape
         and (existing_routerai is not None or not existing_has_jsonc_features)
     )
     config_can_be_managed = (not config_path.exists()) or previous_config is not None or compatible_existing

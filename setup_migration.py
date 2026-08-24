@@ -95,21 +95,29 @@ def _reconcile_missing_routerai(*, destination: Path, desired_data: bytes, sourc
     if error or desired_error or existing is None or desired is None:
         return None
 
+    provider_missing = "provider" not in existing
     providers = existing.get("provider")
     desired_router = routerai_provider(desired)
-    if not isinstance(providers, dict) or "routerai" in providers or desired_router is None:
+    if not provider_missing and not isinstance(providers, dict):
+        return None
+    if isinstance(providers, dict) and "routerai" in providers:
+        return None
+    if desired_router is None:
         return None
 
     if has_jsonc_features:
         reporter.add(
             "OpenCode config",
             STATE_CONFLICT,
-            "существующий config содержит другой provider и JSONC-комментарии/trailing commas; файл сохранён без потери форматирования",
+            "существующий config без RouterAI содержит JSONC-комментарии/trailing commas; файл сохранён без потери форматирования",
         )
         return False
 
     merged = copy.deepcopy(existing)
-    merged["provider"]["routerai"] = copy.deepcopy(desired_router)
+    merged_providers = merged.setdefault("provider", {})
+    if not isinstance(merged_providers, dict):
+        return None
+    merged_providers["routerai"] = copy.deepcopy(desired_router)
     if "$schema" not in merged and "$schema" in desired:
         merged["$schema"] = copy.deepcopy(desired["$schema"])
     if "autoupdate" in desired:
