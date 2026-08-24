@@ -109,6 +109,38 @@ class NpmLatestPolicyTests(unittest.TestCase):
             self._restore_active_patch(originals)
 
 
+    def test_standalone_curl_install_does_not_require_npm(self) -> None:
+        original_inventory = runtime.executable_inventory
+        original_common = runtime.report_common_tool_inventory
+        original_managers = runtime._known_opencode_managers
+        original_which = runtime.shutil.which
+        try:
+            runtime.executable_inventory = lambda command: [
+                ExecutableInstance(Path("/home/test/.opencode/bin/opencode"), "1.18.21", "unknown", True)
+            ] if command == "opencode" else []
+            runtime.report_common_tool_inventory = lambda reporter: None
+            runtime._known_opencode_managers = lambda npm: {}
+            runtime.shutil.which = lambda name: None
+
+            reporter = runtime.Reporter()
+            runtime.reconcile_npm(Path("/unused"), self._base_config(), reporter, check=True, skip=False)
+
+            conflicts = [r for r in reporter.results if r.state == runtime.STATE_CONFLICT]
+            self.assertFalse(conflicts, reporter.results)
+            cli = [r for r in reporter.results if r.component == "OpenCode CLI"][-1]
+            self.assertEqual(cli.state, runtime.STATE_OK)
+            self.assertIn("владелец: curl", cli.detail)
+            self.assertIn("opencode upgrade --method curl", cli.detail)
+            packages = [r for r in reporter.results if r.component == "OpenCode npm packages"][-1]
+            self.assertEqual(packages.state, runtime.STATE_OK)
+            self.assertIn("не требуется", packages.detail)
+        finally:
+            runtime.executable_inventory = original_inventory
+            runtime.report_common_tool_inventory = original_common
+            runtime._known_opencode_managers = original_managers
+            runtime.shutil.which = original_which
+
+
 class OpenCodeOwnershipTests(unittest.TestCase):
     def setUp(self) -> None:
         self.original_inventory = runtime.executable_inventory

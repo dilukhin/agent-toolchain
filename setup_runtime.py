@@ -175,11 +175,12 @@ def _brew_installed_version() -> str | None:
     return None
 
 
-def _known_opencode_managers(npm: str) -> dict[str, str]:
+def _known_opencode_managers(npm: str | None) -> dict[str, str]:
     result: dict[str, str] = {}
-    npm_version = _npm_global_version(npm, "opencode-ai")
-    if npm_version:
-        result["npm"] = npm_version
+    if npm:
+        npm_version = _npm_global_version(npm, "opencode-ai")
+        if npm_version:
+            result["npm"] = npm_version
     choco_version = _choco_installed_version()
     if choco_version:
         result["choco"] = choco_version
@@ -194,6 +195,7 @@ def _known_opencode_managers(npm: str) -> dict[str, str]:
 
 def _update_command(manager: str) -> str | None:
     return {
+        "curl": "opencode upgrade --method curl",
         "npm": "npm install -g opencode-ai@latest",
         "pnpm": "pnpm install -g opencode-ai@latest",
         "bun": "bun install -g opencode-ai@latest",
@@ -221,7 +223,7 @@ def _version_number(text: str | None) -> str | None:
     return match.group(1) if match else None
 
 
-def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: bool, npm: str) -> None:
+def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: bool, npm: str | None) -> None:
     cli_package = str(config["dependencies"].get("opencode-cli-package", "opencode-ai"))
     items = executable_inventory("opencode")
     active = active_instance(items)
@@ -257,6 +259,14 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
                 + ". Исправьте PATH или изолируйте/удалите неиспользуемую установку; setup не создаёт ещё одну копию.",
             )
             return
+        if npm is None:
+            reporter.add(
+                "OpenCode CLI",
+                STATE_MISSING,
+                "OpenCode не найден; npm недоступен для текущего fresh-install пути. "
+                "Существующую standalone/curl-установку setup умеет принять без npm.",
+            )
+            return
         latest_cli = _npm_latest_version(npm, cli_package)
         if latest_cli is None:
             reporter.add("OpenCode CLI", STATE_CONFLICT, f"не удалось получить актуальную версию npm-пакета {cli_package}")
@@ -275,8 +285,12 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
         return
 
     manager = active.manager
-    if manager == "unknown" and len(managers) == 1:
-        manager = next(iter(managers))
+    if manager == "unknown":
+        normalized_path = str(active.path).replace("\\", "/").lower()
+        if "/.opencode/bin/opencode" in normalized_path or "/.local/bin/opencode" in normalized_path:
+            manager = "curl"
+        elif len(managers) == 1:
+            manager = next(iter(managers))
 
     extra_managers = {name: version for name, version in managers.items() if name != manager}
     if extra_managers:
@@ -302,6 +316,14 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
             STATE_OK,
             f"активный экземпляр: {active.path}; версия: {actual_version or active.version or 'не определена'}; "
             f"владелец: {manager}; npm-дубликат не создаётся{command_detail}",
+        )
+        return
+
+    if npm is None:
+        reporter.add(
+            "OpenCode CLI",
+            STATE_CONFLICT,
+            "активный экземпляр классифицирован как npm, но команда npm недоступна; состояние не изменено",
         )
         return
 
@@ -342,11 +364,24 @@ def reconcile_npm(config_dir: Path, config: dict[str, Any], reporter: Reporter,
         reporter.add("OpenCode npm packages", STATE_OK, "установка/проверка npm-пакетов пропущена")
         return
     npm = shutil.which("npm")
-    if not npm:
-        reporter.add("OpenCode npm packages", STATE_CONFLICT, "npm недоступен")
-        return
 
     _reconcile_opencode_cli(config, reporter, check, npm)
+
+    if not npm:
+        if active_instance(executable_inventory("opencode")) is not None:
+            reporter.add(
+                "OpenCode npm packages",
+                STATE_OK,
+                "npm недоступен и не требуется для уже установленного OpenCode; "
+                "@opencode-ai/plugin при необходимости устанавливается самим OpenCode через Bun при загрузке config",
+            )
+        else:
+            reporter.add(
+                "OpenCode npm packages",
+                STATE_CONFLICT,
+                "npm недоступен для текущего fresh-install пути OpenCode",
+            )
+        return
 
     plugin_package = "@opencode-ai/plugin"
     configured = config["dependencies"].get(plugin_package, "latest")

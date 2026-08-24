@@ -117,6 +117,40 @@ class ExistingQwenConfigTests(unittest.TestCase):
             self.assertNotIn("small_model", final)
             self.assertEqual(final["autoupdate"], "notify")
 
+
+    def test_existing_plain_config_without_provider_is_preserved_and_routerai_added(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            config_dir = home / ".config" / "opencode"
+            config_dir.mkdir(parents=True)
+            config_path = config_dir / "opencode.jsonc"
+
+            existing = {
+                "$schema": "https://opencode.ai/config.json",
+                "permission": {"bash": "ask"},
+                "model": "opencode/deepseek-v4-flash-free",
+            }
+            config_path.write_text(json.dumps(existing, indent=2) + "\n", encoding="utf-8")
+
+            check = self._run_core(home, check=True)
+            self.assertEqual(check.returncode, 2, check.stdout + check.stderr)
+            self.assertNotIn("existing config is not safely adoptable for RouterAI", check.stdout)
+            self.assertIn("ключ RouterAI не настроен", check.stdout)
+
+            first = self._run_core(home)
+            self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
+
+            merged = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(merged["permission"], existing["permission"])
+            self.assertEqual(merged["model"], existing["model"])
+            self.assertIn("routerai", merged["provider"])
+            canonical = config_dir / "credentials" / "routerai-api-key.txt"
+            self.assertFalse(canonical.exists())
+            self.assertEqual(
+                merged["provider"]["routerai"]["options"]["apiKey"],
+                "{file:" + str(canonical.resolve()) + "}",
+            )
+
     def test_qwen_jsonc_with_comments_remains_conflict(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             home = Path(td) / "home"
