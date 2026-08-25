@@ -70,16 +70,31 @@
 
 Registry валидируется при каждом запуске setup до mutations. Ошибка schema/spec является conflict и останавливает reconciliation.
 
+## Bootstrap Python runtime
+
+Платформенные wrappers используют отдельный bootstrap Python `venv`, чтобы текущие Python-зависимости setup и helper runtime не устанавливались в системный Python:
+
+- Linux: `${XDG_DATA_HOME:-$HOME/.local/share}/opencode_setup/runtime/python`;
+- Windows: `%LOCALAPPDATA%\opencode_setup\runtime\python`;
+- путь можно переопределить через `OPENCODE_SETUP_RUNTIME_DIR` (Windows также принимает параметр `-RuntimeDir`).
+
+Обычный apply создаёт отсутствующий runtime во временном соседнем каталоге, проверяет `python` и `pip`, записывает точный ownership-marker и только затем перемещает готовый runtime на целевой путь. `--check`/`-Check` не создаёт runtime: до первого apply он использует базовый Python только для read-only диагностики.
+
+Существующий каталог принимается только при доказанном ownership-marker и рабочем runtime Python. Неизвестный или неполный каталог не усыновляется и не заменяется автоматически. Это сохраняет инвариант `unknown != ours`.
+
+Bootstrap venv — **промежуточный слой изоляции**, а не реализация `managed_tools`: текущие `ssh_relay` и `agent-safe` пока могут исполняться из source checkout, не имеют общего stable-entrypoint reconciliation и не записываются как ToolSpec runtime в manifest. Его задача на этом этапе — убрать зависимость от системного `pip` без преждевременного переписывания helper deployment.
+
 ## Что пока не реализовано
 
-Этот changeset **не** реализует:
+Текущий фундамент и bootstrap runtime **не** реализуют:
 
-- получение/сборку tool runtime;
+- generic получение/сборку tool runtime по ToolSpec;
 - stable entrypoint reconciliation;
 - изменение PATH;
-- user/system tool deployment;
-- health execution;
-- запись фактического runtime в `managed_tools`;
-- `bundle`, `tunnelctl`, `proxy-tools` как реальные ToolSpec.
+- user/system tool deployment через общий reconciler;
+- generic health execution по ToolSpec;
+- запись фактического helper runtime в `managed_tools`;
+- `bundle`, `tunnelctl`, `proxy-tools` как реальные ToolSpec;
+- окончательное разделение installed runtime `ssh_relay`/`agent-safe` и их source checkout.
 
-Следующий этап должен добавить generic reconciler поверх уже существующих ToolSpec + manifest v2, а затем подключить первый инструмент (`bundle`) с pinned-tested ref и изолированным runtime.
+Следующий этап должен добавить generic reconciler поверх уже существующих ToolSpec + manifest v2, а затем подключить первый инструмент (`bundle`) с pinned-tested ref и изолированным runtime. После стабилизации общего механизма следует оценить миграцию существующих Python helper tools без дублирования уже работающей логики.
