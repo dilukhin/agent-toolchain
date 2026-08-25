@@ -52,20 +52,29 @@ if ($python) {
 }
 
 $runtimePython = Join-Path $RuntimeDir "Scripts\python.exe"
+$markerFile = Join-Path $RuntimeDir ".opencode-setup-managed-runtime"
+$markerExpected = "opencode_setup-bootstrap-python-v1"
+$runtimeOwned = $false
+if (Test-Path -LiteralPath $markerFile -PathType Leaf) {
+    $runtimeOwned = ((Get-Content -LiteralPath $markerFile -Raw).Trim() -eq $markerExpected)
+}
 $corePythonExe = $basePythonExe
 $corePythonPrefix = $basePythonPrefix
 
 if ($Check) {
-    if (Test-Path -LiteralPath $runtimePython -PathType Leaf) {
+    if (Test-Path -LiteralPath $RuntimeDir) {
+        if (-not $runtimeOwned -or -not (Test-Path -LiteralPath $runtimePython -PathType Leaf)) {
+            throw "Managed Python runtime path exists but ownership/health is not proven: $RuntimeDir. Check mode is read-only; refusing to adopt or repair it."
+        }
         $corePythonExe = $runtimePython
         $corePythonPrefix = @("-B")
     }
 } else {
-    if ((Test-Path -LiteralPath $RuntimeDir) -and -not (Test-Path -LiteralPath $runtimePython -PathType Leaf)) {
-        throw "Managed Python runtime path exists but is incomplete: $RuntimeDir. Refusing to replace it automatically."
+    if ((Test-Path -LiteralPath $RuntimeDir) -and (-not $runtimeOwned -or -not (Test-Path -LiteralPath $runtimePython -PathType Leaf))) {
+        throw "Managed Python runtime path exists but ownership/health is not proven: $RuntimeDir. Refusing to replace it automatically."
     }
 
-    if (-not (Test-Path -LiteralPath $runtimePython -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath $RuntimeDir)) {
         $runtimeParent = Split-Path -Parent $RuntimeDir
         New-Item -ItemType Directory -Path $runtimeParent -Force | Out-Null
         $runtimeTmp = Join-Path $runtimeParent (".python-runtime.tmp-" + $PID + "-" + [guid]::NewGuid().ToString("N"))
@@ -82,6 +91,7 @@ if ($Check) {
             if ($LASTEXITCODE -ne 0) {
                 throw "Created Python runtime has no working pip: $runtimeTmp"
             }
+            Set-Content -LiteralPath (Join-Path $runtimeTmp ".opencode-setup-managed-runtime") -Value $markerExpected -Encoding ASCII
             if (Test-Path -LiteralPath $RuntimeDir) {
                 throw "Runtime path appeared concurrently; refusing to replace it: $RuntimeDir"
             }

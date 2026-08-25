@@ -4,7 +4,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -73,7 +72,9 @@ class LinuxBootstrapPythonRuntimeTests(unittest.TestCase):
             )
             self.assertEqual(apply.returncode, 0, apply.stdout + apply.stderr)
             runtime_python = runtime_dir / "bin" / "python"
+            marker = runtime_dir / ".opencode-setup-managed-runtime"
             self.assertTrue(runtime_python.is_file())
+            self.assertEqual(marker.read_text(encoding="utf-8").strip(), "opencode_setup-bootstrap-python-v1")
             apply_probe = json.loads(probe.read_text(encoding="utf-8"))
             self.assertEqual(Path(apply_probe["executable"]).resolve(), runtime_python.resolve())
             pip = subprocess.run(
@@ -137,7 +138,45 @@ class LinuxBootstrapPythonRuntimeTests(unittest.TestCase):
             )
             self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
             self.assertEqual(sentinel.read_text(encoding="utf-8"), "preserve")
-            self.assertIn("incomplete", cp.stderr)
+            self.assertIn("ownership/health is not proven", cp.stderr)
+
+    def test_check_refuses_external_venv_without_managed_marker(self) -> None:
+        bash = shutil.which("bash")
+        if not bash:
+            self.skipTest("bash is unavailable")
+
+        with tempfile.TemporaryDirectory() as td:
+            temp = Path(td)
+            script_dir = temp / "repo"
+            script_dir.mkdir()
+            wrapper = script_dir / "setup_linux.sh"
+            shutil.copy2(ROOT / "setup_linux.sh", wrapper)
+            wrapper.chmod(0o755)
+            (script_dir / "setup_core.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
+
+            runtime_dir = temp / "external-venv"
+            runtime_bin = runtime_dir / "bin"
+            runtime_bin.mkdir(parents=True)
+            fake_python = runtime_bin / "python"
+            fake_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            fake_python.chmod(0o755)
+            env = {
+                **os.environ,
+                "HOME": str(temp / "home"),
+                "OPENCODE_SETUP_RUNTIME_DIR": str(runtime_dir),
+                "PYTHONUTF8": "1",
+                "PYTHONIOENCODING": "utf-8",
+            }
+            cp = subprocess.run(
+                [bash, str(wrapper), "--check", "--skip-package-install", "--skip-dependency-install"],
+                text=True,
+                encoding="utf-8",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=env,
+            )
+            self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
+            self.assertIn("refusing to adopt or repair", cp.stderr.lower())
 
 
 if __name__ == "__main__":

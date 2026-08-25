@@ -48,20 +48,31 @@ fi
 
 base_python="${OPENCODE_SETUP_PYTHON:-python3}"
 venv_python="$RUNTIME_DIR/bin/python"
+marker_file="$RUNTIME_DIR/.opencode-setup-managed-runtime"
+marker_expected="opencode_setup-bootstrap-python-v1"
+runtime_owned=0
+if [[ -f "$marker_file" ]] && [[ "$(cat "$marker_file")" == "$marker_expected" ]]; then
+  runtime_owned=1
+fi
 core_python="$base_python"
 
 if [[ $check_mode -eq 1 ]]; then
-  if [[ -x "$venv_python" ]]; then
+  if [[ -e "$RUNTIME_DIR" ]]; then
+    if [[ $runtime_owned -ne 1 || ! -x "$venv_python" ]]; then
+      echo "Managed Python runtime path exists but ownership/health is not proven: $RUNTIME_DIR" >&2
+      echo "Check mode is read-only; refusing to adopt or repair this directory." >&2
+      exit 2
+    fi
     core_python="$venv_python"
   fi
 else
-  if [[ -e "$RUNTIME_DIR" && ! -x "$venv_python" ]]; then
-    echo "Managed Python runtime path exists but is incomplete: $RUNTIME_DIR" >&2
+  if [[ -e "$RUNTIME_DIR" && ( $runtime_owned -ne 1 || ! -x "$venv_python" ) ]]; then
+    echo "Managed Python runtime path exists but ownership/health is not proven: $RUNTIME_DIR" >&2
     echo "Refusing to replace an unknown/incomplete runtime automatically." >&2
     exit 2
   fi
 
-  if [[ ! -x "$venv_python" ]]; then
+  if [[ ! -e "$RUNTIME_DIR" ]]; then
     runtime_parent="$(dirname "$RUNTIME_DIR")"
     mkdir -p "$runtime_parent"
     runtime_tmp="$runtime_parent/.python-runtime.tmp.$$"
@@ -86,6 +97,7 @@ else
       echo "Created Python runtime has no working pip: $runtime_tmp" >&2
       exit 2
     fi
+    printf '%s\n' "$marker_expected" > "$runtime_tmp/.opencode-setup-managed-runtime"
     if [[ -e "$RUNTIME_DIR" ]]; then
       echo "Runtime path appeared concurrently; refusing to replace it: $RUNTIME_DIR" >&2
       exit 2
@@ -93,6 +105,7 @@ else
     mv "$runtime_tmp" "$RUNTIME_DIR"
     runtime_tmp=""
     trap - EXIT
+    runtime_owned=1
   fi
   core_python="$venv_python"
 fi
