@@ -58,6 +58,15 @@ class WindowsNpmLayeredInventoryTests(unittest.TestCase):
         recommendation = duplicate_recommendation("Python", items)
         self.assertIn("остальные глобальные экземпляры удалить", recommendation)
 
+    def test_opencode_install_script_path_is_classified_as_curl(self) -> None:
+        path = Path("/home/test/.opencode/bin/opencode")
+        self.assertEqual(infer_manager(path, command="opencode"), "curl")
+        self.assertEqual(infer_manager(path, command="other"), "unknown")
+
+    def test_local_bin_opencode_is_not_assumed_to_be_curl(self) -> None:
+        path = Path("/home/test/.local/bin/opencode")
+        self.assertEqual(infer_manager(path, command="opencode"), "local")
+
 
 if __name__ == "__main__":
     unittest.main()

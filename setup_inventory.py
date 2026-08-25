@@ -83,7 +83,9 @@ def infer_manager(path: Path, *, command: str | None = None) -> str:
         return "brew"
     if "/mise/" in value or "/.mise/" in value:
         return "mise"
-    if "/.opencode/bin/" in value or "/.local/bin/opencode" in value:
+    if command == "opencode" and "/.opencode/bin/opencode" in value:
+        return "curl"
+    if "/.local/bin/opencode" in value:
         return "local"
     return "unknown"
 
