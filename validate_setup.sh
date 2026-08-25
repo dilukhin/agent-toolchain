@@ -278,7 +278,7 @@ assert config["provider"]["routerai"]["options"]["apiKey"] == expected
 PY_PLAIN
 find "$home3/.local/state/opencode_setup/backups" -type f -name opencode.jsonc -print -quit | grep -q .
 grep -q 'up-to-date.*RouterAI credential' "$test_root/plain-config-migration.out"
-grep -q 'up-to-date.*OpenCode config migration' "$test_root/plain-config-migration.out"
+grep -q 'up-to-date.*OpenCode config.*backup:' "$test_root/plain-config-migration.out"
 echo "PASS existing plain OpenCode config is safely migrated with backup and credential preservation"
 
 if grep -RInE --exclude='validate_setup.sh' --exclude='*.md' -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|sk-[A-Za-z0-9_-]{24,}|gh[pousr]_[A-Za-z0-9]{20,}' "$SCRIPT_DIR"; then

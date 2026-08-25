@@ -38,6 +38,28 @@ class Reporter:
     def add(self, component: str, state: str, detail: str = "") -> None:
         if state not in VALID_STATES:
             raise ValueError(f"invalid state: {state}")
+
+        # Reconciliation helpers historically reported an observed pre-state and then
+        # appended a separate validation/migration row after a successful apply.  That
+        # made the final table look as if the component were still missing/outdated.
+        # Fold successful post-action rows back into the component they verify so the
+        # rendered STATE always describes the final verified state.
+        base_component: str | None = None
+        if state == STATE_OK:
+            for suffix in (" validation", " migration"):
+                if component.endswith(suffix):
+                    base_component = component[:-len(suffix)]
+                    break
+            if component == "OpenCode autoupdate policy":
+                base_component = "OpenCode config"
+
+        if base_component:
+            for index in range(len(self.results) - 1, -1, -1):
+                existing = self.results[index]
+                if existing.component == base_component and existing.state != STATE_CONFLICT:
+                    self.results[index] = Result(base_component, STATE_OK, detail)
+                    return
+
         self.results.append(Result(component, state, detail))
 
     @property
@@ -132,11 +154,13 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
     legacy = set(legacy_hashes)
 
     if not destination.exists():
-        reporter.add(component, STATE_MISSING, str(destination))
         if check:
+            reporter.add(component, STATE_MISSING,
+                         f"{destination}; обычный apply создаст управляемый файл автоматически")
             return False
         atomic_write(destination, source_data)
         managed[component] = {"path": str(destination), "sha256": desired_hash, "source": source_label}
+        reporter.add(component, STATE_OK, f"создан автоматически: {destination}")
         return True
     if not destination.is_file():
         reporter.add(component, STATE_CONFLICT, f"destination is not a regular file: {destination}")
@@ -168,7 +192,7 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
         backup = backup_file(destination, state_dir, component)
         atomic_write(destination, source_data)
         managed[component] = {"path": str(destination), "sha256": desired_hash, "source": source_label}
-        reporter.add(component, STATE_OUTDATED, f"forced replacement after backup: {backup}")
+        reporter.add(component, STATE_OK, f"заменён после backup: {backup}")
         return True
 
     if current_hash == desired_hash:
@@ -178,11 +202,13 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
             return True
         return False
 
-    reporter.add(component, STATE_OUTDATED, "managed source changed")
     if check:
+        reporter.add(component, STATE_OUTDATED,
+                     "managed source changed; обычный apply обновит управляемый файл автоматически")
         return False
     atomic_write(destination, source_data)
     managed[component] = {"path": str(destination), "sha256": desired_hash, "source": source_label}
+    reporter.add(component, STATE_OK, "управляемый источник обновлён автоматически")
     return True
 
 
@@ -422,7 +448,7 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
                 reporter.add(component, STATE_CONFLICT, "--force would backup and adopt safely merged config")
                 return False
             backup = backup_file(destination, state_dir, component)
-            reporter.add(component, STATE_OUTDATED, f"forced safe adoption after backup: {backup}")
+            reporter.add(component, STATE_OK, f"forced safe adoption after backup: {backup}")
         else:
             reporter.add(component, STATE_OK, detail)
         if not check and (previous is None or previous.get("sha256") != current_hash or previous.get("mode") != "merged-json"):
@@ -431,16 +457,17 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
             return True
         return False
 
-    reporter.add(component, STATE_OUTDATED,
-                 "compatible existing RouterAI config; managed fields can be merged without removing user settings")
     if check:
+        reporter.add(component, STATE_OUTDATED,
+                     "compatible existing RouterAI config; managed fields can be merged without removing user settings; "
+                     "обычный apply выполнит merge автоматически")
         return False
     backup = backup_file(destination, state_dir, component)
     merged_data = _json_bytes(merged)
     atomic_write(destination, merged_data)
     managed[component] = {"path": str(destination), "sha256": sha256_bytes(merged_data),
                           "source": source_label, "mode": "merged-json"}
-    reporter.add(component + " migration", STATE_OK, f"backup: {backup}")
+    reporter.add(component, STATE_OK, f"managed fields merged automatically; backup: {backup}")
     return True
 
 
@@ -505,8 +532,10 @@ def reconcile_agents_file(*, destination: Path, template_data: bytes, source_lab
                                   "block_sha256": sha256_bytes(desired_block)}
             return True
 
-        reporter.add(component, STATE_OUTDATED, "existing user AGENTS.md; managed block can be appended safely")
         if check:
+            reporter.add(component, STATE_OUTDATED,
+                         "existing user AGENTS.md; managed block can be appended safely; "
+                         "обычный apply добавит блок автоматически")
             return False
         backup = backup_file(destination, state_dir, component)
         separator = "" if not text or text.endswith("\n\n") else ("\n" if text.endswith("\n") else "\n\n")
@@ -515,7 +544,7 @@ def reconcile_agents_file(*, destination: Path, template_data: bytes, source_lab
         managed[component] = {"path": str(destination), "sha256": sha256_bytes(updated),
                               "source": source_label, "mode": "block",
                               "block_sha256": sha256_bytes(desired_block)}
-        reporter.add(component + " migration", STATE_OK, f"user text preserved; backup: {backup}")
+        reporter.add(component, STATE_OK, f"managed block appended automatically; user text preserved; backup: {backup}")
         return True
 
     if previous.get("path") != str(destination):
@@ -542,8 +571,9 @@ def reconcile_agents_file(*, destination: Path, template_data: bytes, source_lab
             return True
         return False
 
-    reporter.add(component, STATE_OUTDATED, "managed AGENTS block source changed")
     if check:
+        reporter.add(component, STATE_OUTDATED,
+                     "managed AGENTS block source changed; обычный apply обновит только управляемый блок автоматически")
         return False
     backup = backup_file(destination, state_dir, component)
     updated_text = text[:start] + desired_text.rstrip("\n") + text[end_pos:]
@@ -554,7 +584,7 @@ def reconcile_agents_file(*, destination: Path, template_data: bytes, source_lab
     managed[component] = {"path": str(destination), "sha256": sha256_bytes(updated),
                           "source": source_label, "mode": "block",
                           "block_sha256": sha256_bytes(desired_block)}
-    reporter.add(component + " migration", STATE_OK, f"only managed block replaced; backup: {backup}")
+    reporter.add(component, STATE_OK, f"only managed block replaced automatically; backup: {backup}")
     return True
 
 
@@ -649,26 +679,47 @@ def inspect_repo(path: Path, expected_url: str, branch: str) -> tuple[str, str]:
 def reconcile_repo(*, component: str, path: Path, url: str, branch: str,
                    reporter: Reporter, check: bool) -> tuple[bool, str]:
     state, detail = inspect_repo(path, url, branch)
-    reporter.add(component, state, detail)
     if check:
+        if state == STATE_MISSING:
+            detail += "; обычный apply клонирует управляемый репозиторий автоматически"
+        elif state == STATE_OUTDATED:
+            detail += "; обычный apply выполнит безопасный ff-only update автоматически"
+        reporter.add(component, state, detail)
         return state in {STATE_OK, STATE_OUTDATED}, state
+
+    if state == STATE_CONFLICT:
+        reporter.add(component, state, detail)
+        return False, state
+    if state == STATE_OK:
+        reporter.add(component, state, detail)
+        return True, state
+
+    action = ""
     if state == STATE_MISSING:
         path.parent.mkdir(parents=True, exist_ok=True)
         cp = run(["git", "clone", "--branch", branch, "--single-branch", url, str(path)])
         if cp.returncode != 0:
-            reporter.add(component + " clone", STATE_CONFLICT, cp.stderr.strip()[-400:])
+            reporter.add(component, STATE_CONFLICT, "clone failed; " + cp.stderr.strip()[-400:])
             return False, STATE_CONFLICT
+        action = "клонирован автоматически"
         state, detail = inspect_repo(path, url, branch)
         if state not in {STATE_OK, STATE_OUTDATED}:
-            reporter.add(component + " clone", STATE_CONFLICT, detail)
+            reporter.add(component, STATE_CONFLICT, "clone завершён, но итоговое состояние не подтверждено: " + detail)
             return False, STATE_CONFLICT
     if state == STATE_OUTDATED:
         cp = run(["git", "pull", "--ff-only", "origin", branch], cwd=path)
         if cp.returncode != 0:
-            reporter.add(component + " update", STATE_CONFLICT, "fast-forward update failed; repository preserved")
+            reporter.add(component, STATE_CONFLICT, "fast-forward update failed; repository preserved")
             return False, STATE_CONFLICT
+        action = (action + "; " if action else "") + "ff-only update применён автоматически"
         state, detail = inspect_repo(path, url, branch)
         if state != STATE_OK:
-            reporter.add(component + " update", STATE_CONFLICT, detail)
+            reporter.add(component, STATE_CONFLICT, "update завершён, но итоговое состояние не подтверждено: " + detail)
             return False, STATE_CONFLICT
-    return state == STATE_OK, state
+
+    if state == STATE_OK:
+        prefix = (action + "; ") if action else ""
+        reporter.add(component, STATE_OK, prefix + detail)
+        return True, STATE_OK
+    reporter.add(component, STATE_CONFLICT, "reconciliation завершён без подтверждённого up-to-date состояния")
+    return False, STATE_CONFLICT
