@@ -277,7 +277,8 @@ def _report_ssh_relay_source_launcher(repo: Path, managed_python: str, public: P
         return
     script = repo / "ssh_relay.py"
     try:
-        first_line = script.open("r", encoding="utf-8").readline().strip()
+        with script.open("r", encoding="utf-8") as stream:
+            first_line = stream.readline().strip()
     except OSError:
         return
     if first_line != "#!/usr/bin/env python3":
@@ -373,6 +374,19 @@ def ensure_ssh_relay_runtime(repo: Path, python_exe: str, reporter: Reporter,
     internal, internal_changed = _reconcile_internal_ssh_relay_launcher(repo, runtime_root, reporter, check)
     if internal is None:
         target = _ssh_relay_public_entrypoint()
+        if check:
+            if not target.exists() and not target.is_symlink():
+                reporter.add(
+                    "ssh_relay entrypoint",
+                    STATE_MISSING,
+                    f"{target}; обычный apply сначала настроит runtime launcher, затем создаст public entrypoint",
+                )
+            else:
+                reporter.add(
+                    "ssh_relay entrypoint",
+                    STATE_OUTDATED,
+                    f"{target}; проверка ownership/target будет завершена после reconciliation runtime launcher",
+                )
         _report_ssh_relay_source_launcher(repo, python_exe, target, reporter)
         return
     public, public_changed = _reconcile_public_ssh_relay_entrypoint(internal, reporter, check)
