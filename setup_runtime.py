@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shlex
 import shutil
 import sys
 from pathlib import Path
@@ -26,8 +28,277 @@ from setup_lib import (
     STATE_OK,
     STATE_OUTDATED,
     STATE_SKIPPED,
+    atomic_write,
     run,
 )
+
+_MANAGED_RUNTIME_MARKER = "opencode_setup-bootstrap-python-v1"
+_SSH_RELAY_LAUNCHER_MARKER = "opencode_setup:ssh_relay-entrypoint-v1"
+_SSH_RELAY_PUBLIC_MARKER = "opencode_setup:ssh_relay-public-entrypoint-v1"
+
+
+def _managed_python_runtime_root(python_exe: str) -> Path | None:
+    """Return the opencode_setup-owned venv root for python_exe, if ownership is proven."""
+    try:
+        executable = Path(python_exe).expanduser().resolve()
+        root = executable.parent.parent
+        marker = root / ".opencode-setup-managed-runtime"
+        if not marker.is_file():
+            return None
+        if marker.read_text(encoding="utf-8").strip() != _MANAGED_RUNTIME_MARKER:
+            return None
+        expected = root / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        if executable != expected.resolve():
+            return None
+        return root
+    except OSError:
+        return None
+
+
+def _ssh_relay_internal_entrypoint(runtime_root: Path) -> Path:
+    if os.name == "nt":
+        return runtime_root / "Scripts" / "ssh_relay.cmd"
+    return runtime_root / "bin" / "ssh_relay"
+
+
+def _ssh_relay_public_entrypoint() -> Path:
+    override = os.environ.get("OPENCODE_SETUP_BIN_DIR")
+    if override:
+        base = Path(override).expanduser()
+    elif os.name == "nt":
+        local = os.environ.get("LOCALAPPDATA")
+        base = Path(local) / "opencode_setup" / "bin" if local else Path.home() / ".local" / "bin"
+    else:
+        base = Path.home() / ".local" / "bin"
+    return base / ("ssh_relay.cmd" if os.name == "nt" else "ssh_relay")
+
+
+def _escape_cmd_path(path: Path) -> str:
+    return str(path).replace("%", "%%")
+
+
+def _render_ssh_relay_internal_entrypoint(repo: Path) -> bytes:
+    source = (repo / "ssh_relay.py").resolve()
+    if os.name == "nt":
+        text = (
+            "@echo off\r\n"
+            f"rem {_SSH_RELAY_LAUNCHER_MARKER}\r\n"
+            f'"%~dp0python.exe" -B "{_escape_cmd_path(source)}" %*\r\n'
+        )
+    else:
+        text = (
+            "#!/bin/sh\n"
+            f"# {_SSH_RELAY_LAUNCHER_MARKER}\n"
+            'SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\n'
+            f'exec "$SCRIPT_DIR/python" -B {shlex.quote(str(source))} "$@"\n'
+        )
+    return text.encode("utf-8")
+
+
+def _render_ssh_relay_public_entrypoint(internal: Path) -> bytes:
+    text = (
+        "@echo off\r\n"
+        f"rem {_SSH_RELAY_PUBLIC_MARKER}\r\n"
+        f'"{_escape_cmd_path(internal.resolve())}" %*\r\n'
+    )
+    return text.encode("utf-8")
+
+
+def _inspect_generated_launcher(path: Path, desired: bytes, *, executable: bool) -> tuple[str, str]:
+    if not path.exists():
+        return STATE_MISSING, str(path)
+    if path.is_symlink() or not path.is_file():
+        return STATE_CONFLICT, f"entrypoint path exists but is not the expected regular file: {path}"
+    try:
+        current = path.read_bytes()
+    except OSError as exc:
+        return STATE_CONFLICT, f"cannot read managed entrypoint {path}: {exc}"
+    if current != desired:
+        return STATE_CONFLICT, f"existing entrypoint differs from opencode_setup generated content; preserved: {path}"
+    if executable and not os.access(path, os.X_OK):
+        return STATE_OUTDATED, f"managed launcher is not executable: {path}"
+    return STATE_OK, str(path)
+
+
+def _reconcile_internal_ssh_relay_launcher(
+    repo: Path,
+    runtime_root: Path,
+    reporter: Reporter,
+    check: bool,
+) -> tuple[Path | None, bool]:
+    path = _ssh_relay_internal_entrypoint(runtime_root)
+    desired = _render_ssh_relay_internal_entrypoint(repo)
+    executable = os.name != "nt"
+    state, detail = _inspect_generated_launcher(path, desired, executable=executable)
+    if state == STATE_OK:
+        reporter.add("ssh_relay runtime launcher", STATE_OK, detail)
+        return path, False
+    if state == STATE_CONFLICT:
+        reporter.add("ssh_relay runtime launcher", STATE_CONFLICT, detail)
+        return None, False
+    if check:
+        action = "создаст" if state == STATE_MISSING else "восстановит executable mode для"
+        reporter.add(
+            "ssh_relay runtime launcher",
+            state,
+            f"{detail}; обычный apply {action} launcher, использующий managed Python runtime",
+        )
+        return None, False
+    try:
+        if state == STATE_MISSING:
+            atomic_write(path, desired)
+        if executable:
+            path.chmod(0o755)
+    except OSError as exc:
+        reporter.add(
+            "ssh_relay runtime launcher",
+            STATE_FAILED,
+            f"не удалось настроить managed launcher {path}: {exc}",
+        )
+        return None, False
+    reporter.add(
+        "ssh_relay runtime launcher",
+        STATE_CONFIGURED,
+        f"launcher настроен: {path}; он всегда использует Python из managed runtime",
+    )
+    return path, True
+
+
+def _inspect_linux_public_entrypoint(public: Path, internal: Path) -> tuple[str, str]:
+    if public.is_symlink():
+        try:
+            target = (public.parent / os.readlink(public)).resolve()
+        except OSError as exc:
+            return STATE_CONFLICT, f"cannot inspect ssh_relay symlink {public}: {exc}"
+        if target == internal.resolve():
+            return STATE_OK, f"{public} -> {internal}"
+        return STATE_CONFLICT, f"existing symlink points elsewhere and is preserved: {public} -> {target}"
+    if public.exists():
+        return STATE_CONFLICT, f"existing non-managed entrypoint is preserved: {public}"
+    return STATE_MISSING, str(public)
+
+
+def _reconcile_public_ssh_relay_entrypoint(
+    internal: Path,
+    reporter: Reporter,
+    check: bool,
+) -> tuple[Path | None, bool]:
+    public = _ssh_relay_public_entrypoint()
+    if os.name != "nt":
+        state, detail = _inspect_linux_public_entrypoint(public, internal)
+        if state == STATE_OK:
+            reporter.add("ssh_relay entrypoint", STATE_OK, detail)
+            return public, False
+        if state == STATE_CONFLICT:
+            reporter.add("ssh_relay entrypoint", STATE_CONFLICT, detail)
+            return None, False
+        if check:
+            reporter.add(
+                "ssh_relay entrypoint",
+                STATE_MISSING,
+                f"{public}; обычный apply создаст безопасную ссылку на managed runtime launcher",
+            )
+            return None, False
+        try:
+            public.parent.mkdir(parents=True, exist_ok=True)
+            os.symlink(str(internal.resolve()), public)
+        except OSError as exc:
+            reporter.add("ssh_relay entrypoint", STATE_FAILED, f"не удалось создать {public}: {exc}")
+            return None, False
+        reporter.add(
+            "ssh_relay entrypoint",
+            STATE_CONFIGURED,
+            f"создан: {public} -> {internal}; используйте `ssh_relay ...` вместо прямого `./ssh_relay.py`",
+        )
+        return public, True
+
+    desired = _render_ssh_relay_public_entrypoint(internal)
+    state, detail = _inspect_generated_launcher(public, desired, executable=False)
+    if state == STATE_OK:
+        reporter.add("ssh_relay entrypoint", STATE_OK, detail)
+        return public, False
+    if state == STATE_CONFLICT:
+        reporter.add("ssh_relay entrypoint", STATE_CONFLICT, detail)
+        return None, False
+    if check:
+        reporter.add(
+            "ssh_relay entrypoint",
+            state,
+            f"{detail}; обычный apply создаст managed Windows entrypoint",
+        )
+        return None, False
+    try:
+        atomic_write(public, desired)
+    except OSError as exc:
+        reporter.add("ssh_relay entrypoint", STATE_FAILED, f"не удалось создать {public}: {exc}")
+        return None, False
+    reporter.add(
+        "ssh_relay entrypoint",
+        STATE_CONFIGURED,
+        f"создан managed Windows entrypoint: {public}",
+    )
+    return public, True
+
+
+def _run_ssh_relay_entrypoint(entrypoint: Path, arg: str):
+    if os.name == "nt":
+        comspec = os.environ.get("COMSPEC", "cmd.exe")
+        return run([comspec, "/d", "/c", str(entrypoint), arg])
+    return run([str(entrypoint), arg])
+
+
+def _report_ssh_relay_resolution(entrypoint: Path, internal: Path, reporter: Reporter) -> None:
+    resolved = shutil.which("ssh_relay")
+    if not resolved:
+        reporter.add(
+            "ssh_relay command resolution",
+            STATE_OUTDATED,
+            f"managed entrypoint готов: {entrypoint}, но его каталог не активен в PATH. "
+            f"MANUAL ACTION REQUIRED: добавьте {entrypoint.parent} в PATH или используйте абсолютный путь {entrypoint}",
+        )
+        return
+    try:
+        resolved_path = Path(resolved).resolve()
+    except OSError:
+        resolved_path = Path(resolved)
+    expected = internal.resolve() if os.name != "nt" else entrypoint.resolve()
+    if os.path.normcase(str(resolved_path)) == os.path.normcase(str(expected)):
+        reporter.add("ssh_relay command resolution", STATE_OK, f"ssh_relay -> {resolved}")
+        return
+    reporter.add(
+        "ssh_relay command resolution",
+        STATE_CONFLICT,
+        f"команда ssh_relay в PATH разрешается в другой экземпляр: {resolved}; managed entrypoint сохранён: {entrypoint}",
+    )
+
+
+def _report_ssh_relay_source_launcher(repo: Path, managed_python: str, public: Path, reporter: Reporter) -> None:
+    if os.name == "nt":
+        return
+    script = repo / "ssh_relay.py"
+    try:
+        first_line = script.open("r", encoding="utf-8").readline().strip()
+    except OSError:
+        return
+    if first_line != "#!/usr/bin/env python3":
+        return
+    source_python = shutil.which("python3")
+    if not source_python:
+        return
+    try:
+        if Path(source_python).resolve() == Path(managed_python).resolve():
+            return
+    except OSError:
+        pass
+    probe = run([source_python, "-c", "import paramiko"])
+    if probe.returncode == 0:
+        return
+    reporter.add(
+        "ssh_relay source launcher",
+        STATE_INFO,
+        f"{script} запускается через неуправляемый Python {source_python}, где paramiko отсутствует. "
+        f"Прямой `./ssh_relay.py daemon ...` поэтому не является проверенным runtime; используйте managed entrypoint: {public}",
+    )
 
 
 def ensure_ssh_relay_runtime(repo: Path, python_exe: str, reporter: Reporter,
@@ -38,9 +309,11 @@ def ensure_ssh_relay_runtime(repo: Path, python_exe: str, reporter: Reporter,
     if skip_install:
         reporter.add("ssh_relay runtime", STATE_SKIPPED, "установка/проверка зависимостей пропущена")
         return
+
     import_test = run([python_exe, "-c", "import paramiko"])
     installed_now = False
-    if import_test.returncode != 0:
+    runtime_ready = import_test.returncode == 0
+    if not runtime_ready:
         if check:
             reporter.add(
                 "ssh_relay runtime",
@@ -48,30 +321,82 @@ def ensure_ssh_relay_runtime(repo: Path, python_exe: str, reporter: Reporter,
                 "отсутствует Python-зависимость paramiko; обычный apply установит её автоматически "
                 "в управляемый Python runtime",
             )
+        else:
+            install = run([python_exe, "-m", "pip", "install", "paramiko"])
+            if install.returncode != 0:
+                reporter.add(
+                    "ssh_relay runtime",
+                    STATE_FAILED,
+                    "не удалось установить paramiko в управляемый Python runtime: " + install.stderr.strip()[-400:],
+                )
+                return
+            installed_now = True
+            runtime_ready = True
+
+    runtime_root = _managed_python_runtime_root(python_exe)
+    if runtime_root is None:
+        if not runtime_ready:
             return
-        install = run([python_exe, "-m", "pip", "install", "paramiko"])
-        if install.returncode != 0:
+        version = run([python_exe, str(repo / "ssh_relay.py"), "--version"])
+        help_cp = run([python_exe, str(repo / "ssh_relay.py"), "--help"])
+        if version.returncode != 0 or help_cp.returncode != 0 or "job" not in help_cp.stdout:
+            state = STATE_FAILED if installed_now else STATE_CONFLICT
             reporter.add(
                 "ssh_relay runtime",
-                STATE_FAILED,
-                "не удалось установить paramiko в управляемый Python runtime: " + install.stderr.strip()[-400:],
+                state,
+                "--version/--help завершились ошибкой либо отсутствует команда job",
             )
-            return
-        installed_now = True
-    version = run([python_exe, str(repo / "ssh_relay.py"), "--version"])
-    help_cp = run([python_exe, str(repo / "ssh_relay.py"), "--help"])
-    if version.returncode != 0 or help_cp.returncode != 0 or "job" not in help_cp.stdout:
-        state = STATE_FAILED if installed_now else STATE_CONFLICT
-        detail = ("paramiko установлен, но итоговая проверка ssh_relay не пройдена: "
-                  "--version/--help завершились ошибкой либо отсутствует команда job")
-        reporter.add("ssh_relay runtime", state, detail)
-    else:
-        detail = version.stdout.strip() or "проверено"
-        if installed_now:
-            reporter.add("ssh_relay runtime", STATE_CONFIGURED,
-                         "paramiko установлен в управляемый Python runtime; итоговая проверка: " + detail)
+        elif installed_now:
+            reporter.add(
+                "ssh_relay runtime",
+                STATE_CONFIGURED,
+                "paramiko установлен; source CLI проверен: " + (version.stdout.strip() or "ssh_relay"),
+            )
         else:
-            reporter.add("ssh_relay runtime", STATE_OK, detail)
+            reporter.add("ssh_relay runtime", STATE_OK, version.stdout.strip() or "проверено")
+        return
+
+    if runtime_ready:
+        if installed_now:
+            reporter.add(
+                "ssh_relay runtime",
+                STATE_CONFIGURED,
+                f"paramiko установлен в managed Python runtime: {python_exe}",
+            )
+        else:
+            reporter.add(
+                "ssh_relay runtime",
+                STATE_OK,
+                f"paramiko доступен в managed Python runtime: {python_exe}",
+            )
+
+    internal, internal_changed = _reconcile_internal_ssh_relay_launcher(repo, runtime_root, reporter, check)
+    if internal is None:
+        target = _ssh_relay_public_entrypoint()
+        _report_ssh_relay_source_launcher(repo, python_exe, target, reporter)
+        return
+    public, public_changed = _reconcile_public_ssh_relay_entrypoint(internal, reporter, check)
+    target = public or _ssh_relay_public_entrypoint()
+    _report_ssh_relay_source_launcher(repo, python_exe, target, reporter)
+    if public is None or not runtime_ready:
+        return
+
+    version = _run_ssh_relay_entrypoint(public, "--version")
+    help_cp = _run_ssh_relay_entrypoint(public, "--help")
+    if version.returncode != 0 or help_cp.returncode != 0 or "job" not in help_cp.stdout:
+        state = STATE_FAILED if (internal_changed or public_changed) else STATE_CONFLICT
+        reporter.add(
+            "ssh_relay health",
+            state,
+            "managed entrypoint существует, но --version/--help не подтвердили работоспособность ssh_relay",
+        )
+        return
+    reporter.add(
+        "ssh_relay health",
+        STATE_OK,
+        f"managed entrypoint проверен: {public}; {version.stdout.strip() or 'ssh_relay'}",
+    )
+    _report_ssh_relay_resolution(public, internal, reporter)
 
 
 def _module_origin(python_exe: str, module: str) -> Path | None:
