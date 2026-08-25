@@ -186,7 +186,8 @@ def reconcile_agent_safe_repo(*, component: str, path: Path, url: str, branch: s
         reporter.add(
             component,
             STATE_OUTDATED,
-            "legacy editable-install egg-info is the only local artifact; ff-only update can recover without deleting files",
+            "legacy editable-install egg-info is the only local artifact; обычный apply выполнит безопасный "
+            "ff-only recovery автоматически без удаления файлов",
         )
         return True, STATE_OUTDATED
 
@@ -332,7 +333,8 @@ def main(argv: list[str] | None = None) -> int:
                 reporter.add(
                     "RouterAI credential",
                     STATE_MISSING,
-                    f"служебная заглушка предыдущей версии не является API key; запишите реальный ключ RouterAI: {api_key_file}",
+                    f"MANUAL ACTION REQUIRED: служебная заглушка предыдущей версии не является API key; "
+                    f"запишите реальный ключ RouterAI: {api_key_file}",
                 )
             else:
                 mode_detail = "external file referenced by config" if credential_mode == "external-file" else "existing credential file"
@@ -344,13 +346,18 @@ def main(argv: list[str] | None = None) -> int:
     else:
         if credential_mode == "external-file":
             state = STATE_MISSING if args.check else STATE_CONFLICT
-            reporter.add("RouterAI credential", state,
-                         f"existing config references missing credential; no alternate placeholder created: {api_key_file}")
+            reporter.add(
+                "RouterAI credential",
+                state,
+                f"existing config references missing credential. MANUAL ACTION REQUIRED: provision RouterAI credential at "
+                f"the existing path: {api_key_file}; no alternate placeholder created",
+            )
         else:
             reporter.add(
                 "RouterAI credential",
                 STATE_MISSING,
-                f"ключ RouterAI не настроен; запишите реальный API key по canonical path: {api_key_file}",
+                f"MANUAL ACTION REQUIRED: ключ RouterAI не настроен; запишите реальный API key по canonical path: "
+                f"{api_key_file}",
             )
 
     if api_key_file is not None and not args.check:
@@ -389,7 +396,12 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if not shutil.which("git"):
-        reporter.add("dependency repositories", STATE_CONFLICT, "git is not available")
+        reporter.add(
+            "dependency repositories",
+            STATE_CONFLICT,
+            "git is not available. MANUAL ACTION REQUIRED: install Git and make the git command available in PATH, "
+            "then rerun setup",
+        )
         ssh_usable = safe_usable = False
         ssh_repo_state = safe_repo_state = STATE_CONFLICT
     else:
@@ -415,7 +427,12 @@ def main(argv: list[str] | None = None) -> int:
             if not valid:
                 reporter.add("skill ssh-relay", STATE_CONFLICT, f"source invalid: {detail}")
             elif args.check and ssh_repo_state == STATE_OUTDATED:
-                reporter.add("skill ssh-relay", STATE_OUTDATED, "dependency repository has upstream changes")
+                reporter.add(
+                    "skill ssh-relay",
+                    STATE_OUTDATED,
+                    "dependency repository has upstream changes; обычный apply сначала выполнит безопасный ff-only update "
+                    "репозитория, затем обновит управляемый skill автоматически",
+                )
             else:
                 manifest_changed |= reconcile_file(
                     component="skill ssh-relay",
@@ -425,7 +442,13 @@ def main(argv: list[str] | None = None) -> int:
                 )
         else:
             state = STATE_MISSING if ssh_repo_state == STATE_MISSING else STATE_CONFLICT
-            reporter.add("skill ssh-relay", state, "authoritative repository is not usable")
+            if state == STATE_MISSING:
+                detail = ("authoritative repository is missing; обычный apply клонирует его и затем установит "
+                          "управляемый skill автоматически")
+            else:
+                detail = ("authoritative repository is not usable; исправьте конфликт repository, указанный выше, "
+                          "затем повторите setup")
+            reporter.add("skill ssh-relay", state, detail)
 
         if safe_usable:
             for skill_name, relative in safe_spec["skills"].items():
@@ -436,7 +459,12 @@ def main(argv: list[str] | None = None) -> int:
                     reporter.add(component, STATE_CONFLICT, f"source invalid: {detail}")
                     continue
                 if args.check and safe_repo_state == STATE_OUTDATED:
-                    reporter.add(component, STATE_OUTDATED, "dependency repository has upstream changes")
+                    reporter.add(
+                        component,
+                        STATE_OUTDATED,
+                        "dependency repository has upstream changes; обычный apply сначала выполнит безопасный ff-only "
+                        "update репозитория, затем обновит управляемый skill автоматически",
+                    )
                     continue
                 manifest_changed |= reconcile_file(
                     component=component, destination=skills_dir / skill_name / "SKILL.md",
@@ -445,15 +473,27 @@ def main(argv: list[str] | None = None) -> int:
                 )
         else:
             state = STATE_MISSING if safe_repo_state == STATE_MISSING else STATE_CONFLICT
+            if state == STATE_MISSING:
+                detail = ("authoritative repository is missing; обычный apply клонирует его и затем установит "
+                          "управляемый skill автоматически")
+            else:
+                detail = ("authoritative repository is not usable; исправьте конфликт repository, указанный выше, "
+                          "затем повторите setup")
             for skill_name in safe_spec["skills"]:
-                reporter.add(f"skill {skill_name}", state, "authoritative repository is not usable")
+                reporter.add(f"skill {skill_name}", state, detail)
 
     if not args.check and manifest_changed:
         state_dir.mkdir(parents=True, exist_ok=True)
         save_manifest(manifest_path, manifest)
         reporter.add("ownership manifest", STATE_OK, str(manifest_path))
+    elif manifest_path.exists():
+        reporter.add("ownership manifest", STATE_OK, str(manifest_path))
     else:
-        reporter.add("ownership manifest", STATE_OK if manifest_path.exists() else STATE_MISSING, str(manifest_path))
+        reporter.add(
+            "ownership manifest",
+            STATE_MISSING,
+            f"{manifest_path}; обычный apply создаст ownership manifest автоматически после успешного reconciliation",
+        )
 
     reporter.render()
     return 2 if reporter.has_conflict else 0

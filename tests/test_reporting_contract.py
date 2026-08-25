@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import subprocess
 import sys
 import tempfile
@@ -9,6 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import setup_core as core  # noqa: E402
 import setup_lib as lib  # noqa: E402
 import setup_runtime as runtime  # noqa: E402
 
@@ -145,6 +148,44 @@ class RuntimeReportingTests(unittest.TestCase):
         finally:
             runtime.run = original_run
             runtime._module_origin = original_origin
+
+
+class CoreActionGuidanceTests(unittest.TestCase):
+    def test_check_explains_remaining_missing_actions_without_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config_dir = root / "config"
+            stash_dir = root / "stash"
+            credential_dir = config_dir / "credentials"
+            skills_dir = root / "skills"
+            state_dir = root / "state"
+            projects_dir = root / "projects"
+            expected_absent = [config_dir, stash_dir, skills_dir, state_dir, projects_dir]
+
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                rc = core.main([
+                    "--check",
+                    "--config-dir", str(config_dir),
+                    "--stash-dir", str(stash_dir),
+                    "--credential-dir", str(credential_dir),
+                    "--skills-dir", str(skills_dir),
+                    "--state-dir", str(state_dir),
+                    "--projects-dir", str(projects_dir),
+                    "--skip-package-install",
+                    "--skip-dependency-install",
+                    "--ssh-relay-url", str(root / "ssh.git"),
+                    "--agent-safe-url", str(root / "safe.git"),
+                ])
+
+            self.assertEqual(rc, 0)
+            text = output.getvalue()
+            self.assertRegex(text, r"missing\s+RouterAI credential.*MANUAL ACTION REQUIRED")
+            self.assertRegex(text, r"missing\s+skill ssh-relay.*обычный apply.*клонирует")
+            self.assertRegex(text, r"missing\s+skill recovery-mode.*обычный apply.*клонирует")
+            self.assertRegex(text, r"missing\s+ownership manifest.*обычный apply.*создаст")
+            for path in expected_absent:
+                self.assertFalse(path.exists(), path)
 
 
 if __name__ == "__main__":
