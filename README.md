@@ -20,7 +20,7 @@ Linux:
 ./setup_linux.sh --check
 ```
 
-`--check`/`-Check` ничего не изменяет и показывает состояния `missing`, `up-to-date`, `outdated`, `modified/conflict`.
+`--check`/`-Check` ничего не изменяет и показывает состояния `missing`, `up-to-date`, `outdated`, `modified/conflict`. Если изолированный bootstrap Python runtime ещё не создан, check запускает reconciler базовым Python и только сообщает отсутствующие Python-зависимости; сам runtime создаётся только обычным apply.
 
 ## Что управляется
 
@@ -34,6 +34,7 @@ Linux:
 | `recovery-mode`, `risk-gate`, `safe-cli`, `unknown-system-safety` | `dilukhin/agent-safe` | `~/.agents/skills/<name>` |
 | `ssh_relay` checkout | `dilukhin/ssh_relay`, `main` | `~/projects/ssh_relay` |
 | `agent-safe` checkout | `dilukhin/agent-safe`, `master` | `~/projects/agent-safe` |
+| bootstrap Python runtime | platform wrapper + Python `venv` | Linux: `${XDG_DATA_HOME:-~/.local/share}/opencode_setup/runtime/python`; Windows: `%LOCALAPPDATA%\opencode_setup\runtime\python` |
 | OpenCode CLI | обнаруженный владеющий менеджер; для fresh install — npm | активный executable в `PATH` |
 | `@opencode-ai/plugin` | npm `latest` | OpenCode config directory |
 
@@ -110,11 +111,15 @@ Legacy `~/projects/stash/opencode.ai/api-key.txt` остаётся поддер�
 
 ## ssh_relay и agent-safe
 
-`ssh_relay` является authoritative source для `ssh-relay/SKILL.md`. Setup проверяет Python dependency/runtime, `ssh_relay.py --version`, `--help` и наличие `job`; реальная SSH-задача не запускается.
+Платформенный wrapper обычного apply сначала создаёт отдельный bootstrap Python `venv` и запускает `setup_core.py` уже через него. Поэтому Python-зависимости helper runtime не устанавливаются в системный Python. `--check` остаётся строго read-only и не создаёт этот venv. Каталог runtime принимается как управляемый только при наличии точного ownership-marker; существующий неизвестный или неполный каталог не усыновляется и не перезаписывается автоматически.
 
-`agent-safe` является authoritative source для четырёх skills и устанавливается editable-командой `python -m pip install -e <repo>`, после чего проверяется `python -m agent_safe --help`.
+`ssh_relay` является authoritative source для `ssh-relay/SKILL.md`. Setup устанавливает `paramiko` в изолированный bootstrap runtime, затем проверяет `ssh_relay.py --version`, `--help` и наличие `job`; реальная SSH-задача не запускается.
 
-Если default path уже существует, но не является Git working copy, setup **не удаляет и не заменяет его**. Это `modified/conflict`. Сначала пользователь должен определить назначение/ценность каталога; безопасный вариант — переименовать его вручную в backup-name и повторить setup, после чего reconciler сможет clone authoritative repository. Автоматический destructive repair намеренно отсутствует.
+`agent-safe` является authoritative source для четырёх skills и устанавливается editable-командой `<bootstrap-python> -m pip install -e <repo>`, после чего проверяется `<bootstrap-python> -m agent_safe --help`.
+
+Это промежуточная изоляция Python package state, а не завершённый ToolSpec deployment: `ssh_relay` и `agent-safe` пока исполняются из source checkout, стабильные managed entrypoints и запись их runtime в `managed_tools` ещё не реализованы.
+
+Если default path dependency repository уже существует, но не является Git working copy, setup **не удаляет и не заменяет его**. Это `modified/conflict`. Сначала пользователь должен определить назначение/ценность каталога; безопасный вариант — переименовать его вручную в backup-name и повторить setup, после чего reconciler сможет clone authoritative repository. Автоматический destructive repair намеренно отсутствует.
 
 ## Владение версиями ПО и дубли
 
@@ -122,7 +127,7 @@ Legacy `~/projects/stash/opencode.ai/api-key.txt` остаётся поддер�
 
 Если виден один OpenCode, но дополнительная package-manager установка изолирована от `PATH`, она отмечается как предупреждение и может быть оставлена, если изоляция намеренная. Если фактическая версия active executable расходится с metadata менеджера, setup сообщает об этом отдельно и ничего не исправляет автоматически.
 
-Для существующей однозначной установки её менеджер сохраняется владельцем. Например, Chocolatey-установка не вызывает установку второй npm-копии. Официальная standalone-установка из install script в `~/.opencode/bin` или `~/.local/bin` распознаётся как `curl`-installation и не требует наличия npm; рекомендуемая команда обновления для неё — `opencode upgrade --method curl`. Для нового компьютера без OpenCode текущий bootstrap по-прежнему использует npm.
+Для существующей однозначной установки её менеджер сохраняется владельцем. Например, Chocolatey-установка не вызывает установку второй npm-копии. Официальная standalone-установка из install script в `~/.opencode/bin/opencode` распознаётся как `curl`-installation и не требует наличия npm; рекомендуемая команда обновления для неё — `opencode upgrade --method curl`. Путь `~/.local/bin/opencode` сам по себе не доказывает способ установки и остаётся `local`. Для нового компьютера без OpenCode текущий bootstrap по-прежнему использует npm.
 
 В отчёте показывается рекомендуемая команда обновления, когда она известна: например `choco upgrade opencode -y` или `npm install -g opencode-ai@latest`.
 
@@ -162,7 +167,7 @@ BMAD создаёт `<project>/_bmad` и `<project>/.agents/skills`. Глоба�
 ./validate_setup.sh --bmad
 ```
 
-Regression suite `tests/test_setup_*.py` проверяет сценарии, найденные на реальных существующих машинах: external `{file:...}` credential без инспекции содержимого, сохранение exact file reference, inline credential conflict, fresh canonical credential path без fake key-файла, legacy managed placeholder как `missing`, sibling-provider Qwen migration, многократную идемпотентность manifest/config, managed block AGENTS, benign/unsafe untracked dependency paths, agent-safe egg-info self-healing и ownership/duplicate-policy OpenCode.
+Regression suite `tests/test_setup_*.py` проверяет сценарии, найденные на реальных существующих машинах: external `{file:...}` credential без инспекции содержимого, сохранение exact file reference, inline credential conflict, fresh canonical credential path без fake key-файла, legacy managed placeholder как `missing`, sibling-provider Qwen migration, многократную идемпотентность manifest/config, managed block AGENTS, benign/unsafe untracked dependency paths, agent-safe egg-info self-healing, ownership/duplicate-policy OpenCode и read-only/idempotency/unknown-ownership contract bootstrap Python runtime.
 
 GitHub Actions выполняет regression suite и полные Windows/Linux validators.
 
@@ -175,7 +180,7 @@ GitHub Actions выполняет regression suite и полные Windows/Linux
 | `setup_migration.py` | совместимость/idempotency migration ownership и `autoupdate` policy |
 | `setup_runtime.py` | OpenCode/npm/Python runtime checks и ownership manager policy |
 | `setup_inventory.py` | read-only inventory executable/дублирующихся установок |
-| `setup_windows.ps1`, `setup_linux.sh` | платформенные wrappers |
+| `setup_windows.ps1`, `setup_linux.sh` | платформенные wrappers и bootstrap isolated Python runtime |
 | `templates/` | RouterAI managed fields и OpenCode instructions |
 | `skills/remote-long-running/SKILL.md` | общий skill длительных операций |
 | `config_data.json` | модели, version policies, BMAD и managed environment |
