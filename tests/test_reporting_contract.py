@@ -117,6 +117,7 @@ class RuntimeReportingTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as td:
                 repo = Path(td) / "agent-safe"
                 repo.mkdir()
+                repo_resolved = repo.resolve()
 
                 runtime._module_origin = lambda python_exe, module: None
                 check_reporter = runtime.Reporter()
@@ -124,7 +125,7 @@ class RuntimeReportingTests(unittest.TestCase):
                 self.assertEqual(check_reporter.results[-1].state, runtime.STATE_MISSING)
                 self.assertIn("обычный apply", check_reporter.results[-1].detail)
 
-                origins = iter([None, repo / "agent_safe" / "__init__.py"])
+                origins = iter([None, repo_resolved / "agent_safe" / "__init__.py"])
                 runtime._module_origin = lambda python_exe, module: next(origins)
 
                 def fake_run(cmd: list[str], cwd=None, env=None):
