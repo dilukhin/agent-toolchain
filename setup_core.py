@@ -6,12 +6,15 @@ import argparse
 import json
 import os
 import shutil
+import stat
 import sys
 from pathlib import Path
 
 from setup_lib import (
     Reporter,
+    STATE_CONFIGURED,
     STATE_CONFLICT,
+    STATE_FAILED,
     STATE_MISSING,
     STATE_OK,
     STATE_OUTDATED,
@@ -97,7 +100,7 @@ def _record_credential(manifest: dict, path: Path, mode: str) -> bool:
 def _has_nonfile_routerai_credential(config: dict | None) -> bool:
     """Return True when an existing RouterAI apiKey is present but is not {file:...}.
 
-    Such values may be inline secrets or another credential mechanism.  The setup must
+    Such values may be inline secrets or another credential mechanism. The setup must
     never print, migrate, or replace them automatically with a placeholder file.
     """
     if config is None:
@@ -112,12 +115,7 @@ def _has_nonfile_routerai_credential(config: dict | None) -> bool:
 
 
 def _managed_credential_is_legacy_placeholder(path: Path, mode: str | None) -> bool:
-    """Recognize only the exact placeholder written by older opencode_setup versions.
-
-    External credential files are never inspected. For setup-managed paths, read at
-    most one byte beyond the known placeholder length so a real credential is not read
-    in full merely to classify this legacy state.
-    """
+    """Recognize only the exact placeholder written by older opencode_setup versions."""
     if mode not in _MANAGED_CREDENTIAL_MODES or path.is_symlink():
         return False
     try:
@@ -128,11 +126,7 @@ def _managed_credential_is_legacy_placeholder(path: Path, mode: str | None) -> b
 
 
 def _agent_safe_legacy_metadata_only(path: Path) -> bool:
-    """Recognize only the setuptools metadata created by the legacy editable install.
-
-    This is intentionally dependency-specific.  Any tracked change or any other
-    untracked path keeps the normal strict repository conflict behavior.
-    """
+    """Recognize only the setuptools metadata created by the legacy editable install."""
     if not (path / ".git").exists():
         return False
     env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
@@ -161,15 +155,7 @@ def _agent_safe_remote_differs(path: Path, branch: str) -> bool:
 
 def reconcile_agent_safe_repo(*, component: str, path: Path, url: str, branch: str,
                               reporter: Reporter, check: bool) -> tuple[bool, str]:
-    """Recover the one legacy self-conflict caused by editable-install egg-info.
-
-    Older opencode_setup versions installed agent-safe editable before agent-safe ignored
-    ``*.egg-info/``.  That left ``src/agent_safe.egg-info/`` untracked, which then blocked
-    the normal safe updater.  If and only if this generated directory is the entire
-    working-tree delta and upstream differs, allow a read-only ``outdated`` result or a
-    single ff-only pull.  No files are deleted; normal strict reconciliation runs again
-    immediately after the pull.
-    """
+    """Recover the one legacy self-conflict caused by editable-install egg-info."""
     state, _ = inspect_repo(path, url, branch)
     legacy_recovery = (
         state == STATE_CONFLICT
@@ -194,21 +180,26 @@ def reconcile_agent_safe_repo(*, component: str, path: Path, url: str, branch: s
     pull = run(["git", "pull", "--ff-only", "origin", branch], cwd=path)
     if pull.returncode != 0:
         reporter.add(
-            component + " recovery",
-            STATE_CONFLICT,
-            "ff-only recovery update failed; repository and generated metadata preserved",
+            component,
+            STATE_FAILED,
+            "не удалось выполнить ff-only recovery; repository и generated metadata сохранены",
         )
         return False, STATE_CONFLICT
 
+    final_state, detail = inspect_repo(path, url, branch)
+    if final_state != STATE_OK:
+        reporter.add(
+            component,
+            STATE_FAILED,
+            "ff-only recovery выполнен, но итоговое состояние repository не подтверждено: " + detail,
+        )
+        return False, STATE_CONFLICT
     reporter.add(
-        component + " recovery",
-        STATE_OK,
-        "applied ff-only upstream update; legacy generated metadata was not deleted",
+        component,
+        STATE_CONFIGURED,
+        "безопасный ff-only recovery применён; legacy generated metadata не удалялась; итоговая проверка: " + detail,
     )
-    return reconcile_repo(
-        component=component, path=path, url=url, branch=branch,
-        reporter=reporter, check=False,
-    )
+    return True, STATE_OK
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -260,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             reporter.add(
                 "ownership manifest schema",
-                STATE_OK,
+                STATE_CONFIGURED,
                 "schema 1 мигрирована в памяти в schema 2; результат будет сохранён после reconciliation",
             )
 
@@ -295,8 +286,6 @@ def main(argv: list[str] | None = None) -> int:
     api_key_file: Path | None = None
     credential_mode: str | None = None
     if existing_nonfile_credential:
-        # Existing credential semantics are authoritative.  Do not inspect or migrate
-        # the value and do not create a parallel placeholder.
         pass
     elif existing_file_ref:
         referenced = resolve_credential_path(existing_file_ref, config_dir)
@@ -313,7 +302,6 @@ def main(argv: list[str] | None = None) -> int:
             api_key_file = credential_dir / "routerai-api-key.txt"
             credential_mode = "managed-path"
         else:
-            # Compatibility for direct setup_core callers from the first reconciler generation.
             api_key_file = stash_dir / "api-key.txt"
             credential_mode = "legacy-managed-path"
 
@@ -338,9 +326,41 @@ def main(argv: list[str] | None = None) -> int:
                 )
             else:
                 mode_detail = "external file referenced by config" if credential_mode == "external-file" else "existing credential file"
-                reporter.add("RouterAI credential", STATE_OK, f"{mode_detail}; bytes preserved: {api_key_file}")
-                if not args.check and credential_mode != "external-file" and os.name != "nt":
-                    os.chmod(api_key_file, 0o600)
+                if credential_mode != "external-file" and os.name != "nt":
+                    try:
+                        current_mode = stat.S_IMODE(api_key_file.stat().st_mode)
+                    except OSError as exc:
+                        reporter.add("RouterAI credential", STATE_CONFLICT,
+                                     f"не удалось проверить permissions credential file {api_key_file}: {exc}")
+                    else:
+                        if current_mode != 0o600:
+                            if args.check:
+                                reporter.add(
+                                    "RouterAI credential",
+                                    STATE_OUTDATED,
+                                    f"{mode_detail}; bytes preserved: {api_key_file}; permissions {oct(current_mode)}; "
+                                    "обычный apply установит permissions 0o600 без изменения содержимого",
+                                )
+                            else:
+                                try:
+                                    os.chmod(api_key_file, 0o600)
+                                except OSError as exc:
+                                    reporter.add(
+                                        "RouterAI credential",
+                                        STATE_FAILED,
+                                        f"не удалось установить permissions 0o600 для {api_key_file}: {exc}; bytes не изменялись",
+                                    )
+                                else:
+                                    reporter.add(
+                                        "RouterAI credential",
+                                        STATE_CONFIGURED,
+                                        f"permissions изменены {oct(current_mode)} -> 0o600; bytes сохранены: {api_key_file}",
+                                    )
+                        else:
+                            reporter.add("RouterAI credential", STATE_OK,
+                                         f"{mode_detail}; permissions 0o600; bytes preserved: {api_key_file}")
+                else:
+                    reporter.add("RouterAI credential", STATE_OK, f"{mode_detail}; bytes preserved: {api_key_file}")
         else:
             reporter.add("RouterAI credential", STATE_CONFLICT, f"path exists but is not a regular file: {api_key_file}")
     else:
@@ -483,9 +503,16 @@ def main(argv: list[str] | None = None) -> int:
                 reporter.add(f"skill {skill_name}", state, detail)
 
     if not args.check and manifest_changed:
-        state_dir.mkdir(parents=True, exist_ok=True)
-        save_manifest(manifest_path, manifest)
-        reporter.add("ownership manifest", STATE_OK, str(manifest_path))
+        existed_before = manifest_path.exists()
+        try:
+            state_dir.mkdir(parents=True, exist_ok=True)
+            save_manifest(manifest_path, manifest)
+        except OSError as exc:
+            reporter.add("ownership manifest", STATE_FAILED,
+                         f"не удалось сохранить ownership manifest {manifest_path}: {exc}")
+        else:
+            action = "обновлён" if existed_before else "создан"
+            reporter.add("ownership manifest", STATE_CONFIGURED, f"{action}: {manifest_path}")
     elif manifest_path.exists():
         reporter.add("ownership manifest", STATE_OK, str(manifest_path))
     else:

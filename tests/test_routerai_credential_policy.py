@@ -110,7 +110,18 @@ class RouterAiCredentialPolicyTests(unittest.TestCase):
             self.assertEqual(provisioned.returncode, 2, provisioned.stdout + provisioned.stderr)
             self.assertEqual(canonical.read_bytes(), b"test-routerai-key\n")
             self.assertNotIn("служебная заглушка предыдущей версии", provisioned.stdout)
-            self.assertIn("existing credential file", provisioned.stdout)
+            if os.name == "nt":
+                self.assertIn("up-to-date", provisioned.stdout)
+                self.assertIn("existing credential file", provisioned.stdout)
+            else:
+                self.assertRegex(provisioned.stdout, r"configured\s+RouterAI credential")
+                self.assertIn("permissions изменены", provisioned.stdout)
+                self.assertIn("0o600", provisioned.stdout)
+
+            repeat = self._run_core(home)
+            self.assertEqual(repeat.returncode, 2, repeat.stdout + repeat.stderr)
+            self.assertEqual(canonical.read_bytes(), b"test-routerai-key\n")
+            self.assertRegex(repeat.stdout, r"up-to-date\s+RouterAI credential")
 
     def test_external_file_is_not_classified_by_placeholder_like_contents(self) -> None:
         with tempfile.TemporaryDirectory() as td:

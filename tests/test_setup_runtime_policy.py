@@ -102,12 +102,13 @@ class NpmLatestPolicyTests(unittest.TestCase):
                 runtime.reconcile_npm(config_dir, self._base_config(), reporter, check=False, skip=False)
                 self.assertTrue(any("@opencode-ai/plugin@9.9.9" in cmd for cmd in commands), commands)
                 self.assertEqual(runtime.installed_version(package_json), "9.9.9")
-                self.assertFalse(any(r.state == runtime.STATE_CONFLICT for r in reporter.results), reporter.results)
+                plugin = [r for r in reporter.results if r.component == "OpenCode plugin"][-1]
+                self.assertEqual(plugin.state, runtime.STATE_CONFIGURED)
+                self.assertFalse(reporter.has_conflict, reporter.results)
         finally:
             runtime.run = original_run
             runtime.shutil.which = original_which
             self._restore_active_patch(originals)
-
 
     def test_standalone_curl_install_does_not_require_npm(self) -> None:
         original_inventory = runtime.executable_inventory

@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,12 +17,29 @@ from typing import Any, Iterable
 MANIFEST_SCHEMA = 1
 STATE_MISSING = "missing"
 STATE_OK = "up-to-date"
+STATE_CONFIGURED = "configured"
 STATE_OUTDATED = "outdated"
+STATE_FAILED = "failed"
 STATE_CONFLICT = "modified/conflict"
-VALID_STATES = {STATE_MISSING, STATE_OK, STATE_OUTDATED, STATE_CONFLICT}
+STATE_INFO = "info"
+STATE_SKIPPED = "skipped"
+VALID_STATES = {
+    STATE_MISSING,
+    STATE_OK,
+    STATE_CONFIGURED,
+    STATE_OUTDATED,
+    STATE_FAILED,
+    STATE_CONFLICT,
+    STATE_INFO,
+    STATE_SKIPPED,
+}
 
 AGENTS_BLOCK_START = "<!-- opencode_setup:managed:start -->"
 AGENTS_BLOCK_END = "<!-- opencode_setup:managed:end -->"
+
+_ANSI_GREEN = "\x1b[32m"
+_ANSI_RED = "\x1b[31m"
+_ANSI_RESET = "\x1b[0m"
 
 
 @dataclass
@@ -29,6 +47,40 @@ class Result:
     component: str
     state: str
     detail: str = ""
+
+
+def _enable_windows_ansi(stream: Any) -> bool:
+    if os.name != "nt":
+        return True
+    if stream is not sys.stdout:
+        return False
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+        if handle in (0, -1):
+            return False
+        mode = ctypes.c_uint()
+        if kernel32.GetConsoleMode(handle, ctypes.byref(mode)) == 0:
+            return False
+        enabled = 0x0004  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        if mode.value & enabled:
+            return True
+        return bool(kernel32.SetConsoleMode(handle, mode.value | enabled))
+    except Exception:
+        return False
+
+
+def _stream_supports_color(stream: Any) -> bool:
+    if "NO_COLOR" in os.environ or os.environ.get("TERM", "").lower() == "dumb":
+        return False
+    try:
+        if not stream.isatty():
+            return False
+    except (AttributeError, OSError):
+        return False
+    return _enable_windows_ansi(stream)
 
 
 class Reporter:
@@ -39,38 +91,64 @@ class Reporter:
         if state not in VALID_STATES:
             raise ValueError(f"invalid state: {state}")
 
-        # Reconciliation helpers historically reported an observed pre-state and then
-        # appended a separate validation/migration row after a successful apply.  That
-        # made the final table look as if the component were still missing/outdated.
-        # Fold successful post-action rows back into the component they verify so the
-        # rendered STATE always describes the final verified state.
+        # Compatibility for helpers that report a post-action validation/migration row.
+        # A successful action is not "up-to-date": it was changed by this run.
         base_component: str | None = None
-        if state == STATE_OK:
-            for suffix in (" validation", " migration"):
-                if component.endswith(suffix):
-                    base_component = component[:-len(suffix)]
-                    break
-            if component == "OpenCode autoupdate policy":
-                base_component = "OpenCode config"
+        suffix = None
+        for candidate in (" validation", " migration", " recovery"):
+            if component.endswith(candidate):
+                base_component = component[:-len(candidate)]
+                suffix = candidate
+                break
+        if component == "OpenCode autoupdate policy":
+            base_component = "OpenCode config"
+            suffix = " policy"
 
         if base_component:
+            if state == STATE_OK:
+                state = STATE_CONFIGURED
+            elif state == STATE_CONFLICT and suffix == " recovery":
+                state = STATE_FAILED
             for index in range(len(self.results) - 1, -1, -1):
                 existing = self.results[index]
-                if existing.component == base_component and existing.state != STATE_CONFLICT:
-                    self.results[index] = Result(base_component, STATE_OK, detail)
+                if existing.component == base_component and existing.state not in {STATE_CONFLICT, STATE_FAILED}:
+                    self.results[index] = Result(base_component, state, detail)
                     return
+            component = base_component
+
+        # A configured component can be validated again later in the same run. Preserve
+        # the fact that this run changed it instead of degrading the result to up-to-date.
+        if state == STATE_OK:
+            for index in range(len(self.results) - 1, -1, -1):
+                existing = self.results[index]
+                if existing.component != component:
+                    continue
+                if existing.state == STATE_CONFIGURED:
+                    combined = existing.detail
+                    if detail and detail not in combined:
+                        combined = f"{combined}; итоговая проверка: {detail}" if combined else detail
+                    self.results[index] = Result(component, STATE_CONFIGURED, combined)
+                    return
+                break
 
         self.results.append(Result(component, state, detail))
 
     @property
     def has_conflict(self) -> bool:
-        return any(x.state == STATE_CONFLICT for x in self.results)
+        return any(x.state in {STATE_CONFLICT, STATE_FAILED} for x in self.results)
 
-    def render(self) -> None:
-        print("STATE              COMPONENT                     DETAILS")
-        print("-----------------  ----------------------------  ----------------------------------------")
+    def render(self, *, stream: Any | None = None, color: bool | None = None) -> None:
+        stream = sys.stdout if stream is None else stream
+        use_color = _stream_supports_color(stream) if color is None else color
+        print("STATE              COMPONENT                     DETAILS", file=stream)
+        print("-----------------  ----------------------------  ----------------------------------------", file=stream)
         for x in self.results:
-            print(f"{x.state:<17}  {x.component:<28}  {x.detail}")
+            state_field = f"{x.state:<17}"
+            if use_color and x.state == STATE_CONFIGURED:
+                state_field = f"{_ANSI_GREEN}{state_field}{_ANSI_RESET}"
+            elif use_color and x.state in {STATE_FAILED, STATE_CONFLICT}:
+                state_field = f"{_ANSI_RED}{state_field}{_ANSI_RESET}"
+            print(f"{state_field}  {x.component:<28}  {x.detail}", file=stream)
 
 
 def run(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -160,7 +238,7 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
             return False
         atomic_write(destination, source_data)
         managed[component] = {"path": str(destination), "sha256": desired_hash, "source": source_label}
-        reporter.add(component, STATE_OK, f"создан автоматически: {destination}")
+        reporter.add(component, STATE_CONFIGURED, f"создан управляемый файл: {destination}")
         return True
     if not destination.is_file():
         reporter.add(component, STATE_CONFLICT, f"destination is not a regular file: {destination}")
@@ -171,11 +249,13 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
     if previous and previous.get("path") != str(destination):
         reporter.add(component, STATE_CONFLICT, "manifest points to a different destination")
         return False
-    if previous is None and not legacy_owned and current_hash == desired_hash:
-        reporter.add(component, STATE_OK, f"exact source match; {'would adopt' if check else 'adopted'} ownership")
+    if previous is None and current_hash == desired_hash:
         if check:
+            reporter.add(component, STATE_OUTDATED,
+                         "содержимое уже совпадает с целевым, но ownership ещё не принят; обычный apply примет ownership")
             return False
         managed[component] = {"path": str(destination), "sha256": desired_hash, "source": source_label}
+        reporter.add(component, STATE_CONFIGURED, "содержимое уже совпадало с целевым; ownership принят этим запуском")
         return True
     if previous is None and not legacy_owned:
         reporter.add(component, STATE_CONFLICT, "existing file is not owned by opencode_setup")
@@ -192,14 +272,20 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
         backup = backup_file(destination, state_dir, component)
         atomic_write(destination, source_data)
         managed[component] = {"path": str(destination), "sha256": desired_hash, "source": source_label}
-        reporter.add(component, STATE_OK, f"заменён после backup: {backup}")
+        reporter.add(component, STATE_CONFIGURED, f"локально изменённый управляемый файл заменён после backup: {backup}")
         return True
 
     if current_hash == desired_hash:
-        reporter.add(component, STATE_OK, str(destination))
-        if not check and (previous is None or previous.get("source") != source_label):
+        metadata_change = previous is None or previous.get("source") != source_label
+        if metadata_change:
+            if check:
+                reporter.add(component, STATE_OUTDATED,
+                             "содержимое актуально, но ownership metadata устарела; обычный apply обновит metadata")
+                return False
             managed[component] = {"path": str(destination), "sha256": desired_hash, "source": source_label}
+            reporter.add(component, STATE_CONFIGURED, "содержимое уже было актуально; ownership metadata обновлена")
             return True
+        reporter.add(component, STATE_OK, str(destination))
         return False
 
     if check:
@@ -208,7 +294,7 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
         return False
     atomic_write(destination, source_data)
     managed[component] = {"path": str(destination), "sha256": desired_hash, "source": source_label}
-    reporter.add(component, STATE_OK, "управляемый источник обновлён автоматически")
+    reporter.add(component, STATE_CONFIGURED, "управляемый файл обновлён до текущего источника")
     return True
 
 
@@ -434,27 +520,44 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
         return False
 
     if previous is None and not semantic_change:
-        reporter.add(component, STATE_OK, f"compatible existing RouterAI config; {'would adopt' if check else 'adopted'} ownership")
         if check:
+            reporter.add(component, STATE_OUTDATED,
+                         "совместимый RouterAI config уже совпадает по содержимому, но ownership ещё не принят; "
+                         "обычный apply примет ownership")
             return False
         managed[component] = {"path": str(destination), "sha256": current_hash,
                               "source": source_label, "mode": "merged-json"}
+        reporter.add(component, STATE_CONFIGURED,
+                     "содержимое RouterAI config уже было совместимым; ownership принят, user settings сохранены")
         return True
 
     if not semantic_change:
-        detail = "compatible RouterAI config; user settings preserved"
+        metadata_change = bool(previous) and (
+            previous.get("sha256") != current_hash
+            or previous.get("mode") != "merged-json"
+            or previous.get("source") != source_label
+        )
         if previous and current_hash != previous.get("sha256") and force:
             if check:
                 reporter.add(component, STATE_CONFLICT, "--force would backup and adopt safely merged config")
                 return False
             backup = backup_file(destination, state_dir, component)
-            reporter.add(component, STATE_OK, f"forced safe adoption after backup: {backup}")
-        else:
-            reporter.add(component, STATE_OK, detail)
-        if not check and (previous is None or previous.get("sha256") != current_hash or previous.get("mode") != "merged-json"):
             managed[component] = {"path": str(destination), "sha256": current_hash,
                                   "source": source_label, "mode": "merged-json"}
+            reporter.add(component, STATE_CONFIGURED,
+                         f"совместимый config принят после backup без изменения user settings: {backup}")
             return True
+        if metadata_change:
+            if check:
+                reporter.add(component, STATE_OUTDATED,
+                             "содержимое RouterAI config актуально, но ownership metadata устарела; обычный apply обновит metadata")
+                return False
+            managed[component] = {"path": str(destination), "sha256": current_hash,
+                                  "source": source_label, "mode": "merged-json"}
+            reporter.add(component, STATE_CONFIGURED,
+                         "содержимое уже было актуально; ownership metadata обновлена, user settings сохранены")
+            return True
+        reporter.add(component, STATE_OK, "compatible RouterAI config; user settings preserved")
         return False
 
     if check:
@@ -467,7 +570,7 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
     atomic_write(destination, merged_data)
     managed[component] = {"path": str(destination), "sha256": sha256_bytes(merged_data),
                           "source": source_label, "mode": "merged-json"}
-    reporter.add(component, STATE_OK, f"managed fields merged automatically; backup: {backup}")
+    reporter.add(component, STATE_CONFIGURED, f"managed fields merged; user settings сохранены; backup: {backup}")
     return True
 
 
@@ -524,12 +627,15 @@ def reconcile_agents_file(*, destination: Path, template_data: bytes, source_lab
             if sha256_bytes(block) != sha256_bytes(desired_block):
                 reporter.add(component, STATE_CONFLICT, "unowned managed block differs from desired block; preserved")
                 return False
-            reporter.add(component, STATE_OK, f"existing managed block; {'would adopt' if check else 'adopted'} block ownership")
             if check:
+                reporter.add(component, STATE_OUTDATED,
+                             "managed block уже совпадает с целевым, но ownership ещё не принят; обычный apply примет ownership")
                 return False
             managed[component] = {"path": str(destination), "sha256": sha256_bytes(current),
                                   "source": source_label, "mode": "block",
                                   "block_sha256": sha256_bytes(desired_block)}
+            reporter.add(component, STATE_CONFIGURED,
+                         "managed block уже совпадал с целевым; block ownership принят, surrounding user text сохранён")
             return True
 
         if check:
@@ -544,7 +650,8 @@ def reconcile_agents_file(*, destination: Path, template_data: bytes, source_lab
         managed[component] = {"path": str(destination), "sha256": sha256_bytes(updated),
                               "source": source_label, "mode": "block",
                               "block_sha256": sha256_bytes(desired_block)}
-        reporter.add(component, STATE_OK, f"managed block appended automatically; user text preserved; backup: {backup}")
+        reporter.add(component, STATE_CONFIGURED,
+                     f"managed block добавлен; user text сохранён; backup: {backup}")
         return True
 
     if previous.get("path") != str(destination):
@@ -565,10 +672,18 @@ def reconcile_agents_file(*, destination: Path, template_data: bytes, source_lab
             return False
 
     if current_block == desired_block:
-        reporter.add(component, STATE_OK, "managed block current; surrounding user text preserved")
-        if not check and previous.get("sha256") != sha256_bytes(current):
+        metadata_change = previous.get("sha256") != sha256_bytes(current)
+        if metadata_change:
+            if check:
+                reporter.add(component, STATE_OUTDATED,
+                             "managed block актуален, но ownership metadata для surrounding user text устарела; "
+                             "обычный apply обновит metadata")
+                return False
             previous["sha256"] = sha256_bytes(current)
+            reporter.add(component, STATE_CONFIGURED,
+                         "managed block уже был актуален; ownership metadata обновлена, surrounding user text сохранён")
             return True
+        reporter.add(component, STATE_OK, "managed block current; surrounding user text preserved")
         return False
 
     if check:
@@ -584,7 +699,8 @@ def reconcile_agents_file(*, destination: Path, template_data: bytes, source_lab
     managed[component] = {"path": str(destination), "sha256": sha256_bytes(updated),
                           "source": source_label, "mode": "block",
                           "block_sha256": sha256_bytes(desired_block)}
-    reporter.add(component, STATE_OK, f"only managed block replaced automatically; backup: {backup}")
+    reporter.add(component, STATE_CONFIGURED,
+                 f"обновлён только managed block; surrounding user text сохранён; backup: {backup}")
     return True
 
 
@@ -694,32 +810,36 @@ def reconcile_repo(*, component: str, path: Path, url: str, branch: str,
         reporter.add(component, state, detail)
         return True, state
 
-    action = ""
+    actions: list[str] = []
     if state == STATE_MISSING:
         path.parent.mkdir(parents=True, exist_ok=True)
         cp = run(["git", "clone", "--branch", branch, "--single-branch", url, str(path)])
         if cp.returncode != 0:
-            reporter.add(component, STATE_CONFLICT, "clone failed; " + cp.stderr.strip()[-400:])
+            reporter.add(component, STATE_FAILED, "clone завершился ошибкой; repository не настроен: " + cp.stderr.strip()[-400:])
             return False, STATE_CONFLICT
-        action = "клонирован автоматически"
+        actions.append("репозиторий клонирован")
         state, detail = inspect_repo(path, url, branch)
         if state not in {STATE_OK, STATE_OUTDATED}:
-            reporter.add(component, STATE_CONFLICT, "clone завершён, но итоговое состояние не подтверждено: " + detail)
+            reporter.add(component, STATE_FAILED,
+                         "clone завершён, но итоговое состояние repository не подтверждено: " + detail)
             return False, STATE_CONFLICT
     if state == STATE_OUTDATED:
         cp = run(["git", "pull", "--ff-only", "origin", branch], cwd=path)
         if cp.returncode != 0:
-            reporter.add(component, STATE_CONFLICT, "fast-forward update failed; repository preserved")
+            reporter.add(component, STATE_FAILED, "ff-only update завершился ошибкой; repository сохранён без reset/clean")
             return False, STATE_CONFLICT
-        action = (action + "; " if action else "") + "ff-only update применён автоматически"
+        actions.append("безопасный ff-only update применён")
         state, detail = inspect_repo(path, url, branch)
         if state != STATE_OK:
-            reporter.add(component, STATE_CONFLICT, "update завершён, но итоговое состояние не подтверждено: " + detail)
+            reporter.add(component, STATE_FAILED,
+                         "update завершён, но итоговое состояние repository не подтверждено: " + detail)
             return False, STATE_CONFLICT
 
     if state == STATE_OK:
-        prefix = (action + "; ") if action else ""
-        reporter.add(component, STATE_OK, prefix + detail)
+        if actions:
+            reporter.add(component, STATE_CONFIGURED, "; ".join(actions) + f"; итоговая проверка: {detail}")
+        else:
+            reporter.add(component, STATE_OK, detail)
         return True, STATE_OK
-    reporter.add(component, STATE_CONFLICT, "reconciliation завершён без подтверждённого up-to-date состояния")
+    reporter.add(component, STATE_FAILED, "reconciliation завершён без подтверждённого целевого состояния")
     return False, STATE_CONFLICT

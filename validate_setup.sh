@@ -144,6 +144,8 @@ for skill in ssh-relay remote-long-running recovery-mode risk-gate safe-cli unkn
 done
 node -e 'const fs=require("node:fs"); const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); if(Object.keys(d.provider.routerai.models).length!==13) process.exit(1)' "$config_dir/opencode.jsonc"
 [[ "$(wc -l < "$config_dir/AGENTS.md")" -le 12 ]]
+grep -q '^configured.*OpenCode config' "$test_root/install.out"
+grep -q '^configured.*ownership manifest' "$test_root/install.out"
 echo "PASS clean isolated install + unknown/BMAD/API-key preservation"
 
 snapshot_tree() {
@@ -158,7 +160,8 @@ before_repeat="$(snapshot_tree "$home")"
 python3 "${core_args[@]}" > "$test_root/repeat.out"
 after_repeat="$(snapshot_tree "$home")"
 [[ "$before_repeat" == "$after_repeat" ]]
-echo "PASS repeated setup is idempotent"
+! grep -q '^configured' "$test_root/repeat.out"
+echo "PASS repeated setup is idempotent and reports no new configuration"
 
 cat > "$test_root/ssh-seed/opencode/skills/ssh-relay/SKILL.md" <<'SKILL'
 ---
@@ -174,6 +177,7 @@ git -C "$test_root/ssh-seed" push -q origin main
 python3 "${core_args[@]}" --check > "$test_root/update-check.out"
 grep -q 'outdated.*ssh_relay repository' "$test_root/update-check.out"
 python3 "${core_args[@]}" > "$test_root/update.out"
+grep -q '^configured.*ssh_relay repository' "$test_root/update.out"
 grep -q 'fixture v2' "$skills_dir/ssh-relay/SKILL.md"
 echo "PASS clean dependency repo fast-forward + managed skill update"
 
@@ -187,6 +191,7 @@ set -e
 [[ "$manual_hash" == "$(sha256sum "$skills_dir/remote-long-running/SKILL.md" | awk '{print $1}')" ]]
 grep -q 'modified/conflict.*skill remote-long-running' "$test_root/manual-conflict.out"
 python3 "${core_args[@]}" --force > "$test_root/force.out"
+grep -q '^configured.*skill remote-long-running' "$test_root/force.out"
 ! grep -q 'LOCAL MANUAL CHANGE' "$skills_dir/remote-long-running/SKILL.md"
 find "$state_dir/backups" -type f -name SKILL.md -print -quit | grep -q .
 echo "PASS locally modified managed skill is preserved; --force backs up and replaces owned file"
@@ -207,8 +212,8 @@ before_check="$(snapshot_tree "$home")"
 python3 "${core_args[@]}" --check > "$test_root/final-check.out"
 after_check="$(snapshot_tree "$home")"
 [[ "$before_check" == "$after_check" ]]
-! grep -qE '^(missing|outdated|modified/conflict)' "$test_root/final-check.out"
-echo "PASS --check is read-only and final state is up-to-date"
+! grep -qE '^(missing|outdated|configured|failed|modified/conflict)' "$test_root/final-check.out"
+echo "PASS --check is read-only and clean final state is neutral up-to-date"
 
 git -C "$projects_dir/agent-safe" config user.email test@example.invalid
 git -C "$projects_dir/agent-safe" config user.name opencode-setup-test
@@ -277,8 +282,8 @@ assert config["user_setting"] is True
 assert config["provider"]["routerai"]["options"]["apiKey"] == expected
 PY_PLAIN
 find "$home3/.local/state/opencode_setup/backups" -type f -name opencode.jsonc -print -quit | grep -q .
-grep -q 'up-to-date.*RouterAI credential' "$test_root/plain-config-migration.out"
-grep -q 'up-to-date.*OpenCode config.*backup:' "$test_root/plain-config-migration.out"
+grep -q 'configured.*RouterAI credential.*permissions изменены.*0o600' "$test_root/plain-config-migration.out"
+grep -q 'configured.*OpenCode config.*backup:' "$test_root/plain-config-migration.out"
 echo "PASS existing plain OpenCode config is safely migrated with backup and credential preservation"
 
 if grep -RInE --exclude='validate_setup.sh' --exclude='*.md' -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|sk-[A-Za-z0-9_-]{24,}|gh[pousr]_[A-Za-z0-9]{20,}' "$SCRIPT_DIR"; then
