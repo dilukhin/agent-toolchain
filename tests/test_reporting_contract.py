@@ -59,21 +59,27 @@ class ReporterColorTests(unittest.TestCase):
     def test_forced_color_marks_only_action_and_error_states(self) -> None:
         reporter = lib.Reporter()
         reporter.add("already", lib.STATE_OK, "unchanged")
-        reporter.add("changed", lib.STATE_CONFIGURED, "created")
-        reporter.add("failed", lib.STATE_FAILED, "install failed")
-        reporter.add("conflict", lib.STATE_CONFLICT, "blocked")
+        reporter.add("changed-component", lib.STATE_CONFIGURED, "created")
+        reporter.add("failed-component", lib.STATE_FAILED, "install failed")
+        reporter.add("conflict-component", lib.STATE_CONFLICT, "blocked")
+        reporter.add("notice-component", lib.STATE_INFO, "advisory")
+        reporter.add("skipped-component", lib.STATE_SKIPPED, "not checked")
 
         output = io.StringIO()
         reporter.render(stream=output, color=True)
         lines = output.getvalue().splitlines()
-        already = next(line for line in lines if "already" in line)
-        changed = next(line for line in lines if "changed" in line)
-        failed = next(line for line in lines if "failed" in line and "install failed" in line)
-        conflict = next(line for line in lines if "conflict" in line and "blocked" in line)
+        already = next(line for line in lines if "  already " in line)
+        changed = next(line for line in lines if "  changed-component " in line)
+        failed = next(line for line in lines if "  failed-component " in line)
+        conflict = next(line for line in lines if "  conflict-component " in line)
+        notice = next(line for line in lines if "  notice-component " in line)
+        skipped = next(line for line in lines if "  skipped-component " in line)
         self.assertNotIn("\x1b[", already)
         self.assertIn("\x1b[32m", changed)
         self.assertIn("\x1b[31m", failed)
         self.assertIn("\x1b[31m", conflict)
+        self.assertNotIn("\x1b[", notice)
+        self.assertNotIn("\x1b[", skipped)
 
     def test_redirected_output_has_no_ansi(self) -> None:
         reporter = lib.Reporter()
@@ -158,6 +164,15 @@ class FileReconciliationReportingTests(unittest.TestCase):
 
 
 class RuntimeReportingTests(unittest.TestCase):
+    def test_skip_is_neutral_and_not_up_to_date(self) -> None:
+        ssh_reporter = runtime.Reporter()
+        runtime.ensure_ssh_relay_runtime(Path("/unused"), sys.executable, ssh_reporter, check=False, skip_install=True)
+        self.assertEqual(ssh_reporter.results[-1].state, runtime.STATE_SKIPPED)
+
+        safe_reporter = runtime.Reporter()
+        runtime.ensure_agent_safe_runtime(Path("/unused"), sys.executable, safe_reporter, check=False, skip_install=True)
+        self.assertEqual(safe_reporter.results[-1].state, runtime.STATE_SKIPPED)
+
     def test_ssh_relay_check_explains_auto_install_and_apply_reports_configured(self) -> None:
         original_run = runtime.run
         try:

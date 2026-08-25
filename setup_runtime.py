@@ -21,9 +21,11 @@ from setup_lib import (
     STATE_CONFIGURED,
     STATE_CONFLICT,
     STATE_FAILED,
+    STATE_INFO,
     STATE_MISSING,
     STATE_OK,
     STATE_OUTDATED,
+    STATE_SKIPPED,
     run,
 )
 
@@ -34,7 +36,7 @@ def ensure_ssh_relay_runtime(repo: Path, python_exe: str, reporter: Reporter,
         reporter.add("ssh_relay runtime", STATE_CONFLICT, "для ssh_relay требуется Python 3.12+")
         return
     if skip_install:
-        reporter.add("ssh_relay runtime", STATE_OK, "установка/проверка зависимостей пропущена")
+        reporter.add("ssh_relay runtime", STATE_SKIPPED, "установка/проверка зависимостей пропущена")
         return
     import_test = run([python_exe, "-c", "import paramiko"])
     installed_now = False
@@ -87,7 +89,7 @@ def _module_origin(python_exe: str, module: str) -> Path | None:
 def ensure_agent_safe_runtime(repo: Path, python_exe: str, reporter: Reporter,
                               check: bool, skip_install: bool) -> None:
     if skip_install:
-        reporter.add("agent-safe runtime", STATE_OK, "установка/проверка зависимостей пропущена")
+        reporter.add("agent-safe runtime", STATE_SKIPPED, "установка/проверка зависимостей пропущена")
         return
 
     repo_resolved = repo.resolve()
@@ -357,7 +359,7 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
     extra_managers = {name: version for name, version in managers.items() if name != manager}
     if extra_managers:
         detail = "; ".join(isolated_manager_detail(name, version) for name, version in sorted(extra_managers.items()))
-        reporter.add("ПРЕДУПРЕЖДЕНИЕ: изолированные установки OpenCode", STATE_OK, detail)
+        reporter.add("ПРЕДУПРЕЖДЕНИЕ: изолированные установки OpenCode", STATE_INFO, detail)
 
     update_command = _update_command(manager)
     command_detail = f"; команда обновления: {update_command}" if update_command else "; команда обновления не определена"
@@ -367,7 +369,7 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
     if manager_version and actual_version and manager_version != actual_version:
         reporter.add(
             "ПРЕДУПРЕЖДЕНИЕ: версия OpenCode расходится с менеджером",
-            STATE_OK,
+            STATE_INFO,
             f"активный executable сообщает {actual_version}, {manager} зарегистрировал {manager_version}. "
             "Возможны ручное/self-update изменение binary, stale shim или смешанная ownership; ничего не исправлено автоматически.",
         )
@@ -431,7 +433,7 @@ def reconcile_npm(config_dir: Path, config: dict[str, Any], reporter: Reporter,
                   check: bool, skip: bool) -> None:
     report_common_tool_inventory(reporter)
     if skip:
-        reporter.add("OpenCode npm packages", STATE_OK, "установка/проверка npm-пакетов пропущена")
+        reporter.add("OpenCode npm packages", STATE_SKIPPED, "установка/проверка npm-пакетов пропущена")
         return
     npm = shutil.which("npm")
 

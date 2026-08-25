@@ -21,7 +21,18 @@ STATE_CONFIGURED = "configured"
 STATE_OUTDATED = "outdated"
 STATE_FAILED = "failed"
 STATE_CONFLICT = "modified/conflict"
-VALID_STATES = {STATE_MISSING, STATE_OK, STATE_CONFIGURED, STATE_OUTDATED, STATE_FAILED, STATE_CONFLICT}
+STATE_INFO = "info"
+STATE_SKIPPED = "skipped"
+VALID_STATES = {
+    STATE_MISSING,
+    STATE_OK,
+    STATE_CONFIGURED,
+    STATE_OUTDATED,
+    STATE_FAILED,
+    STATE_CONFLICT,
+    STATE_INFO,
+    STATE_SKIPPED,
+}
 
 AGENTS_BLOCK_START = "<!-- opencode_setup:managed:start -->"
 AGENTS_BLOCK_END = "<!-- opencode_setup:managed:end -->"
