@@ -64,7 +64,8 @@ class LinuxVenvPrerequisiteTests(unittest.TestCase):
             self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
             self.assertFalse(runtime_dir.exists())
             self.assertIn("PREREQUISITE", cp.stderr)
-            self.assertIn("python3.12-venv", cp.stderr)
+            self.assertIn("MANUAL ACTION REQUIRED", cp.stderr)
+            self.assertIn("sudo apt install python3.12-venv", cp.stderr)
 
     def test_apply_stops_before_runtime_mutation_when_venv_prerequisite_is_missing(self) -> None:
         bash = shutil.which("bash")
@@ -102,7 +103,8 @@ class LinuxVenvPrerequisiteTests(unittest.TestCase):
             self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
             self.assertFalse(runtime_dir.exists())
             self.assertFalse(runtime_parent.exists(), "prerequisite failure must happen before mkdir/temp runtime creation")
-            self.assertIn("python3.12-venv", cp.stderr)
+            self.assertIn("MANUAL ACTION REQUIRED", cp.stderr)
+            self.assertIn("sudo apt install python3.12-venv", cp.stderr)
 
 
 if __name__ == "__main__":

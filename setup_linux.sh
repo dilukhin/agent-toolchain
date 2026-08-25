@@ -56,11 +56,22 @@ if [[ -f "$marker_file" ]] && [[ "$(cat "$marker_file")" == "$marker_expected" ]
 fi
 core_python="$base_python"
 
+print_manual_venv_action() {
+  local version="$1"
+  echo "MANUAL ACTION REQUIRED: install Python venv support for base Python $version, then rerun setup." >&2
+  if command -v apt >/dev/null 2>&1; then
+    echo "  sudo apt install python${version}-venv" >&2
+  else
+    echo "  Install the distribution package that provides ensurepip/venv for Python $version." >&2
+  fi
+}
+
 venv_prerequisite_ok=1
 base_python_version=""
 if [[ ! -e "$RUNTIME_DIR" ]]; then
   if ! base_python_version="$("$base_python" -B -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)"; then
     echo "Base Python is not runnable: $base_python" >&2
+    echo "MANUAL ACTION REQUIRED: install a runnable Python or set OPENCODE_SETUP_PYTHON to one, then rerun setup." >&2
     exit 2
   fi
   if ! "$base_python" -B -c 'import ensurepip, venv' >/dev/null 2>&1; then
@@ -73,24 +84,26 @@ if [[ $check_mode -eq 1 ]]; then
     if [[ $runtime_owned -ne 1 || ! -x "$venv_python" ]]; then
       echo "Managed Python runtime path exists but ownership/health is not proven: $RUNTIME_DIR" >&2
       echo "Check mode is read-only; refusing to adopt or repair this directory." >&2
+      echo "MANUAL ACTION REQUIRED: inspect this runtime path and resolve its ownership/health before rerunning setup; do not delete or overwrite unknown data." >&2
       exit 2
     fi
     core_python="$venv_python"
   elif [[ $venv_prerequisite_ok -ne 1 ]]; then
     echo "PREREQUISITE: base Python $base_python_version cannot create the isolated bootstrap runtime because ensurepip/venv support is unavailable." >&2
-    echo "On Debian/Ubuntu/Mint install python${base_python_version}-venv (or the distribution equivalent) before apply." >&2
+    print_manual_venv_action "$base_python_version"
   fi
 else
   if [[ -e "$RUNTIME_DIR" && ( $runtime_owned -ne 1 || ! -x "$venv_python" ) ]]; then
     echo "Managed Python runtime path exists but ownership/health is not proven: $RUNTIME_DIR" >&2
     echo "Refusing to replace an unknown/incomplete runtime automatically." >&2
+    echo "MANUAL ACTION REQUIRED: inspect this runtime path and resolve its ownership/health before rerunning setup; do not delete or overwrite unknown data." >&2
     exit 2
   fi
 
   if [[ ! -e "$RUNTIME_DIR" ]]; then
     if [[ $venv_prerequisite_ok -ne 1 ]]; then
       echo "Cannot create isolated Python runtime: base Python $base_python_version has no ensurepip/venv support." >&2
-      echo "On Debian/Ubuntu/Mint install python${base_python_version}-venv (or the distribution equivalent), then rerun setup." >&2
+      print_manual_venv_action "$base_python_version"
       exit 2
     fi
 
