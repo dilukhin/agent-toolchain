@@ -56,6 +56,18 @@ if [[ -f "$marker_file" ]] && [[ "$(cat "$marker_file")" == "$marker_expected" ]
 fi
 core_python="$base_python"
 
+venv_prerequisite_ok=1
+base_python_version=""
+if [[ ! -e "$RUNTIME_DIR" ]]; then
+  if ! base_python_version="$("$base_python" -B -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)"; then
+    echo "Base Python is not runnable: $base_python" >&2
+    exit 2
+  fi
+  if ! "$base_python" -B -c 'import ensurepip, venv' >/dev/null 2>&1; then
+    venv_prerequisite_ok=0
+  fi
+fi
+
 if [[ $check_mode -eq 1 ]]; then
   if [[ -e "$RUNTIME_DIR" ]]; then
     if [[ $runtime_owned -ne 1 || ! -x "$venv_python" ]]; then
@@ -64,6 +76,9 @@ if [[ $check_mode -eq 1 ]]; then
       exit 2
     fi
     core_python="$venv_python"
+  elif [[ $venv_prerequisite_ok -ne 1 ]]; then
+    echo "PREREQUISITE: base Python $base_python_version cannot create the isolated bootstrap runtime because ensurepip/venv support is unavailable." >&2
+    echo "On Debian/Ubuntu/Mint install python${base_python_version}-venv (or the distribution equivalent) before apply." >&2
   fi
 else
   if [[ -e "$RUNTIME_DIR" && ( $runtime_owned -ne 1 || ! -x "$venv_python" ) ]]; then
@@ -73,6 +88,12 @@ else
   fi
 
   if [[ ! -e "$RUNTIME_DIR" ]]; then
+    if [[ $venv_prerequisite_ok -ne 1 ]]; then
+      echo "Cannot create isolated Python runtime: base Python $base_python_version has no ensurepip/venv support." >&2
+      echo "On Debian/Ubuntu/Mint install python${base_python_version}-venv (or the distribution equivalent), then rerun setup." >&2
+      exit 2
+    fi
+
     runtime_parent="$(dirname "$RUNTIME_DIR")"
     mkdir -p "$runtime_parent"
     runtime_tmp="$runtime_parent/.python-runtime.tmp.$$"
@@ -89,8 +110,7 @@ else
     trap cleanup_runtime_tmp EXIT
 
     if ! "$base_python" -B -m venv "$runtime_tmp"; then
-      echo "Failed to create isolated Python runtime." >&2
-      echo "On Debian/Ubuntu/Mint install the matching python3-venv package, then rerun setup." >&2
+      echo "Failed to create isolated Python runtime after prerequisite checks passed." >&2
       exit 2
     fi
     if ! "$runtime_tmp/bin/python" -m pip --version >/dev/null 2>&1; then
