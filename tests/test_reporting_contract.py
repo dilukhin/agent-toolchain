@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import subprocess
 import sys
 import tempfile
@@ -17,28 +18,88 @@ import setup_runtime as runtime  # noqa: E402
 
 
 class ReporterTransitionTests(unittest.TestCase):
-    def test_successful_migration_replaces_observed_pre_state(self) -> None:
+    def test_successful_migration_is_reported_as_configured(self) -> None:
         reporter = lib.Reporter()
         reporter.add("OpenCode config", lib.STATE_OUTDATED, "before")
         reporter.add("OpenCode config migration", lib.STATE_OK, "backup: /tmp/example")
 
         self.assertEqual(len(reporter.results), 1)
         self.assertEqual(reporter.results[0].component, "OpenCode config")
-        self.assertEqual(reporter.results[0].state, lib.STATE_OK)
+        self.assertEqual(reporter.results[0].state, lib.STATE_CONFIGURED)
         self.assertIn("backup", reporter.results[0].detail)
 
-    def test_successful_runtime_validation_replaces_missing_pre_state(self) -> None:
+    def test_successful_runtime_validation_is_reported_as_configured(self) -> None:
         reporter = lib.Reporter()
         reporter.add("ssh_relay runtime", lib.STATE_MISSING, "before")
         reporter.add("ssh_relay runtime validation", lib.STATE_OK, "ssh_relay 0.9.0")
 
         self.assertEqual(len(reporter.results), 1)
         self.assertEqual(reporter.results[0].component, "ssh_relay runtime")
-        self.assertEqual(reporter.results[0].state, lib.STATE_OK)
+        self.assertEqual(reporter.results[0].state, lib.STATE_CONFIGURED)
+
+    def test_later_validation_does_not_erase_configured_state(self) -> None:
+        reporter = lib.Reporter()
+        reporter.add("fixture", lib.STATE_CONFIGURED, "created")
+        reporter.add("fixture", lib.STATE_OK, "verified")
+        self.assertEqual(len(reporter.results), 1)
+        self.assertEqual(reporter.results[0].state, lib.STATE_CONFIGURED)
+        self.assertIn("verified", reporter.results[0].detail)
+
+    def test_failed_action_is_an_error_state(self) -> None:
+        reporter = lib.Reporter()
+        reporter.add("fixture", lib.STATE_FAILED, "install failed")
+        self.assertTrue(reporter.has_conflict)
+
+
+class ReporterColorTests(unittest.TestCase):
+    class TtyBuffer(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+    def test_forced_color_marks_only_action_and_error_states(self) -> None:
+        reporter = lib.Reporter()
+        reporter.add("already", lib.STATE_OK, "unchanged")
+        reporter.add("changed", lib.STATE_CONFIGURED, "created")
+        reporter.add("failed", lib.STATE_FAILED, "install failed")
+        reporter.add("conflict", lib.STATE_CONFLICT, "blocked")
+
+        output = io.StringIO()
+        reporter.render(stream=output, color=True)
+        lines = output.getvalue().splitlines()
+        already = next(line for line in lines if "already" in line)
+        changed = next(line for line in lines if "changed" in line)
+        failed = next(line for line in lines if "failed" in line and "install failed" in line)
+        conflict = next(line for line in lines if "conflict" in line and "blocked" in line)
+        self.assertNotIn("\x1b[", already)
+        self.assertIn("\x1b[32m", changed)
+        self.assertIn("\x1b[31m", failed)
+        self.assertIn("\x1b[31m", conflict)
+
+    def test_redirected_output_has_no_ansi(self) -> None:
+        reporter = lib.Reporter()
+        reporter.add("changed", lib.STATE_CONFIGURED, "created")
+        output = io.StringIO()
+        reporter.render(stream=output)
+        self.assertNotIn("\x1b[", output.getvalue())
+
+    def test_no_color_disables_ansi_even_for_tty(self) -> None:
+        reporter = lib.Reporter()
+        reporter.add("changed", lib.STATE_CONFIGURED, "created")
+        previous = os.environ.get("NO_COLOR")
+        os.environ["NO_COLOR"] = "1"
+        try:
+            output = self.TtyBuffer()
+            reporter.render(stream=output)
+            self.assertNotIn("\x1b[", output.getvalue())
+        finally:
+            if previous is None:
+                os.environ.pop("NO_COLOR", None)
+            else:
+                os.environ["NO_COLOR"] = previous
 
 
 class FileReconciliationReportingTests(unittest.TestCase):
-    def test_check_explains_automatic_fix_and_apply_reports_final_state(self) -> None:
+    def test_check_explains_automatic_fix_apply_is_configured_repeat_is_up_to_date(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             destination = root / "managed" / "file.txt"
@@ -77,12 +138,27 @@ class FileReconciliationReportingTests(unittest.TestCase):
             self.assertTrue(changed)
             self.assertEqual(destination.read_bytes(), b"desired\n")
             self.assertEqual(len(apply_reporter.results), 1)
-            self.assertEqual(apply_reporter.results[0].state, lib.STATE_OK)
-            self.assertNotIn(lib.STATE_MISSING, [item.state for item in apply_reporter.results])
+            self.assertEqual(apply_reporter.results[0].state, lib.STATE_CONFIGURED)
+            self.assertIn("создан", apply_reporter.results[0].detail)
+
+            repeat_reporter = lib.Reporter()
+            changed = lib.reconcile_file(
+                component="fixture",
+                destination=destination,
+                source_data=b"desired\n",
+                source_label="test",
+                manifest=manifest,
+                reporter=repeat_reporter,
+                check=False,
+                force=False,
+                state_dir=state_dir,
+            )
+            self.assertFalse(changed)
+            self.assertEqual(repeat_reporter.results[0].state, lib.STATE_OK)
 
 
 class RuntimeReportingTests(unittest.TestCase):
-    def test_ssh_relay_check_explains_auto_install_and_apply_reports_up_to_date(self) -> None:
+    def test_ssh_relay_check_explains_auto_install_and_apply_reports_configured(self) -> None:
         original_run = runtime.run
         try:
             def fake_run(cmd: list[str], cwd=None, env=None):
@@ -108,12 +184,30 @@ class RuntimeReportingTests(unittest.TestCase):
             runtime.ensure_ssh_relay_runtime(repo, sys.executable, apply_reporter, check=False, skip_install=False)
             self.assertEqual(len(apply_reporter.results), 1)
             self.assertEqual(apply_reporter.results[0].component, "ssh_relay runtime")
-            self.assertEqual(apply_reporter.results[0].state, runtime.STATE_OK)
-            self.assertIn("paramiko установлен автоматически", apply_reporter.results[0].detail)
+            self.assertEqual(apply_reporter.results[0].state, runtime.STATE_CONFIGURED)
+            self.assertIn("paramiko установлен", apply_reporter.results[0].detail)
         finally:
             runtime.run = original_run
 
-    def test_agent_safe_check_explains_auto_install_and_apply_reports_up_to_date(self) -> None:
+    def test_ssh_relay_install_failure_reports_failed(self) -> None:
+        original_run = runtime.run
+        try:
+            def fake_run(cmd: list[str], cwd=None, env=None):
+                if cmd[1:] == ["-c", "import paramiko"]:
+                    return subprocess.CompletedProcess(cmd, 1, "", "missing")
+                if cmd[1:4] == ["-m", "pip", "install"]:
+                    return subprocess.CompletedProcess(cmd, 1, "", "pip failure")
+                raise AssertionError(f"unexpected command: {cmd}")
+
+            runtime.run = fake_run
+            reporter = runtime.Reporter()
+            runtime.ensure_ssh_relay_runtime(Path("/tmp/ssh"), sys.executable, reporter, check=False, skip_install=False)
+            self.assertEqual(reporter.results[-1].state, runtime.STATE_FAILED)
+            self.assertTrue(reporter.has_conflict)
+        finally:
+            runtime.run = original_run
+
+    def test_agent_safe_check_explains_auto_install_and_apply_reports_configured(self) -> None:
         original_run = runtime.run
         original_origin = runtime._module_origin
         try:
@@ -143,8 +237,8 @@ class RuntimeReportingTests(unittest.TestCase):
                 runtime.ensure_agent_safe_runtime(repo, sys.executable, apply_reporter, check=False, skip_install=False)
                 self.assertEqual(len(apply_reporter.results), 1)
                 self.assertEqual(apply_reporter.results[0].component, "agent-safe runtime")
-                self.assertEqual(apply_reporter.results[0].state, runtime.STATE_OK)
-                self.assertIn("установлен автоматически", apply_reporter.results[0].detail)
+                self.assertEqual(apply_reporter.results[0].state, runtime.STATE_CONFIGURED)
+                self.assertIn("установлен", apply_reporter.results[0].detail)
         finally:
             runtime.run = original_run
             runtime._module_origin = original_origin
@@ -180,6 +274,8 @@ class CoreActionGuidanceTests(unittest.TestCase):
 
             self.assertEqual(rc, 0)
             text = output.getvalue()
+            self.assertNotIn("\x1b[", text)
+            self.assertNotIn(lib.STATE_CONFIGURED, text)
             self.assertRegex(text, r"missing\s+RouterAI credential.*MANUAL ACTION REQUIRED")
             self.assertRegex(text, r"missing\s+skill ssh-relay.*обычный apply.*клонирует")
             self.assertRegex(text, r"missing\s+skill recovery-mode.*обычный apply.*клонирует")

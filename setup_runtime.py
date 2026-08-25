@@ -16,7 +16,16 @@ from setup_inventory import (
     render_instances,
     report_common_tool_inventory,
 )
-from setup_lib import Reporter, STATE_CONFLICT, STATE_MISSING, STATE_OK, STATE_OUTDATED, run
+from setup_lib import (
+    Reporter,
+    STATE_CONFIGURED,
+    STATE_CONFLICT,
+    STATE_FAILED,
+    STATE_MISSING,
+    STATE_OK,
+    STATE_OUTDATED,
+    run,
+)
 
 
 def ensure_ssh_relay_runtime(repo: Path, python_exe: str, reporter: Reporter,
@@ -42,24 +51,25 @@ def ensure_ssh_relay_runtime(repo: Path, python_exe: str, reporter: Reporter,
         if install.returncode != 0:
             reporter.add(
                 "ssh_relay runtime",
-                STATE_CONFLICT,
-                "автоматическая установка paramiko завершилась ошибкой: " + install.stderr.strip()[-400:],
+                STATE_FAILED,
+                "не удалось установить paramiko в управляемый Python runtime: " + install.stderr.strip()[-400:],
             )
             return
         installed_now = True
     version = run([python_exe, str(repo / "ssh_relay.py"), "--version"])
     help_cp = run([python_exe, str(repo / "ssh_relay.py"), "--help"])
     if version.returncode != 0 or help_cp.returncode != 0 or "job" not in help_cp.stdout:
-        reporter.add(
-            "ssh_relay runtime",
-            STATE_CONFLICT,
-            "--version/--help завершились ошибкой либо отсутствует команда job",
-        )
+        state = STATE_FAILED if installed_now else STATE_CONFLICT
+        detail = ("paramiko установлен, но итоговая проверка ssh_relay не пройдена: "
+                  "--version/--help завершились ошибкой либо отсутствует команда job")
+        reporter.add("ssh_relay runtime", state, detail)
     else:
         detail = version.stdout.strip() or "проверено"
         if installed_now:
-            detail = "paramiko установлен автоматически; " + detail
-        reporter.add("ssh_relay runtime", STATE_OK, detail)
+            reporter.add("ssh_relay runtime", STATE_CONFIGURED,
+                         "paramiko установлен в управляемый Python runtime; итоговая проверка: " + detail)
+        else:
+            reporter.add("ssh_relay runtime", STATE_OK, detail)
 
 
 def _module_origin(python_exe: str, module: str) -> Path | None:
@@ -99,8 +109,8 @@ def ensure_agent_safe_runtime(repo: Path, python_exe: str, reporter: Reporter,
         if install.returncode != 0:
             reporter.add(
                 "agent-safe runtime",
-                STATE_CONFLICT,
-                "автоматическая editable-установка завершилась ошибкой: " + install.stderr.strip()[-400:],
+                STATE_FAILED,
+                "не удалось выполнить управляемую editable-установку: " + install.stderr.strip()[-400:],
             )
             return
         installed_now = True
@@ -108,19 +118,23 @@ def ensure_agent_safe_runtime(repo: Path, python_exe: str, reporter: Reporter,
         if origin is None or not origin.is_relative_to(repo_resolved):
             reporter.add(
                 "agent-safe runtime",
-                STATE_CONFLICT,
-                "editable install завершён, но импорт идёт не из управляемого репозитория",
+                STATE_FAILED,
+                "editable install выполнен, но итоговый import идёт не из управляемого репозитория",
             )
             return
 
     help_cp = run([python_exe, "-m", "agent_safe", "--help"])
     if help_cp.returncode != 0:
-        reporter.add("agent-safe runtime", STATE_CONFLICT, "python -m agent_safe --help завершился ошибкой")
+        reporter.add(
+            "agent-safe runtime",
+            STATE_FAILED if installed_now else STATE_CONFLICT,
+            "python -m agent_safe --help завершился ошибкой",
+        )
+    elif installed_now:
+        reporter.add("agent-safe runtime", STATE_CONFIGURED,
+                     "управляемый editable-пакет установлен; import/help проверены")
     else:
-        detail = "управляемый editable import/help проверен"
-        if installed_now:
-            detail = "editable-пакет установлен автоматически; " + detail
-        reporter.add("agent-safe runtime", STATE_OK, detail)
+        reporter.add("agent-safe runtime", STATE_OK, "управляемый editable import/help проверен")
 
 
 def installed_version(package_json: Path) -> str | None:
@@ -313,21 +327,22 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
             return
         cp = run([npm, "install", "-g", f"{cli_package}@{latest_cli}"])
         if cp.returncode != 0:
-            reporter.add("OpenCode CLI", STATE_CONFLICT, cp.stderr.strip()[-400:])
+            reporter.add("OpenCode CLI", STATE_FAILED,
+                         "npm install не выполнил установку OpenCode: " + cp.stderr.strip()[-400:])
             return
         after = active_instance(executable_inventory("opencode"))
         after_version = _version_number(after.version) if after else None
         if after is None or after_version != latest_cli:
             reporter.add(
                 "OpenCode CLI",
-                STATE_CONFLICT,
-                "npm install завершён, но активный opencode не появился с целевой версией",
+                STATE_FAILED,
+                "npm install завершён, но итоговая проверка не нашла активный opencode целевой версии",
             )
             return
         reporter.add(
             "OpenCode CLI",
-            STATE_OK,
-            f"установлен автоматически через npm: {after.path}; {cli_package}@{latest_cli}",
+            STATE_CONFIGURED,
+            f"OpenCode установлен через npm: {after.path}; {cli_package}@{latest_cli}",
         )
         return
 
@@ -390,9 +405,10 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
             return
         cp = run([npm, "install", "-g", f"{cli_package}@{latest_cli}"])
         if cp.returncode != 0:
-            reporter.add("OpenCode CLI", STATE_CONFLICT, cp.stderr.strip()[-400:])
+            reporter.add("OpenCode CLI", STATE_FAILED,
+                         "npm install не выполнил обновление OpenCode: " + cp.stderr.strip()[-400:])
         elif _npm_global_version(npm, cli_package) != latest_cli:
-            reporter.add("OpenCode CLI", STATE_CONFLICT,
+            reporter.add("OpenCode CLI", STATE_FAILED,
                          "npm install завершён, но npm не показывает целевую версию")
         else:
             refreshed = active_instance(executable_inventory("opencode"))
@@ -400,14 +416,14 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
             if refreshed is None or refreshed.manager != "npm" or refreshed_version != latest_cli:
                 reporter.add(
                     "OpenCode CLI",
-                    STATE_CONFLICT,
-                    "npm обновлён, но активный opencode в PATH не соответствует управляемому npm-экземпляру/версии",
+                    STATE_FAILED,
+                    "npm обновлён, но итоговый активный opencode в PATH не соответствует управляемому npm-экземпляру/версии",
                 )
             else:
                 reporter.add(
                     "OpenCode CLI",
-                    STATE_OK,
-                    f"обновлён автоматически: {refreshed.path}; {cli_package}@{latest_cli}{command_detail}",
+                    STATE_CONFIGURED,
+                    f"OpenCode обновлён через npm: {refreshed.path}; {cli_package}@{latest_cli}{command_detail}",
                 )
 
 
@@ -464,9 +480,11 @@ def reconcile_npm(config_dir: Path, config: dict[str, Any], reporter: Reporter,
     config_dir.mkdir(parents=True, exist_ok=True)
     cp = run([npm, "install", "--prefix", str(config_dir), "--save-exact", f"{plugin_package}@{target}"])
     if cp.returncode != 0:
-        reporter.add("OpenCode plugin", STATE_CONFLICT, cp.stderr.strip()[-400:])
+        reporter.add("OpenCode plugin", STATE_FAILED,
+                     "npm install не выполнил установку/обновление plugin: " + cp.stderr.strip()[-400:])
     elif installed_version(package_json) != target:
-        reporter.add("OpenCode plugin", STATE_CONFLICT,
-                     "npm install завершён, но целевая версия plugin не активна")
+        reporter.add("OpenCode plugin", STATE_FAILED,
+                     "npm install завершён, но итоговая проверка не видит целевую версию plugin")
     else:
-        reporter.add("OpenCode plugin", STATE_OK, f"установлен/обновлён автоматически: {target}")
+        action = "установлен" if current is None else f"обновлён с {current}"
+        reporter.add("OpenCode plugin", STATE_CONFIGURED, f"{action} до {target} через npm")

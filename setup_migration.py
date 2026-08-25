@@ -124,12 +124,13 @@ def _reconcile_missing_routerai(*, destination: Path, desired_data: bytes, sourc
         merged["autoupdate"] = copy.deepcopy(desired["autoupdate"])
 
     merged_data = (json.dumps(merged, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-    reporter.add(
-        "OpenCode config",
-        STATE_OUTDATED,
-        "существующие providers сохранены; RouterAI будет добавлен соседним provider, autoupdate переведён в notify",
-    )
     if check:
+        reporter.add(
+            "OpenCode config",
+            STATE_OUTDATED,
+            "существующие providers будут сохранены; обычный apply добавит RouterAI соседним provider, "
+            "переведёт autoupdate в notify и создаст backup",
+        )
         return False
 
     backup = backup_file(destination, state_dir, "OpenCode config")
@@ -140,7 +141,8 @@ def _reconcile_missing_routerai(*, destination: Path, desired_data: bytes, sourc
         "source": source_label,
         "mode": _SIBLING_MODE,
     }
-    reporter.add("OpenCode config migration", STATE_OK, f"providers сохранены; backup: {backup}")
+    reporter.add("OpenCode config migration", STATE_OK,
+                 f"RouterAI добавлен соседним provider; providers сохранены; autoupdate=notify; backup: {backup}")
     return True
 
 
@@ -183,9 +185,9 @@ def _reconcile_managed_autoupdate(*, destination: Path, desired_data: bytes, sou
                      "для смены autoupdate нужен semantic change JSONC с комментариями/trailing commas; файл сохранён")
         return False
 
-    reporter.add(component, STATE_OUTDATED,
-                 f"встроенный auto-update будет переведён в режим уведомления: autoupdate={desired['autoupdate']!r}")
     if check:
+        reporter.add(component, STATE_OUTDATED,
+                     f"обычный apply переведёт встроенный auto-update в режим уведомления: autoupdate={desired['autoupdate']!r}")
         return False
 
     backup = backup_file(destination, state_dir, component)
@@ -199,7 +201,7 @@ def _reconcile_managed_autoupdate(*, destination: Path, desired_data: bytes, sou
         "mode": mode,
     }
     reporter.add("OpenCode autoupdate policy", STATE_OK,
-                 f"режим notify применён; дальнейшее обновление выполняется владельцем installation; backup: {backup}")
+                 f"autoupdate=notify применён; дальнейшее обновление выполняется владельцем installation; backup: {backup}")
     return True
 
 

@@ -118,8 +118,10 @@ try {
         AgentSafeUrl = $safeRemote
     }
 
-    & (Join-Path $root "setup_windows.ps1") @setupParams
+    $firstOutput = (& (Join-Path $root "setup_windows.ps1") @setupParams 2>&1 | Out-String)
     if ($LASTEXITCODE -ne 0) { throw "isolated Windows setup failed" }
+    if ($firstOutput -notmatch '(?m)^configured\s+OpenCode config') { throw "Initial Windows apply must report configured OpenCode config." }
+    if ($firstOutput -notmatch '(?m)^configured\s+ownership manifest') { throw "Initial Windows apply must report configured ownership manifest." }
     if ((Get-FileHash -LiteralPath $keyFile -Algorithm SHA256).Hash -ne $keyBefore) { throw "Existing API key bytes changed." }
     if (-not (Test-Path -LiteralPath (Join-Path $skillsDir "custom-user\SKILL.md"))) { throw "Unknown user skill was removed." }
     if (-not (Test-Path -LiteralPath (Join-Path $skillsDir "bmad-user-skill\SKILL.md"))) { throw "BMAD-like user skill was removed." }
@@ -132,17 +134,19 @@ try {
     Write-Host "PASS isolated Windows install + ownership boundaries"
 
     $before = Get-TreeSnapshot -Path $testHome
-    & (Join-Path $root "setup_windows.ps1") @setupParams
+    $repeatOutput = (& (Join-Path $root "setup_windows.ps1") @setupParams 2>&1 | Out-String)
     if ($LASTEXITCODE -ne 0) { throw "repeated Windows setup failed" }
     $after = Get-TreeSnapshot -Path $testHome
     if ($before -ne $after) { throw "Repeated Windows setup changed file bytes." }
-    Write-Host "PASS repeated Windows setup is idempotent"
+    if ($repeatOutput -match '(?m)^configured\s+') { throw "Repeated no-op Windows setup must not report configured rows." }
+    Write-Host "PASS repeated Windows setup is idempotent and reports no new configuration"
 
     $beforeCheck = Get-TreeSnapshot -Path $testHome
-    & (Join-Path $root "setup_windows.ps1") @setupParams -Check
+    $checkOutput = (& (Join-Path $root "setup_windows.ps1") @setupParams -Check 2>&1 | Out-String)
     if ($LASTEXITCODE -ne 0) { throw "Windows --check failed in clean state" }
     $afterCheck = Get-TreeSnapshot -Path $testHome
     if ($beforeCheck -ne $afterCheck) { throw "Windows --check changed file bytes." }
+    if ($checkOutput -match '(?m)^(configured|failed)\s+') { throw "Windows --check must not report apply action states." }
     Write-Host "PASS Windows check mode is read-only"
 
     if ($TestBmad) {
