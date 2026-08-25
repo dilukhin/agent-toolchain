@@ -77,7 +77,7 @@ def _escape_cmd_path(path: Path) -> str:
     return str(path).replace("%", "%%")
 
 
-def _render_ssh_relay_internal_entrypoint(repo: Path) -> bytes:
+def _render_ssh_relay_internal_entrypoint(repo: Path, runtime_root: Path) -> bytes:
     source = (repo / "ssh_relay.py").resolve()
     if os.name == "nt":
         text = (
@@ -86,11 +86,11 @@ def _render_ssh_relay_internal_entrypoint(repo: Path) -> bytes:
             f'"%~dp0python.exe" -B "{_escape_cmd_path(source)}" %*\r\n'
         )
     else:
+        managed_python = (runtime_root / "bin" / "python").resolve()
         text = (
             "#!/bin/sh\n"
             f"# {_SSH_RELAY_LAUNCHER_MARKER}\n"
-            'SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\n'
-            f'exec "$SCRIPT_DIR/python" -B {shlex.quote(str(source))} "$@"\n'
+            f"exec {shlex.quote(str(managed_python))} -B {shlex.quote(str(source))} \"$@\"\n"
         )
     return text.encode("utf-8")
 
@@ -127,7 +127,7 @@ def _reconcile_internal_ssh_relay_launcher(
     check: bool,
 ) -> tuple[Path | None, bool]:
     path = _ssh_relay_internal_entrypoint(runtime_root)
-    desired = _render_ssh_relay_internal_entrypoint(repo)
+    desired = _render_ssh_relay_internal_entrypoint(repo, runtime_root)
     executable = os.name != "nt"
     state, detail = _inspect_generated_launcher(path, desired, executable=executable)
     if state == STATE_OK:
