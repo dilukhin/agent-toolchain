@@ -205,15 +205,26 @@ def _reconcile_managed_autoupdate(*, destination: Path, desired_data: bytes, sou
     return True
 
 
-def _restore_sibling_mode(manifest: dict[str, Any], previous: dict[str, Any] | None, check: bool) -> bool:
-    """Keep sibling adoption semantics across no-op reconciliations."""
-    if check or not previous or previous.get("mode") != _SIBLING_MODE:
-        return False
+def _normalize_sibling_mode_for_base(manifest: dict[str, Any], previous: dict[str, Any] | None) -> None:
+    """Hide the migration-only sibling mode from the generic base reconciler."""
+    if not previous or previous.get("mode") != _SIBLING_MODE:
+        return
     current = manifest.get("managed_files", {}).get("OpenCode config")
-    if not isinstance(current, dict) or current.get("mode") == _SIBLING_MODE:
-        return False
+    if not isinstance(current, dict):
+        return
+    normalized = dict(current)
+    normalized["mode"] = "merged-json"
+    manifest["managed_files"]["OpenCode config"] = normalized
+
+
+def _restore_sibling_mode(manifest: dict[str, Any], previous: dict[str, Any] | None) -> None:
+    """Restore sibling adoption semantics after generic reconciliation, including check."""
+    if not previous or previous.get("mode") != _SIBLING_MODE:
+        return
+    current = manifest.get("managed_files", {}).get("OpenCode config")
+    if not isinstance(current, dict):
+        return
     current["mode"] = _SIBLING_MODE
-    return True
 
 
 def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_label: str,
@@ -263,15 +274,17 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
                 reporter.add("OpenCode config", STATE_OK, str(destination))
                 return False
 
-    changed = _reconcile_opencode_config(
-        destination=destination,
-        desired_data=desired_data,
-        source_label=source_label,
-        manifest=manifest,
-        reporter=reporter,
-        check=check,
-        force=force,
-        state_dir=state_dir,
-    )
-    restored_mode = _restore_sibling_mode(manifest, previous, check)
-    return changed or restored_mode
+    _normalize_sibling_mode_for_base(manifest, previous)
+    try:
+        return _reconcile_opencode_config(
+            destination=destination,
+            desired_data=desired_data,
+            source_label=source_label,
+            manifest=manifest,
+            reporter=reporter,
+            check=check,
+            force=force,
+            state_dir=state_dir,
+        )
+    finally:
+        _restore_sibling_mode(manifest, previous)
