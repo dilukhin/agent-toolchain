@@ -3,11 +3,26 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+import bootstrap_core  # noqa: E402
+
+
+class WindowsEntrypointEncodingTests(unittest.TestCase):
+    def test_managed_cmd_enables_utf8_locally_and_preserves_exit_code(self) -> None:
+        core = Path("C:/agent-toolchain/core")
+        text = bootstrap_core._entrypoint_bytes(core, windows=True).decode("utf-8-sig")
+        self.assertIn("@setlocal\r\n", text)
+        self.assertIn('@set "PYTHONUTF8=1"\r\n', text)
+        self.assertIn('@set "PYTHONIOENCODING=utf-8"\r\n', text)
+        self.assertIn('@set "_AGENT_TOOLCHAIN_RC=%ERRORLEVEL%"\r\n', text)
+        self.assertIn("@endlocal & exit /b %_AGENT_TOOLCHAIN_RC%\r\n", text)
 
 
 class LegacyInterfaceRetirementTests(unittest.TestCase):

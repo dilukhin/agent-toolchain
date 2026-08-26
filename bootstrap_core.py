@@ -99,13 +99,19 @@ def _entrypoint_path() -> Path:
     return bin_dir() / ("toolchainctl.cmd" if os.name == "nt" else "toolchainctl")
 
 
-def _entrypoint_bytes(core: Path) -> bytes:
+def _entrypoint_bytes(core: Path, *, windows: bool | None = None) -> bytes:
     tool = core / "toolchainctl.py"
-    if os.name == "nt":
+    is_windows = os.name == "nt" if windows is None else windows
+    if is_windows:
         text = (
             f"@REM {ENTRYPOINT_MARKER}\r\n"
             "@echo off\r\n"
+            "@setlocal\r\n"
+            '@set "PYTHONUTF8=1"\r\n'
+            '@set "PYTHONIOENCODING=utf-8"\r\n'
             f'@"{sys.executable}" -B "{tool}" %*\r\n'
+            '@set "_AGENT_TOOLCHAIN_RC=%ERRORLEVEL%"\r\n'
+            "@endlocal & exit /b %_AGENT_TOOLCHAIN_RC%\r\n"
         )
         return text.encode("utf-8-sig")
     text = (

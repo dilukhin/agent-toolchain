@@ -134,50 +134,60 @@ class PinnedToolSkillTests(unittest.TestCase):
 
 
 class ToolchainCoreAdapterTests(unittest.TestCase):
-    def test_toolchain_mode_bypasses_tracking_repositories_and_external_skill_reconciliation(self) -> None:
+    def test_toolchain_mode_uses_in_memory_legacy_view_without_filesystem_staging(self) -> None:
         core_adapter.install()
         before_repo = setup_core.reconcile_repo
         before_safe_repo = setup_core.reconcile_agent_safe_repo
         before_validate = setup_core.validate_skill
         before_reconcile_file = setup_core.reconcile_file
-        observed: dict[str, object] = {}
+        before_read_bytes = Path.read_bytes
 
-        def fake_main(argv=None):
-            assert argv is not None
-            projects = Path(argv[argv.index("--projects-dir") + 1])
-            observed["projects"] = projects
-            reporter = Reporter()
-            ok, state = setup_core.reconcile_repo(
-                component="ssh_relay repository", path=projects / "ssh_relay",
-                url="ignored", branch="main", reporter=reporter, check=False,
-            )
-            self.assertTrue(ok)
-            self.assertEqual(state, STATE_OK)
-            source = projects / "ssh_relay" / "opencode" / "skills" / "ssh-relay" / "SKILL.md"
-            valid, _ = setup_core.validate_skill(source, "ssh-relay")
-            self.assertTrue(valid)
-            changed = setup_core.reconcile_file(
-                component="skill ssh-relay",
-                destination=projects / "dest" / "SKILL.md",
-                source_data=source.read_bytes(), source_label="legacy-tracking-checkout",
-                manifest=setup_manifest.empty_manifest(), reporter=reporter,
-                check=False, force=False, state_dir=projects / "state",
-            )
-            self.assertFalse(changed)
-            self.assertTrue(any(r.state == STATE_SKIPPED for r in reporter.results))
-            return 0
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            user_projects = root / "projects-that-must-remain-absent"
+            observed: dict[str, object] = {}
 
-        user_projects = Path("/developer/checkout/that/must/not/be-used")
-        argv = ["--projects-dir", str(user_projects)]
-        with mock.patch.object(core_adapter, "_ORIGINAL_MAIN", side_effect=fake_main), \
-                mock.patch.dict(os.environ, {core_adapter._ENV: "1"}, clear=False):
-            self.assertEqual(setup_core.main(argv), 0)
+            def fake_main(argv=None):
+                assert argv is not None
+                projects = Path(argv[argv.index("--projects-dir") + 1]).expanduser().resolve()
+                observed["projects"] = projects
+                reporter = Reporter()
+                ok, state = setup_core.reconcile_repo(
+                    component="ssh_relay repository", path=projects / "ssh_relay",
+                    url="ignored", branch="main", reporter=reporter, check=True,
+                )
+                self.assertTrue(ok)
+                self.assertEqual(state, STATE_OK)
+                source = projects / "ssh_relay" / "opencode" / "skills" / "ssh-relay" / "SKILL.md"
+                valid, _ = setup_core.validate_skill(source, "ssh-relay")
+                self.assertTrue(valid)
+                self.assertEqual(source.read_bytes(), core_adapter._PLACEHOLDER_SKILL_BYTES)
+                changed = setup_core.reconcile_file(
+                    component="skill ssh-relay",
+                    destination=projects / "dest" / "SKILL.md",
+                    source_data=source.read_bytes(), source_label="legacy-tracking-checkout",
+                    manifest=setup_manifest.empty_manifest(), reporter=reporter,
+                    check=True, force=False, state_dir=projects / "state",
+                )
+                self.assertFalse(changed)
+                self.assertTrue(any(r.state == STATE_SKIPPED for r in reporter.results))
+                return 0
 
-        self.assertNotEqual(observed["projects"], user_projects)
+            argv = ["--projects-dir", str(user_projects)]
+            before_entries = set(root.iterdir())
+            with mock.patch.object(core_adapter, "_ORIGINAL_MAIN", side_effect=fake_main), \
+                    mock.patch.dict(os.environ, {core_adapter._ENV: "1"}, clear=False):
+                self.assertEqual(setup_core.main(argv), 0)
+
+            self.assertEqual(observed["projects"], user_projects.resolve())
+            self.assertFalse(user_projects.exists())
+            self.assertEqual(set(root.iterdir()), before_entries)
+
         self.assertIs(setup_core.reconcile_repo, before_repo)
         self.assertIs(setup_core.reconcile_agent_safe_repo, before_safe_repo)
         self.assertIs(setup_core.validate_skill, before_validate)
         self.assertIs(setup_core.reconcile_file, before_reconcile_file)
+        self.assertIs(Path.read_bytes, before_read_bytes)
 
 
 if __name__ == "__main__":
