@@ -4,8 +4,6 @@
 
 Основной установленный интерфейс — `toolchainctl`. Репозиторий нужен для bootstrap/разработки, но production-команды и skills не должны зависеть от состояния developer checkout.
 
-> До ручного переименования GitHub repository этот код временно находится в `dilukhin/opencode_setup`. Product identity и новый runtime namespace уже `agent-toolchain`.
-
 ## Быстрый старт
 
 Bootstrap выполняется один раз или при обновлении самого управляющего core.

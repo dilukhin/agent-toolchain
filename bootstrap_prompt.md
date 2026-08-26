@@ -3,7 +3,7 @@
 Используй этот prompt только для запуска готового `agent-toolchain`; не воспроизводи reconciliation вручную и не читай/не выводи secrets.
 
 ```text
-Получи или безопасно обнови рабочую копию dilukhin/agent-toolchain. До завершения ручного rename repository может временно называться dilukhin/opencode_setup. Не делай reset/clean при локальных изменениях.
+Получи или безопасно обнови рабочую копию dilukhin/agent-toolchain. Не делай reset/clean при локальных изменениях.
 
 1. Если toolchainctl ещё не установлен или нужно обновить управляющий core, запусти один раз: Windows `bootstrap_windows.ps1`, Linux `bootstrap_linux.sh`.
 2. Запусти `toolchainctl check`.
