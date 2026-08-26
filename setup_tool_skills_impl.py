@@ -18,6 +18,7 @@ from setup_lib import (
     atomic_write,
     reconcile_file,
     run,
+    sha256_bytes,
     validate_skill,
 )
 from setup_managed_tools import data_root
@@ -89,23 +90,57 @@ def _bundle_dir(spec: ToolSpec) -> Path:
     return data_root() / "tools" / spec.name / "skill-releases" / spec.ref.lower()
 
 
-def _marker_payload(spec: ToolSpec, bindings: dict[str, str]) -> dict[str, object]:
+def _marker_payload(
+    spec: ToolSpec,
+    bindings: dict[str, str],
+    payload_sha256: dict[str, str],
+) -> dict[str, object]:
     return {
-        "schema": 1,
+        "schema": 2,
         "owner": "agent-toolchain",
         "tool": spec.name,
         "repo": spec.repo,
         "source_ref": spec.ref.lower() if spec.ref else None,
         "skills": bindings,
+        "payload_sha256": payload_sha256,
     }
 
 
+def _payload_hashes(bundle: Path, bindings: dict[str, str]) -> dict[str, str] | None:
+    payload_root = bundle / "payload"
+    if payload_root.is_symlink():
+        return None
+    hashes: dict[str, str] = {}
+    for skill_name in bindings:
+        skill_dir = payload_root / skill_name
+        payload = skill_dir / "SKILL.md"
+        if skill_dir.is_symlink() or payload.is_symlink() or not payload.is_file():
+            return None
+        try:
+            hashes[skill_name] = sha256_bytes(payload.read_bytes())
+        except OSError:
+            return None
+    return hashes
+
+
 def _owned_bundle(bundle: Path, spec: ToolSpec, bindings: dict[str, str]) -> bool:
+    if bundle.is_symlink() or not bundle.is_dir():
+        return False
     try:
         data = json.loads((bundle / _MARKER).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
-    return data == _marker_payload(spec, bindings)
+    if not isinstance(data, dict):
+        return False
+    stored_hashes = data.get("payload_sha256")
+    if not isinstance(stored_hashes, dict) or not all(
+        isinstance(name, str) and isinstance(value, str) for name, value in stored_hashes.items()
+    ):
+        return False
+    actual_hashes = _payload_hashes(bundle, bindings)
+    if actual_hashes is None or actual_hashes != stored_hashes:
+        return False
+    return data == _marker_payload(spec, bindings, actual_hashes)
 
 
 def _payload_path(bundle: Path, skill_name: str) -> Path:
@@ -134,7 +169,7 @@ def _checkout_exact_ref(spec: ToolSpec, source: Path) -> tuple[bool, str]:
 
 def _publish_bundle(spec: ToolSpec, bindings: dict[str, str], reporter: Reporter) -> Path | None:
     bundle = _bundle_dir(spec)
-    if bundle.exists():
+    if bundle.exists() or bundle.is_symlink():
         if _owned_bundle(bundle, spec, bindings):
             return bundle
         reporter.add(f"{spec.name} skill source", STATE_CONFLICT,
@@ -169,9 +204,23 @@ def _publish_bundle(spec: ToolSpec, bindings: dict[str, str], reporter: Reporter
                 return None
             atomic_write(_payload_path(temporary, skill_name), candidate.read_bytes())
         shutil.rmtree(source)
-        marker = json.dumps(_marker_payload(spec, bindings), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        payload_hashes = _payload_hashes(temporary, bindings)
+        if payload_hashes is None:
+            reporter.add(f"{spec.name} skill source", STATE_FAILED,
+                         "validated skill payload could not be hashed before publication")
+            return None
+        marker = json.dumps(
+            _marker_payload(spec, bindings, payload_hashes),
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        ) + "\n"
         atomic_write(temporary / _MARKER, marker.encode("utf-8"))
-        if bundle.exists():
+        if not _owned_bundle(temporary, spec, bindings):
+            reporter.add(f"{spec.name} skill source", STATE_FAILED,
+                         "staged skill bundle failed ownership/integrity validation")
+            return None
+        if bundle.exists() or bundle.is_symlink():
             reporter.add(f"{spec.name} skill source", STATE_FAILED,
                          f"skill bundle path appeared concurrently: {bundle}")
             return None
@@ -212,9 +261,9 @@ def reconcile_pinned_tool_skills(
                              "pinned skill reconciliation skipped with dependency installation")
             continue
         bundle = _bundle_dir(spec)
-        if bundle.exists() and not _owned_bundle(bundle, spec, bindings):
+        if (bundle.exists() or bundle.is_symlink()) and not _owned_bundle(bundle, spec, bindings):
             reporter.add(f"{spec.name} skill source", STATE_CONFLICT,
-                         f"skill bundle path exists but ownership is not proven: {bundle}")
+                         f"skill bundle path exists but ownership or payload integrity is not proven: {bundle}")
             continue
         if not bundle.exists():
             if check:
@@ -231,7 +280,7 @@ def reconcile_pinned_tool_skills(
             changed = True
         else:
             reporter.add(f"{spec.name} skill source", STATE_OK,
-                         f"pinned ref {spec.ref[:12]}: {bundle}")
+                         f"pinned ref {spec.ref[:12]} with verified payload hashes: {bundle}")
 
         for skill_name, relative in bindings.items():
             payload = _payload_path(bundle, skill_name)

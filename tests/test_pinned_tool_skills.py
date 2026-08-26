@@ -15,7 +15,7 @@ import setup_core  # noqa: E402
 import setup_core_adapter as core_adapter  # noqa: E402
 import setup_manifest  # noqa: E402
 import setup_tool_skills_impl as skills  # noqa: E402
-from setup_lib import Reporter, STATE_OK, STATE_SKIPPED  # noqa: E402
+from setup_lib import Reporter, STATE_CONFLICT, STATE_OK, STATE_SKIPPED  # noqa: E402
 from setup_tools import parse_tool_spec  # noqa: E402
 
 
@@ -118,18 +118,38 @@ class PinnedToolSkillTests(unittest.TestCase):
                     check=False, force=False, skip_install=False,
                 )
 
+                bundle = data / "tools" / "ssh_relay" / "skill-releases" / self.REF
+                cached_payload = bundle / "payload" / "ssh-relay" / "SKILL.md"
+                cached_payload.write_text(
+                    "---\nname: ssh-relay\ndescription: Locally tampered.\ncompatibility: opencode\n---\n# tampered\n",
+                    encoding="utf-8",
+                )
+                tamper_reporter = Reporter()
+                changed_tamper = skills.reconcile_pinned_tool_skills(
+                    env_cfg, specs, manifest, tamper_reporter,
+                    skills_dir=destination, state_dir=state,
+                    check=True, force=False, skip_install=False,
+                )
+
             self.assertTrue(changed_apply)
             self.assertFalse(changed_repeat)
-            self.assertEqual(len(commands), command_count, "repeat apply must not fetch the pinned ref again")
+            self.assertFalse(changed_tamper)
+            self.assertEqual(len(commands), command_count, "repeat/tamper checks must not fetch the pinned ref again")
             installed = destination / "ssh-relay" / "SKILL.md"
             self.assertIn("# pinned", installed.read_text(encoding="utf-8"))
+            self.assertNotIn("# tampered", installed.read_text(encoding="utf-8"))
             record = manifest["managed_files"]["skill ssh-relay"]
             self.assertEqual(
                 record["source"],
                 f"tool:ssh_relay@{self.REF}:opencode/skills/ssh-relay/SKILL.md",
             )
-            marker = data / "tools" / "ssh_relay" / "skill-releases" / self.REF / skills._MARKER
-            self.assertIn(self.REF, marker.read_text(encoding="utf-8"))
+            marker = bundle / skills._MARKER
+            marker_text = marker.read_text(encoding="utf-8")
+            self.assertIn(self.REF, marker_text)
+            self.assertIn("payload_sha256", marker_text)
+            conflict = [r for r in tamper_reporter.results if r.component == "ssh_relay skill source"][-1]
+            self.assertEqual(conflict.state, STATE_CONFLICT)
+            self.assertIn("integrity", conflict.detail)
             self.assertEqual((dirty_checkout / "LOCAL.txt").read_text(encoding="utf-8"), "developer work")
 
 
