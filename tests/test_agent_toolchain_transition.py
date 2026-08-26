@@ -27,7 +27,7 @@ class LegacyStateMigrationTests(unittest.TestCase):
         manifest["managed_files"]["fixture"] = {"sha256": "abc", "source": "opencode_setup:test"}
         setup_manifest.save_manifest(state / "manifest.json", manifest)
         nested = state / "backups" / "fixture.txt"
-        nested.parent.mkdir(parents=True)
+        nested.parent.mkdir(parents=True, exist_ok=True)
         nested.write_bytes(b"legacy-backup\x00bytes")
         return nested.read_bytes()
 
@@ -192,6 +192,7 @@ class ManagedPythonToolRuntimeTests(unittest.TestCase):
                 changed_second = managed.reconcile_python_tool(
                     spec, sys.executable, second, check=False, skip_install=False, manifest=manifest
                 )
+                public = managed._public_entrypoint(spec, "ssh_relay")
 
             self.assertTrue(changed_first)
             self.assertFalse(changed_second)
@@ -204,7 +205,6 @@ class ManagedPythonToolRuntimeTests(unittest.TestCase):
             self.assertEqual(len(pip_commands), 1)
             self.assertIn(f"git+{spec.repo}@{self.REF}", pip_commands[0])
             self.assertNotIn(str(root / "repo"), pip_commands[0])
-            public = managed._public_entrypoint(spec, "ssh_relay")
             self.assertTrue(public.exists() or public.is_symlink())
             self.assertEqual([r for r in second.results if r.component == "ssh_relay runtime"][-1].state, STATE_OK)
 

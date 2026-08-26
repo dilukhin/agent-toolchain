@@ -14,6 +14,7 @@ import setup_core
 from setup_lib import Reporter, STATE_CONFIGURED, STATE_CONFLICT, STATE_FAILED, STATE_OUTDATED
 from setup_managed_tools import reconcile_tool_specs
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
+from setup_path import reconcile_public_bin_path
 from setup_tools import parse_tool_specs
 
 PRODUCT = "agent-toolchain"
@@ -144,7 +145,6 @@ def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
         "--state-dir", str(state_dir),
         "--projects-dir", str(paths["projects"]),
         "--python", sys.executable,
-        # Production helper runtimes have already been reconciled from ToolSpec.
         "--skip-dependency-install",
     ]
     if args.command == "check":
@@ -160,7 +160,7 @@ def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
     return argv
 
 
-def _runtime_phase(state_dir: Path, *, check: bool, skip_install: bool) -> int:
+def _managed_phase(state_dir: Path, *, check: bool, skip_install: bool) -> int:
     reporter = Reporter()
     repo_root = Path(__file__).resolve().parent
     try:
@@ -202,6 +202,7 @@ def _runtime_phase(state_dir: Path, *, check: bool, skip_install: bool) -> int:
             "legacy schema is valid; apply persists schema 2 before recording managed tools",
         )
 
+    changed |= reconcile_public_bin_path(manifest, reporter, check=check)
     changed |= reconcile_tool_specs(
         specs,
         sys.executable,
@@ -235,9 +236,9 @@ def main(argv: list[str] | None = None) -> int:
     if migration_detail and migration_state:
         print(f"{migration_state:<18}agent-toolchain state migration  {migration_detail}")
 
-    runtime_rc = _runtime_phase(state_dir, check=check, skip_install=bool(args.skip_dependency_install))
-    if runtime_rc != 0 and not check:
-        return runtime_rc
+    managed_rc = _managed_phase(state_dir, check=check, skip_install=bool(args.skip_dependency_install))
+    if managed_rc != 0 and not check:
+        return managed_rc
 
     previous = os.environ.get("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED")
     os.environ["AGENT_TOOLCHAIN_RUNTIME_PRECONCILED"] = "1"
@@ -248,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
             os.environ.pop("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED", None)
         else:
             os.environ["AGENT_TOOLCHAIN_RUNTIME_PRECONCILED"] = previous
-    return 2 if runtime_rc != 0 or core_rc != 0 else 0
+    return 2 if managed_rc != 0 or core_rc != 0 else 0
 
 
 if __name__ == "__main__":
