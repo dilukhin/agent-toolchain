@@ -11,6 +11,9 @@ if str(ROOT) not in sys.path:
 
 from setup_tools import TOOL_SPEC_SCHEMA, parse_tool_spec, parse_tool_specs  # noqa: E402
 
+SSH_RELAY_REF = "1a794f84bb3664fe580716195ee939bbe2295675"
+AGENT_SAFE_REF = "95545d20533b2dfa1de7d75a30fa1bbfb1d428e3"
+
 
 class ToolSpecTests(unittest.TestCase):
     def test_valid_pinned_git_tool(self) -> None:
@@ -97,14 +100,27 @@ class ToolSpecTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(parsed, {})
 
-    def test_repository_config_uses_current_tool_spec_schema(self) -> None:
+    def test_repository_config_declares_exact_pinned_production_tools(self) -> None:
         data = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
         env = data["managed_environment"]
         self.assertEqual(env["manifest_schema"], 2)
         self.assertEqual(env["tool_spec_schema"], TOOL_SPEC_SCHEMA)
         parsed, error = parse_tool_specs(env)
         self.assertIsNone(error)
-        self.assertEqual(parsed, {})
+        self.assertEqual(set(parsed), {"ssh_relay", "agent-safe"})
+
+        ssh = parsed["ssh_relay"]
+        self.assertEqual(ssh.update_policy, "pinned-tested")
+        self.assertEqual(ssh.runtime, "python-venv")
+        self.assertEqual(ssh.ref, SSH_RELAY_REF)
+        self.assertEqual(ssh.entrypoints, ("ssh_relay",))
+        self.assertIn(("ssh_relay", "doctor"), tuple(check.argv for check in ssh.health_contract))
+
+        safe = parsed["agent-safe"]
+        self.assertEqual(safe.update_policy, "pinned-tested")
+        self.assertEqual(safe.runtime, "python-venv")
+        self.assertEqual(safe.ref, AGENT_SAFE_REF)
+        self.assertEqual(safe.entrypoints, ("safe",))
 
 
 if __name__ == "__main__":

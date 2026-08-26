@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import locale
 import os
 import re
 import shutil
@@ -151,9 +152,34 @@ class Reporter:
             print(f"{state_field}  {x.component:<28}  {x.detail}", file=stream)
 
 
+def _decode_subprocess_output(data: bytes | None) -> str:
+    if not data:
+        return ""
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        encoding = locale.getpreferredencoding(False) or "utf-8"
+        try:
+            return data.decode(encoding, errors="replace")
+        except LookupError:
+            return data.decode("utf-8", errors="replace")
+
+
 def run(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=str(cwd) if cwd else None, env=env, text=True,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    raw = subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd else None,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return subprocess.CompletedProcess(
+        raw.args,
+        raw.returncode,
+        _decode_subprocess_output(raw.stdout),
+        _decode_subprocess_output(raw.stderr),
+    )
 
 
 def sha256_bytes(data: bytes) -> str:

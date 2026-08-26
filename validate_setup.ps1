@@ -3,7 +3,7 @@ param([switch]$TestBmad)
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 
-foreach ($script in @("setup_windows.ps1", "install_bmad_windows.ps1", "validate_setup.ps1")) {
+foreach ($script in @("bootstrap_windows.ps1", "setup_windows.ps1", "install_bmad_windows.ps1", "validate_setup.ps1")) {
     $path = Join-Path $root $script
     if (-not (Test-Path -LiteralPath $path)) { continue }
     $tokens = $null
@@ -16,11 +16,11 @@ Write-Host "PASS PowerShell syntax"
 $python = Get-Command py -ErrorAction SilentlyContinue
 if ($python) {
     $pythonExe = $python.Source
-    $pythonPrefix = @("-3")
+    $pythonPrefix = @("-3", "-B")
 } else {
     $python = Get-Command python -ErrorAction Stop
     $pythonExe = $python.Source
-    $pythonPrefix = @()
+    $pythonPrefix = @("-B")
 }
 & $pythonExe @pythonPrefix -m py_compile (Join-Path $root "setup_core.py") (Join-Path $root "setup_lib.py") (Join-Path $root "setup_migration.py") (Join-Path $root "setup_runtime.py")
 if ($LASTEXITCODE -ne 0) { throw "setup Python modules compile failed" }
@@ -30,7 +30,7 @@ if (@($data.models.PSObject.Properties).Count -ne 13) { throw "config_data.json 
 if ($data.bmad.skills.Count -eq 0 -or @($data.bmad.skills | Sort-Object -Unique).Count -ne $data.bmad.skills.Count) { throw "config_data.json BMAD skills must be non-empty and unique." }
 Write-Host "PASS config_data.json"
 
-$testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("opencode-setup-" + [guid]::NewGuid().ToString("N"))
+$testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("agent-toolchain-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
 
 function Invoke-GitChecked {
@@ -45,7 +45,7 @@ function New-FixtureRemote {
     $bare = Join-Path $testRoot "$Kind.git"
     Invoke-GitChecked @("init", "-q", "-b", $Branch, $seed)
     Invoke-GitChecked @("-C", $seed, "config", "user.email", "test@example.invalid")
-    Invoke-GitChecked @("-C", $seed, "config", "user.name", "opencode-setup-test")
+    Invoke-GitChecked @("-C", $seed, "config", "user.name", "agent-toolchain-test")
     if ($Kind -eq "ssh") {
         $skillDir = Join-Path $seed "opencode\skills\ssh-relay"
         New-Item -ItemType Directory -Path $skillDir -Force | Out-Null
@@ -95,6 +95,7 @@ try {
     $testHome = Join-Path $testRoot "home"
     $configDir = Join-Path $testHome ".config\opencode"
     $stashDir = Join-Path $testHome "projects\stash\opencode.ai"
+    $credentialDir = Join-Path $configDir "credentials"
     $skillsDir = Join-Path $testHome ".agents\skills"
     $stateDir = Join-Path $testHome "state"
     $projectsDir = Join-Path $testHome "projects"
@@ -106,20 +107,43 @@ try {
     "user skill must survive" | Set-Content -LiteralPath (Join-Path $skillsDir "custom-user\SKILL.md") -Encoding ASCII
     "BMAD-like user skill must survive" | Set-Content -LiteralPath (Join-Path $skillsDir "bmad-user-skill\SKILL.md") -Encoding ASCII
 
-    $setupParams = @{
-        ConfigDir = $configDir
-        StashDir = $stashDir
-        SkillsDir = $skillsDir
-        StateDir = $stateDir
-        ProjectsDir = $projectsDir
-        SkipPackageInstall = $true
-        SkipDependencyInstall = $true
-        SshRelayUrl = $sshRemote
-        AgentSafeUrl = $safeRemote
+    function Invoke-CoreFixture {
+        param([switch]$Check)
+        $coreArgs = @(
+            (Join-Path $root "setup_core.py"),
+            "--repo-root", $root,
+            "--config-dir", $configDir,
+            "--stash-dir", $stashDir,
+            "--credential-dir", $credentialDir,
+            "--skills-dir", $skillsDir,
+            "--state-dir", $stateDir,
+            "--projects-dir", $projectsDir,
+            "--skip-package-install",
+            "--skip-dependency-install",
+            "--ssh-relay-url", $sshRemote,
+            "--agent-safe-url", $safeRemote
+        )
+        if ($Check) { $coreArgs += "--check" }
+
+        $oldPythonUtf8 = $env:PYTHONUTF8
+        $oldPythonIoEncoding = $env:PYTHONIOENCODING
+        try {
+            $env:PYTHONUTF8 = "1"
+            $env:PYTHONIOENCODING = "utf-8"
+            $output = (& $pythonExe @pythonPrefix @coreArgs 2>&1 | Out-String)
+            $exitCode = $LASTEXITCODE
+        } finally {
+            if ($null -eq $oldPythonUtf8) { Remove-Item Env:PYTHONUTF8 -ErrorAction SilentlyContinue }
+            else { $env:PYTHONUTF8 = $oldPythonUtf8 }
+            if ($null -eq $oldPythonIoEncoding) { Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue }
+            else { $env:PYTHONIOENCODING = $oldPythonIoEncoding }
+        }
+        return [pscustomobject]@{ Output = $output; ExitCode = $exitCode }
     }
 
-    $firstOutput = (& (Join-Path $root "setup_windows.ps1") @setupParams 2>&1 | Out-String)
-    if ($LASTEXITCODE -ne 0) { throw "isolated Windows setup failed" }
+    $first = Invoke-CoreFixture
+    $firstOutput = $first.Output
+    if ($first.ExitCode -ne 0) { throw "isolated Windows core reconciliation failed" }
     if ($firstOutput -notmatch '(?m)^configured\s+OpenCode config') { throw "Initial Windows apply must report configured OpenCode config." }
     if ($firstOutput -notmatch '(?m)^configured\s+ownership manifest') { throw "Initial Windows apply must report configured ownership manifest." }
     if ((Get-FileHash -LiteralPath $keyFile -Algorithm SHA256).Hash -ne $keyBefore) { throw "Existing API key bytes changed." }
@@ -131,23 +155,25 @@ try {
     $generated = Get-Content -LiteralPath (Join-Path $configDir "opencode.jsonc") -Raw | ConvertFrom-Json
     if (@($generated.provider.routerai.models.PSObject.Properties).Count -ne 13) { throw "Generated config must contain 13 models." }
     if ((Get-Content -LiteralPath (Join-Path $configDir "AGENTS.md")).Count -gt 12) { throw "AGENTS.md is not compact." }
-    Write-Host "PASS isolated Windows install + ownership boundaries"
+    Write-Host "PASS isolated Windows core reconciliation + ownership boundaries"
 
     $before = Get-TreeSnapshot -Path $testHome
-    $repeatOutput = (& (Join-Path $root "setup_windows.ps1") @setupParams 2>&1 | Out-String)
-    if ($LASTEXITCODE -ne 0) { throw "repeated Windows setup failed" }
+    $repeat = Invoke-CoreFixture
+    $repeatOutput = $repeat.Output
+    if ($repeat.ExitCode -ne 0) { throw "repeated Windows core reconciliation failed" }
     $after = Get-TreeSnapshot -Path $testHome
-    if ($before -ne $after) { throw "Repeated Windows setup changed file bytes." }
-    if ($repeatOutput -match '(?m)^configured\s+') { throw "Repeated no-op Windows setup must not report configured rows." }
-    Write-Host "PASS repeated Windows setup is idempotent and reports no new configuration"
+    if ($before -ne $after) { throw "Repeated Windows core reconciliation changed file bytes." }
+    if ($repeatOutput -match '(?m)^configured\s+') { throw "Repeated no-op Windows core reconciliation must not report configured rows." }
+    Write-Host "PASS repeated Windows core reconciliation is idempotent and reports no new configuration"
 
     $beforeCheck = Get-TreeSnapshot -Path $testHome
-    $checkOutput = (& (Join-Path $root "setup_windows.ps1") @setupParams -Check 2>&1 | Out-String)
-    if ($LASTEXITCODE -ne 0) { throw "Windows --check failed in clean state" }
+    $checked = Invoke-CoreFixture -Check
+    $checkOutput = $checked.Output
+    if ($checked.ExitCode -ne 0) { throw "Windows core --check failed in clean state" }
     $afterCheck = Get-TreeSnapshot -Path $testHome
-    if ($beforeCheck -ne $afterCheck) { throw "Windows --check changed file bytes." }
-    if ($checkOutput -match '(?m)^(configured|failed)\s+') { throw "Windows --check must not report apply action states." }
-    Write-Host "PASS Windows check mode is read-only"
+    if ($beforeCheck -ne $afterCheck) { throw "Windows core --check changed file bytes." }
+    if ($checkOutput -match '(?m)^(configured|failed)\s+') { throw "Windows core --check must not report apply action states." }
+    Write-Host "PASS Windows core check mode is read-only"
 
     if ($TestBmad) {
         $bmadTarget = Join-Path $testRoot "bmad-project"

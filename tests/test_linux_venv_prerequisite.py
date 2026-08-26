@@ -1,110 +1,75 @@
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+import setup_managed_tools as managed  # noqa: E402
+import setup_manifest  # noqa: E402
+from setup_lib import Reporter, STATE_CONFLICT, STATE_FAILED  # noqa: E402
+from setup_tools import parse_tool_spec  # noqa: E402
 
 
-@unittest.skipIf(os.name == "nt", "Linux venv prerequisite contract")
-class LinuxVenvPrerequisiteTests(unittest.TestCase):
-    def _fake_python(self, directory: Path) -> Path:
-        path = directory / "python-no-ensurepip"
-        path.write_text(
-            "#!/bin/sh\n"
-            "if [ \"$1\" = \"-B\" ] && [ \"$2\" = \"-c\" ]; then\n"
-            "  case \"$3\" in\n"
-            "    *\"import ensurepip, venv\"*) exit 1 ;;\n"
-            "    *\"sys.version_info\"*) echo 3.12; exit 0 ;;\n"
-            "  esac\n"
-            "fi\n"
-            "exec \"$REAL_PYTHON\" \"$@\"\n",
-            encoding="utf-8",
-        )
-        path.chmod(0o755)
-        return path
+class ManagedVenvPrerequisiteTests(unittest.TestCase):
+    def _spec(self):
+        spec, error = parse_tool_spec("fixture", {
+            "source": "git",
+            "repo": "https://example.invalid/fixture.git",
+            "ref": "1" * 40,
+            "project_directory": "fixture",
+            "runtime": "python-venv",
+            "update_policy": "pinned-tested",
+            "entrypoints": ["fixture"],
+            "health_contract": [{"argv": ["fixture", "--help"]}],
+            "platforms": ["windows", "linux"],
+        })
+        self.assertIsNone(error)
+        assert spec is not None
+        return spec
 
-    def test_check_reports_missing_venv_prerequisite_without_creating_runtime(self) -> None:
-        bash = shutil.which("bash")
-        if not bash:
-            self.skipTest("bash is unavailable")
-
+    def test_check_reports_missing_venv_prerequisite_without_mutation(self) -> None:
+        spec = self._spec()
         with tempfile.TemporaryDirectory() as td:
-            temp = Path(td)
-            repo = temp / "repo"
-            repo.mkdir()
-            wrapper = repo / "setup_linux.sh"
-            shutil.copy2(ROOT / "setup_linux.sh", wrapper)
-            wrapper.chmod(0o755)
-            (repo / "setup_core.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
-            fake_python = self._fake_python(temp)
-            runtime_dir = temp / "runtime"
-            env = {
-                **os.environ,
-                "HOME": str(temp / "home"),
-                "REAL_PYTHON": sys.executable,
-                "OPENCODE_SETUP_PYTHON": str(fake_python),
-                "OPENCODE_SETUP_RUNTIME_DIR": str(runtime_dir),
-            }
+            data = Path(td) / "data"
+            manifest = setup_manifest.empty_manifest()
+            with mock.patch.dict(os.environ, {"AGENT_TOOLCHAIN_DATA_DIR": str(data)}, clear=False), \
+                    mock.patch.object(managed, "_venv_prerequisite", return_value=(False, "3.12")):
+                reporter = Reporter()
+                changed = managed.reconcile_python_tool(
+                    spec, sys.executable, reporter,
+                    check=True, skip_install=False, manifest=manifest,
+                )
+            self.assertFalse(changed)
+            self.assertFalse(data.exists())
+            runtime = [item for item in reporter.results if item.component == "fixture runtime"][-1]
+            self.assertEqual(runtime.state, STATE_CONFLICT)
+            self.assertIn("venv/ensurepip", runtime.detail)
+            self.assertIn("MANUAL ACTION REQUIRED", runtime.detail)
 
-            cp = subprocess.run(
-                [bash, str(wrapper), "--check", "--skip-package-install", "--skip-dependency-install"],
-                text=True,
-                encoding="utf-8",
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=env,
-            )
-
-            self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr)
-            self.assertFalse(runtime_dir.exists())
-            self.assertIn("PREREQUISITE", cp.stderr)
-            self.assertIn("MANUAL ACTION REQUIRED", cp.stderr)
-            self.assertIn("sudo apt install python3.12-venv", cp.stderr)
-
-    def test_apply_stops_before_runtime_mutation_when_venv_prerequisite_is_missing(self) -> None:
-        bash = shutil.which("bash")
-        if not bash:
-            self.skipTest("bash is unavailable")
-
+    def test_apply_stops_before_runtime_directory_when_venv_prerequisite_is_missing(self) -> None:
+        spec = self._spec()
         with tempfile.TemporaryDirectory() as td:
-            temp = Path(td)
-            repo = temp / "repo"
-            repo.mkdir()
-            wrapper = repo / "setup_linux.sh"
-            shutil.copy2(ROOT / "setup_linux.sh", wrapper)
-            wrapper.chmod(0o755)
-            (repo / "setup_core.py").write_text("raise AssertionError('core must not run')\n", encoding="utf-8")
-            fake_python = self._fake_python(temp)
-            runtime_parent = temp / "runtime-parent"
-            runtime_dir = runtime_parent / "python"
-            env = {
-                **os.environ,
-                "HOME": str(temp / "home"),
-                "REAL_PYTHON": sys.executable,
-                "OPENCODE_SETUP_PYTHON": str(fake_python),
-                "OPENCODE_SETUP_RUNTIME_DIR": str(runtime_dir),
-            }
-
-            cp = subprocess.run(
-                [bash, str(wrapper), "--skip-package-install", "--skip-dependency-install"],
-                text=True,
-                encoding="utf-8",
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=env,
-            )
-
-            self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
-            self.assertFalse(runtime_dir.exists())
-            self.assertFalse(runtime_parent.exists(), "prerequisite failure must happen before mkdir/temp runtime creation")
-            self.assertIn("MANUAL ACTION REQUIRED", cp.stderr)
-            self.assertIn("sudo apt install python3.12-venv", cp.stderr)
+            data = Path(td) / "data"
+            manifest = setup_manifest.empty_manifest()
+            with mock.patch.dict(os.environ, {"AGENT_TOOLCHAIN_DATA_DIR": str(data)}, clear=False), \
+                    mock.patch.object(managed, "_venv_prerequisite", return_value=(False, "3.12")):
+                reporter = Reporter()
+                changed = managed.reconcile_python_tool(
+                    spec, sys.executable, reporter,
+                    check=False, skip_install=False, manifest=manifest,
+                )
+            self.assertFalse(changed)
+            self.assertFalse(data.exists(), "prerequisite failure must happen before runtime mkdir/staging")
+            runtime = [item for item in reporter.results if item.component == "fixture runtime"][-1]
+            self.assertEqual(runtime.state, STATE_FAILED)
+            self.assertIn("venv/ensurepip", runtime.detail)
+            self.assertIn("toolchainctl apply", runtime.detail)
 
 
 if __name__ == "__main__":
