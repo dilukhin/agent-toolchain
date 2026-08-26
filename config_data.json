@@ -158,7 +158,66 @@
   "managed_environment": {
     "manifest_schema": 2,
     "tool_spec_schema": 1,
-    "tools": {},
+    "tools": {
+      "agent-safe": {
+        "source": "git",
+        "repo": "https://github.com/dilukhin/agent-safe.git",
+        "ref": "95545d20533b2dfa1de7d75a30fa1bbfb1d428e3",
+        "project_directory": "agent-safe",
+        "runtime": "python-venv",
+        "update_policy": "pinned-tested",
+        "entrypoints": [
+          "safe"
+        ],
+        "health_contract": [
+          {
+            "argv": [
+              "safe",
+              "--help"
+            ]
+          }
+        ],
+        "platforms": [
+          "windows",
+          "linux"
+        ]
+      },
+      "ssh_relay": {
+        "source": "git",
+        "repo": "https://github.com/dilukhin/ssh_relay.git",
+        "ref": "1a794f84bb3664fe580716195ee939bbe2295675",
+        "project_directory": "ssh_relay",
+        "runtime": "python-venv",
+        "update_policy": "pinned-tested",
+        "entrypoints": [
+          "ssh_relay"
+        ],
+        "health_contract": [
+          {
+            "argv": [
+              "ssh_relay",
+              "--version"
+            ]
+          },
+          {
+            "argv": [
+              "ssh_relay",
+              "doctor"
+            ]
+          },
+          {
+            "argv": [
+              "ssh_relay",
+              "--help"
+            ]
+          }
+        ],
+        "platforms": [
+          "windows",
+          "linux"
+        ]
+      }
+    },
     "global_skills_dir": "~/.agents/skills",
     "owned_skills": [
       "remote-long-running"
@@ -194,7 +253,7 @@
     "ssh_relay": {
       "location_hint": "~/projects/ssh_relay/",
       "dependencies": [
-        "Python 3.12+",
+        "Python 3.10+",
         "paramiko"
       ],
       "github_repo": "https://github.com/dilukhin/ssh_relay.git"
@@ -223,7 +282,7 @@
       "projects_dir": "%USERPROFILE%\\projects",
       "python_cmd": "py -3",
       "session_files": "%LOCALAPPDATA%\\ssh_relay\\sessions\\",
-      "state_dir": "%LOCALAPPDATA%\\opencode_setup\\state"
+      "state_dir": "%LOCALAPPDATA%\\agent-toolchain\\state"
     },
     "linux": {
       "config_dir": "~/.config/opencode",
@@ -235,7 +294,7 @@
       "projects_dir": "~/projects",
       "python_cmd": "python3",
       "session_files": "~/.local/share/ssh_relay/sessions/",
-      "state_dir": "${XDG_STATE_HOME:-~/.local/state}/opencode_setup"
+      "state_dir": "${XDG_STATE_HOME:-~/.local/state}/agent-toolchain"
     }
   }
 }

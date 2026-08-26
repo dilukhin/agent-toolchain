@@ -17,6 +17,7 @@ import setup_managed_tools as managed  # noqa: E402
 import setup_manifest  # noqa: E402
 import toolchainctl  # noqa: E402
 from setup_lib import Reporter, STATE_CONFIGURED, STATE_CONFLICT, STATE_MISSING, STATE_OK  # noqa: E402
+from setup_tools import parse_tool_spec  # noqa: E402
 
 
 class LegacyStateMigrationTests(unittest.TestCase):
@@ -44,7 +45,7 @@ class LegacyStateMigrationTests(unittest.TestCase):
             self.assertEqual(selected, legacy.resolve())
             self.assertEqual(state, "outdated")
             self.assertIn("apply", detail or "")
-            self.assertFalse(new.exists(), "check must not create the new state namespace")
+            self.assertFalse(new.exists())
 
     def test_apply_imports_legacy_state_once_and_preserves_original(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -52,7 +53,7 @@ class LegacyStateMigrationTests(unittest.TestCase):
             legacy = root / "legacy"
             new = root / "new"
             expected = self._write_manifest(legacy)
-            legacy_manifest_before = (legacy / "manifest.json").read_bytes()
+            before = (legacy / "manifest.json").read_bytes()
             with mock.patch.dict(os.environ, {
                 "OPENCODE_SETUP_STATE_DIR": str(legacy),
                 "AGENT_TOOLCHAIN_STATE_DIR": str(new),
@@ -63,7 +64,7 @@ class LegacyStateMigrationTests(unittest.TestCase):
             self.assertEqual(state, "configured")
             self.assertIn("original retained unchanged", detail or "")
             self.assertEqual((new / "backups" / "fixture.txt").read_bytes(), expected)
-            self.assertEqual((legacy / "manifest.json").read_bytes(), legacy_manifest_before)
+            self.assertEqual((legacy / "manifest.json").read_bytes(), before)
             self.assertEqual(selected_again, new.resolve())
             self.assertEqual(state_again, "info")
             self.assertIn("inactive backup", detail_again or "")
@@ -86,13 +87,32 @@ class LegacyStateMigrationTests(unittest.TestCase):
 
 
 class ManagedPythonToolRuntimeTests(unittest.TestCase):
-    COMMIT = "1" * 40
+    REF = "1" * 40
 
-    def _fake_run(self, spec: managed.PythonToolRuntime):
+    def _spec(self):
+        spec, error = parse_tool_spec("ssh_relay", {
+            "source": "git",
+            "repo": "https://example.invalid/ssh_relay.git",
+            "ref": self.REF,
+            "project_directory": "ssh_relay",
+            "runtime": "python-venv",
+            "update_policy": "pinned-tested",
+            "entrypoints": ["ssh_relay"],
+            "health_contract": [
+                {"argv": ["ssh_relay", "--version"]},
+                {"argv": ["ssh_relay", "doctor"]},
+                {"argv": ["ssh_relay", "--help"]},
+            ],
+            "platforms": ["windows", "linux"],
+        })
+        self.assertIsNone(error)
+        assert spec is not None
+        return spec
+
+    def _fake_run(self, spec, commands: list[list[str]]):
         def fake_run(cmd: list[str], cwd=None, env=None):
-            if cmd[:3] == ["git", "rev-parse", "HEAD"]:
-                return subprocess.CompletedProcess(cmd, 0, self.COMMIT + "\n", "")
-            if len(cmd) >= 4 and cmd[1:4] == ["-B", "-c", "import ensurepip, venv; import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"]:
+            commands.append(cmd)
+            if len(cmd) >= 3 and cmd[1:3] == ["-B", "-c"]:
                 return subprocess.CompletedProcess(cmd, 0, "3.12\n", "")
             if "-m" in cmd and "venv" in cmd:
                 venv = Path(cmd[-1])
@@ -104,76 +124,92 @@ class ManagedPythonToolRuntimeTests(unittest.TestCase):
                 return subprocess.CompletedProcess(cmd, 0, "", "")
             if len(cmd) >= 5 and cmd[1:4] == ["-m", "pip", "install"]:
                 venv = Path(cmd[0]).parent.parent
-                command = managed._venv_command(venv, spec.public_command)
-                command.parent.mkdir(parents=True, exist_ok=True)
-                command.write_bytes(b"fake-command")
-                if os.name != "nt":
-                    command.chmod(0o755)
+                for entrypoint in spec.entrypoints:
+                    command = managed._venv_command(venv, entrypoint)
+                    command.parent.mkdir(parents=True, exist_ok=True)
+                    command.write_bytes(b"fake-command")
+                    if os.name != "nt":
+                        command.chmod(0o755)
                 return subprocess.CompletedProcess(cmd, 0, "", "")
             if cmd[-1:] == ["--version"]:
-                return subprocess.CompletedProcess(cmd, 0, "fixture 1.0\n", "")
+                return subprocess.CompletedProcess(cmd, 0, "ssh_relay 0.9.0\n", "")
             if cmd[-1:] == ["doctor"]:
                 return subprocess.CompletedProcess(cmd, 0, "Runtime: ok\n", "")
             if cmd[-1:] == ["--help"]:
-                token = spec.required_help_token or "usage"
-                return subprocess.CompletedProcess(cmd, 0, f"usage: fixture {token}\n", "")
+                return subprocess.CompletedProcess(cmd, 0, "usage: ssh_relay job\n", "")
             raise AssertionError(f"unexpected command: {cmd}")
         return fake_run
 
-    def _repo(self, root: Path) -> Path:
-        repo = root / "repo"
-        (repo / ".git").mkdir(parents=True)
-        return repo
-
-    def test_check_is_read_only_for_missing_runtime(self) -> None:
-        spec = managed.SSH_RELAY_RUNTIME
+    def test_check_is_read_only_for_missing_pinned_runtime(self) -> None:
+        spec = self._spec()
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             data = root / "data"
             bin_dir = root / "bin"
-            repo = self._repo(root)
+            commands: list[list[str]] = []
             with mock.patch.dict(os.environ, {
                 "AGENT_TOOLCHAIN_DATA_DIR": str(data),
                 "AGENT_TOOLCHAIN_BIN_DIR": str(bin_dir),
-            }, clear=False), mock.patch.object(managed, "run", self._fake_run(spec)):
+            }, clear=False), mock.patch.object(managed, "run", self._fake_run(spec, commands)):
                 reporter = Reporter()
-                managed.ensure_python_tool_runtime(spec, repo, sys.executable, reporter, check=True, skip_install=False)
+                manifest = setup_manifest.empty_manifest()
+                changed = managed.reconcile_python_tool(
+                    spec, sys.executable, reporter, check=True, skip_install=False, manifest=manifest
+                )
+            self.assertFalse(changed)
             runtime = [r for r in reporter.results if r.component == "ssh_relay runtime"][-1]
             self.assertEqual(runtime.state, STATE_MISSING)
-            self.assertIn("non-editable", runtime.detail)
+            self.assertIn(self.REF[:12], runtime.detail)
             self.assertFalse(data.exists())
             self.assertFalse(bin_dir.exists())
+            self.assertFalse(any("pip" in cmd for cmd in commands))
 
-    def test_apply_publishes_owned_runtime_and_repeat_is_noop(self) -> None:
-        spec = managed.SSH_RELAY_RUNTIME
+    def test_apply_installs_exact_git_ref_records_manifest_and_repeat_is_noop(self) -> None:
+        spec = self._spec()
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             data = root / "data"
             bin_dir = root / "bin"
-            repo = self._repo(root)
+            commands: list[list[str]] = []
+            manifest = setup_manifest.empty_manifest()
             env = {
                 "AGENT_TOOLCHAIN_DATA_DIR": str(data),
                 "AGENT_TOOLCHAIN_BIN_DIR": str(bin_dir),
                 "PATH": str(bin_dir) + os.pathsep + os.environ.get("PATH", ""),
             }
-            fake_run = self._fake_run(spec)
-            with mock.patch.dict(os.environ, env, clear=False), mock.patch.object(managed, "run", fake_run):
+            fake_run = self._fake_run(spec, commands)
+            with mock.patch.dict(os.environ, env, clear=False), \
+                    mock.patch.object(managed, "run", fake_run), \
+                    mock.patch.object(managed.shutil, "which", side_effect=lambda name: (
+                        str(bin_dir / (name + ".cmd" if os.name == "nt" else name))
+                        if name == "ssh_relay" else "/fake/git" if name == "git" else None
+                    )):
                 first = Reporter()
-                managed.ensure_python_tool_runtime(spec, repo, sys.executable, first, check=False, skip_install=False)
+                changed_first = managed.reconcile_python_tool(
+                    spec, sys.executable, first, check=False, skip_install=False, manifest=manifest
+                )
                 second = Reporter()
-                managed.ensure_python_tool_runtime(spec, repo, sys.executable, second, check=False, skip_install=False)
+                changed_second = managed.reconcile_python_tool(
+                    spec, sys.executable, second, check=False, skip_install=False, manifest=manifest
+                )
 
-            release = data / "tools" / spec.name / "releases" / self.COMMIT
+            self.assertTrue(changed_first)
+            self.assertFalse(changed_second)
+            release = data / "tools" / spec.name / "releases" / self.REF
             marker = json.loads((release / managed._RUNTIME_MARKER).read_text(encoding="utf-8"))
-            self.assertEqual(marker["source_commit"], self.COMMIT)
-            self.assertEqual(marker["tool"], spec.name)
-            self.assertEqual([r for r in first.results if r.component == "ssh_relay runtime"][-1].state, STATE_CONFIGURED)
-            self.assertEqual([r for r in second.results if r.component == "ssh_relay runtime"][-1].state, STATE_OK)
-            public = managed._public_entrypoint(spec)
+            self.assertEqual(marker["source_ref"], self.REF)
+            self.assertEqual(manifest["managed_tools"][spec.name]["source_ref"], self.REF)
+            self.assertEqual(manifest["managed_tools"][spec.name]["repo"], spec.repo)
+            pip_commands = [cmd for cmd in commands if len(cmd) >= 4 and cmd[1:4] == ["-m", "pip", "install"]]
+            self.assertEqual(len(pip_commands), 1)
+            self.assertIn(f"git+{spec.repo}@{self.REF}", pip_commands[0])
+            self.assertNotIn(str(root / "repo"), pip_commands[0])
+            public = managed._public_entrypoint(spec, "ssh_relay")
             self.assertTrue(public.exists() or public.is_symlink())
+            self.assertEqual([r for r in second.results if r.component == "ssh_relay runtime"][-1].state, STATE_OK)
 
     def test_foreign_public_entrypoint_is_preserved(self) -> None:
-        spec = managed.SSH_RELAY_RUNTIME
+        spec = self._spec()
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             bin_dir = root / "bin"
@@ -189,8 +225,11 @@ class ManagedPythonToolRuntimeTests(unittest.TestCase):
             before = public.read_bytes()
             with mock.patch.dict(os.environ, {"AGENT_TOOLCHAIN_BIN_DIR": str(bin_dir)}, clear=False):
                 reporter = Reporter()
-                ok = managed._reconcile_entrypoint(spec, target, reporter, check=False)
+                ok, changed = managed._reconcile_entrypoint(
+                    spec, "ssh_relay", target, None, reporter, check=False
+                )
             self.assertFalse(ok)
+            self.assertFalse(changed)
             self.assertEqual(public.read_bytes(), before)
             self.assertEqual(reporter.results[-1].state, STATE_CONFLICT)
 

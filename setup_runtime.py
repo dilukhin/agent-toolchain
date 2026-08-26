@@ -1,11 +1,10 @@
-"""Runtime facade: managed CLI tool runtimes plus unchanged OpenCode/npm policy."""
+"""Compatibility facade for unchanged OpenCode/npm policy and legacy direct callers."""
 from __future__ import annotations
 
-import setup_managed_tools as _managed
+import os
+
 import setup_runtime_legacy as _legacy
 
-# Re-export the established runtime-policy surface so existing focused tests and callers
-# continue to patch the same names while helper-tool deployment moves to a new layer.
 Reporter = _legacy.Reporter
 STATE_CONFIGURED = _legacy.STATE_CONFIGURED
 STATE_CONFLICT = _legacy.STATE_CONFLICT
@@ -26,6 +25,7 @@ render_instances = _legacy.render_instances
 report_common_tool_inventory = _legacy.report_common_tool_inventory
 _known_opencode_managers = _legacy._known_opencode_managers
 installed_version = _legacy.installed_version
+_module_origin = _legacy._module_origin
 
 
 def _sync_legacy_policy() -> None:
@@ -38,6 +38,7 @@ def _sync_legacy_policy() -> None:
     _legacy.render_instances = render_instances
     _legacy.report_common_tool_inventory = report_common_tool_inventory
     _legacy._known_opencode_managers = _known_opencode_managers
+    _legacy._module_origin = _module_origin
 
 
 def reconcile_npm(*args, **kwargs):
@@ -50,13 +51,19 @@ def _reconcile_opencode_cli(*args, **kwargs):
     return _legacy._reconcile_opencode_cli(*args, **kwargs)
 
 
+def _tool_runtime_preconciled(skip_install: bool) -> bool:
+    return skip_install and os.environ.get("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED") == "1"
+
+
 def ensure_ssh_relay_runtime(repo, python_exe, reporter, check, skip_install):
-    _managed.run = run
-    _legacy.run = run
-    return _managed.ensure_ssh_relay_runtime(repo, python_exe, reporter, check, skip_install)
+    if _tool_runtime_preconciled(skip_install):
+        return
+    _sync_legacy_policy()
+    return _legacy.ensure_ssh_relay_runtime(repo, python_exe, reporter, check, skip_install)
 
 
 def ensure_agent_safe_runtime(repo, python_exe, reporter, check, skip_install):
-    _managed.run = run
-    _legacy.run = run
-    return _managed.ensure_agent_safe_runtime(repo, python_exe, reporter, check, skip_install)
+    if _tool_runtime_preconciled(skip_install):
+        return
+    _sync_legacy_policy()
+    return _legacy.ensure_agent_safe_runtime(repo, python_exe, reporter, check, skip_install)

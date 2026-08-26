@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import shutil
 import sys
@@ -10,7 +11,10 @@ import uuid
 from pathlib import Path
 
 import setup_core
-from setup_manifest import load_manifest
+from setup_lib import Reporter, STATE_CONFIGURED, STATE_CONFLICT, STATE_FAILED, STATE_OUTDATED
+from setup_managed_tools import reconcile_tool_specs
+from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
+from setup_tools import parse_tool_specs
 
 PRODUCT = "agent-toolchain"
 LEGACY_PRODUCT = "opencode_setup"
@@ -140,6 +144,8 @@ def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
         "--state-dir", str(state_dir),
         "--projects-dir", str(paths["projects"]),
         "--python", sys.executable,
+        # Production helper runtimes have already been reconciled from ToolSpec.
+        "--skip-dependency-install",
     ]
     if args.command == "check":
         argv.append("--check")
@@ -147,13 +153,74 @@ def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
         argv.append("--force")
     if args.skip_package_install:
         argv.append("--skip-package-install")
-    if args.skip_dependency_install:
-        argv.append("--skip-dependency-install")
     if args.ssh_relay_url:
         argv.extend(["--ssh-relay-url", args.ssh_relay_url])
     if args.agent_safe_url:
         argv.extend(["--agent-safe-url", args.agent_safe_url])
     return argv
+
+
+def _runtime_phase(state_dir: Path, *, check: bool, skip_install: bool) -> int:
+    reporter = Reporter()
+    repo_root = Path(__file__).resolve().parent
+    try:
+        config = json.loads((repo_root / "config_data.json").read_text(encoding="utf-8"))
+        env_cfg = config["managed_environment"]
+    except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        reporter.add("ToolSpec registry", STATE_CONFLICT, f"cannot load managed_environment config: {exc}")
+        reporter.render()
+        return 2
+    if env_cfg.get("manifest_schema") != MANIFEST_SCHEMA:
+        reporter.add(
+            "manifest schema policy",
+            STATE_CONFLICT,
+            f"config requires manifest schema {env_cfg.get('manifest_schema')!r}; runtime supports {MANIFEST_SCHEMA}",
+        )
+        reporter.render()
+        return 2
+    specs, error = parse_tool_specs(env_cfg)
+    if error:
+        reporter.add("ToolSpec registry", STATE_CONFLICT, error)
+        reporter.render()
+        return 2
+    if not specs:
+        reporter.add("ToolSpec registry", STATE_CONFLICT, "no managed production tools are declared")
+        reporter.render()
+        return 2
+
+    manifest_path = state_dir / "manifest.json"
+    manifest, error, migration_pending = load_manifest(manifest_path)
+    if error:
+        reporter.add("ownership manifest", STATE_CONFLICT, error)
+        reporter.render()
+        return 2
+    changed = migration_pending
+    if migration_pending:
+        reporter.add(
+            "ownership manifest schema",
+            STATE_OUTDATED if check else STATE_CONFIGURED,
+            "legacy schema is valid; apply persists schema 2 before recording managed tools",
+        )
+
+    changed |= reconcile_tool_specs(
+        specs,
+        sys.executable,
+        reporter,
+        check=check,
+        skip_install=skip_install,
+        manifest=manifest,
+    )
+    if not check and changed:
+        try:
+            state_dir.mkdir(parents=True, exist_ok=True)
+            save_manifest(manifest_path, manifest)
+        except (OSError, ValueError) as exc:
+            reporter.add("ownership manifest", STATE_FAILED, f"cannot save {manifest_path}: {exc}")
+        else:
+            reporter.add("ownership manifest", STATE_CONFIGURED, f"managed tool ownership recorded: {manifest_path}")
+
+    reporter.render()
+    return 2 if reporter.has_conflict else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -168,7 +235,20 @@ def main(argv: list[str] | None = None) -> int:
     if migration_detail and migration_state:
         print(f"{migration_state:<18}agent-toolchain state migration  {migration_detail}")
 
-    return int(setup_core.main(_core_argv(args, state_dir)))
+    runtime_rc = _runtime_phase(state_dir, check=check, skip_install=bool(args.skip_dependency_install))
+    if runtime_rc != 0 and not check:
+        return runtime_rc
+
+    previous = os.environ.get("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED")
+    os.environ["AGENT_TOOLCHAIN_RUNTIME_PRECONCILED"] = "1"
+    try:
+        core_rc = int(setup_core.main(_core_argv(args, state_dir)))
+    finally:
+        if previous is None:
+            os.environ.pop("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED", None)
+        else:
+            os.environ["AGENT_TOOLCHAIN_RUNTIME_PRECONCILED"] = previous
+    return 2 if runtime_rc != 0 or core_rc != 0 else 0
 
 
 if __name__ == "__main__":
