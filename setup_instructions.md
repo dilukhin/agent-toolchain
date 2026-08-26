@@ -67,7 +67,7 @@ Global skills:          ~/.agents/skills
 5. исходный `opencode_setup` state остаётся неизменённым как inactive backup;
 6. следующие запуски используют новый state.
 
-Если legacy-каталог есть, но его ownership manifest отсутствует/невалиден, automatic adoption запрещён.
+Если legacy-каталог есть, но его ownership manifest отсутствует/невалиден, automatic adoption запрещён. Уже существующий новый `agent-toolchain` state также обязан быть обычным каталогом с валидным manifest; неизвестный или symlink state не усыновляется.
 
 Миграция выполняется отдельно на каждой машине. Для текущего перехода сначала рабочий Linux ILUKHIN, затем домашний Windows-ноутбук.
 
@@ -85,12 +85,15 @@ agent-safe → isolated venv → safe
 Для каждого инструмента:
 
 1. проверяется immutable 40-hex ref;
-2. создаётся отдельный staging venv;
-3. package ставится non-editable из exact Git ref;
-4. health выполняется внутри нового runtime;
-5. runtime публикуется в versioned release directory;
-6. stable public entrypoint создаётся только если target path свободен или доказанно принадлежит agent-toolchain;
-7. ownership записывается в `managed_tools`.
+2. эксклюзивно резервируется final versioned release directory;
+3. venv создаётся **сразу по финальному пути**, потому что стандартный Python venv не relocatable;
+4. package ставится non-editable из exact Git ref;
+5. health выполняется через установленный entrypoint в final runtime;
+6. только после успешного health записывается ownership marker;
+7. stable public entrypoint создаётся только если target path свободен или доказанно принадлежит agent-toolchain;
+8. ownership записывается в `managed_tools`.
+
+Если создание venv, install, health или запись marker завершается ошибкой, удаляется только final release directory, доказанно созданный этим текущим запуском. Ранее существующий, конкурентно появившийся или неизвестный runtime path не удаляется и даёт conflict.
 
 Developer checkout может быть dirty, содержать локальные commits или отсутствовать — production runtime от этого не зависит.
 
@@ -156,6 +159,8 @@ Version/integrity/skill contract берутся из `config_data.json` и ва�
 ## 10. Диагностика конфликтов
 
 При `modified/conflict` сначала определить ownership и фактическое состояние. Не применять `reset`, `clean`, удаление неизвестных runtime/state directories или force replacement как автоматический recovery.
+
+Bootstrap core с корректным marker, но изменённым фактическим payload не считается `up-to-date`: bootstrap fail closed и сохраняет каталог без автоматической замены.
 
 Повторный цикл после исправления причины:
 

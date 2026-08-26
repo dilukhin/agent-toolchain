@@ -112,7 +112,7 @@ stable toolchainctl entrypoint
 
 Общий bootstrap venv отсутствует. Bootstrap не устанавливает Paramiko или другие helper dependencies.
 
-Core принимается только при точном `.agent-toolchain-managed-core.json`. Чужой core path или чужой `toolchainctl` не перезаписывается. Preflight entrypoint выполняется до core mutation. Повторный bootstrap неизменного fingerprint — no-op; backup создаётся только при реальном обновлении доказанно managed core.
+Core принимается как управляемый только при корректном `.agent-toolchain-managed-core.json` **и** совпадении сохранённого fingerprint с фактическим установленным payload. Чужой или локально изменённый core path и чужой `toolchainctl` не перезаписываются. Preflight entrypoint выполняется до core mutation. Повторный bootstrap неизменного fingerprint — no-op; backup создаётся только при реальном обновлении доказанно managed и неизменённого core.
 
 ## Python managed runtime
 
@@ -121,18 +121,24 @@ Core принимается только при точном `.agent-toolchain-m
 ```text
 ToolSpec repo@exact-ref
    ↓
-temporary isolated venv
-   ↓ pip install git+repo@exact-ref (non-editable)
-health внутри staging runtime
+exclusive reserve final versioned release path
    ↓
-versioned release directory
+create venv directly at final path
+   ↓ pip install git+repo@exact-ref (non-editable)
+health through installed entrypoint at final path
+   ↓
+write ownership marker
    ↓
 stable managed entrypoint
    ↓
 manifest.managed_tools
 ```
 
-Release path включает exact ref, поэтому новая версия публикуется рядом с предыдущей, а не модифицирует source checkout.
+Python `venv` не считается relocatable runtime: POSIX console-script shebang и часть Windows launcher metadata могут содержать абсолютный путь interpreter. Поэтому venv нельзя безопасно собрать под `.tmp-*` и затем перенести rename-операцией. Deployer сначала эксклюзивно создаёт exact versioned release directory и строит venv непосредственно внутри него.
+
+Если install, health или запись ownership marker завершается ошибкой, удаляется только release directory, который доказанно был создан **этим же текущим запуском**. Если final path существовал до запуска, появился конкурентно или его ownership не доказан, содержимое не удаляется и reconciliation завершается conflict. Ownership marker пишется только после успешного health.
+
+Release path включает exact ref, поэтому новая версия создаётся рядом с предыдущей, а не модифицирует source checkout или старый release.
 
 Health выполняется через реальный установленный entrypoint. Для `ssh_relay` `doctor` реально импортирует `paramiko` без network/SSH, что предотвращает прежний false-positive `--version`/`--help` health.
 
@@ -185,6 +191,8 @@ Target — `~/.local/bin`. Toolchain не редактирует произво�
 - temporary атомарно публикуется как новый state;
 - legacy оригинал остаётся нетронутым;
 - после появления нового state он становится единственным production state.
+
+Уже существующий новый state не принимается автоматически: его root не должен быть symlink, он должен быть каталогом с валидным ownership manifest. Иначе `toolchainctl` fail closed и не усыновляет содержимое.
 
 Это migration bridge для перехода двух машин, а не долгосрочный compatibility namespace.
 
