@@ -15,6 +15,7 @@ from setup_lib import Reporter, STATE_CONFIGURED, STATE_CONFLICT, STATE_FAILED, 
 from setup_managed_tools import reconcile_tool_specs
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
 from setup_path import reconcile_public_bin_path
+from setup_tool_skills import reconcile_pinned_tool_skills
 from setup_tools import parse_tool_specs
 
 PRODUCT = "agent-toolchain"
@@ -160,7 +161,7 @@ def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
     return argv
 
 
-def _managed_phase(state_dir: Path, *, check: bool, skip_install: bool) -> int:
+def _managed_phase(state_dir: Path, *, check: bool, skip_install: bool, force: bool) -> int:
     reporter = Reporter()
     repo_root = Path(__file__).resolve().parent
     try:
@@ -211,6 +212,18 @@ def _managed_phase(state_dir: Path, *, check: bool, skip_install: bool) -> int:
         skip_install=skip_install,
         manifest=manifest,
     )
+    paths = _default_paths()
+    changed |= reconcile_pinned_tool_skills(
+        env_cfg,
+        specs,
+        manifest,
+        reporter,
+        skills_dir=paths["skills"],
+        state_dir=state_dir,
+        check=check,
+        force=force,
+        skip_install=skip_install,
+    )
     if not check and changed:
         try:
             state_dir.mkdir(parents=True, exist_ok=True)
@@ -236,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
     if migration_detail and migration_state:
         print(f"{migration_state:<18}agent-toolchain state migration  {migration_detail}")
 
-    managed_rc = _managed_phase(state_dir, check=check, skip_install=bool(args.skip_dependency_install))
+    managed_rc = _managed_phase(state_dir, check=check, skip_install=bool(args.skip_dependency_install), force=bool(args.force))
     if managed_rc != 0 and not check:
         return managed_rc
 
