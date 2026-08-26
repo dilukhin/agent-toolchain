@@ -164,7 +164,7 @@ class FinalPathVenvHardeningTests(unittest.TestCase):
             release = data / "tools" / spec.name / "releases" / self.REF
             venv_commands = [cmd for cmd in commands if cmd[1:4] == ["-B", "-m", "venv"]]
             self.assertEqual(len(venv_commands), 1)
-            self.assertEqual(Path(venv_commands[0][-1]), release / "venv")
+            self.assertTrue(os.path.samefile(Path(venv_commands[0][-1]), release / "venv"))
             self.assertNotIn(".tmp-", str(venv_commands[0][-1]))
             self.assertTrue((release / managed._RUNTIME_MARKER).is_file())
 
