@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import tempfile
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -25,6 +26,18 @@ from setup_managed_tools import data_root
 from setup_tools import ToolSpec
 
 _MARKER = ".agent-toolchain-managed-skills.json"
+
+
+def _remove_owned_tree(path: Path) -> None:
+    """Remove a tree created by the current run, including read-only Git files on Windows."""
+    def _onerror(function, name, exc_info):
+        try:
+            os.chmod(name, stat.S_IWRITE)
+            function(name)
+        except OSError:
+            raise exc_info[1]
+
+    shutil.rmtree(path, onerror=_onerror)
 
 
 def _relative_skill_path(value: str) -> str | None:
@@ -203,7 +216,12 @@ def _publish_bundle(spec: ToolSpec, bindings: dict[str, str], reporter: Reporter
                              f"pinned source {spec.ref[:12]} is invalid: {validation}")
                 return None
             atomic_write(_payload_path(temporary, skill_name), candidate.read_bytes())
-        shutil.rmtree(source)
+        try:
+            _remove_owned_tree(source)
+        except OSError as exc:
+            reporter.add(f"{spec.name} skill source", STATE_FAILED,
+                         f"failed to remove temporary pinned checkout: {exc}")
+            return None
         payload_hashes = _payload_hashes(temporary, bindings)
         if payload_hashes is None:
             reporter.add(f"{spec.name} skill source", STATE_FAILED,
@@ -231,7 +249,10 @@ def _publish_bundle(spec: ToolSpec, bindings: dict[str, str], reporter: Reporter
         return bundle
     finally:
         if temporary is not None and temporary.exists():
-            shutil.rmtree(temporary, ignore_errors=True)
+            try:
+                _remove_owned_tree(temporary)
+            except OSError:
+                pass
 
 
 def reconcile_pinned_tool_skills(
