@@ -24,8 +24,8 @@ def _assert_clean_report(reporter: Reporter, phase: str) -> None:
     if not bad:
         return
     reporter.render()
-    detail = ";".join(f"{item.component}: {item.state}: {item.detail}" for item in bad)
-    raisYHassertionError(f"{phase} reported blocking states: {detail}")
+    detail = "; ".join(f"{item.component}: {item.state}: {item.detail}" for item in bad)
+    raise AssertionError(f"{phase} reported blocking states: {detail}")
 
 
 def _snapshot(value: object) -> str:
@@ -115,7 +115,7 @@ def main() -> int:
                 if not isinstance(record, dict):
                     raise AssertionError(f"missing managed_tools record for {tool_name}")
                 if record.get("source_ref") != spec.ref:
-                    raise AssertionError(f"{tool_name} manifest ref mismatch: {record.get('source_ref'i} != {spec.ref}")
+                    raise AssertionError(f"{tool_name} manifest ref mismatch: {record.get('source_ref')} != {spec.ref}")
                 for command in spec.entrypoints:
                     suffix = ".cmd" if os.name == "nt" else ""
                     public = bin_dir / f"{command}{suffix}"
