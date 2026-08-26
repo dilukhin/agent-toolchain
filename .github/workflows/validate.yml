@@ -43,7 +43,8 @@ jobs:
             .\setup_tool_skills_impl.py `
             .\setup_path.py `
             .\setup_inventory.py `
-            .\setup_tools.py
+            .\setup_tools.py `
+            .\tests\run_managed_tools_integration.py
       - name: Validate PowerShell bootstrap and retired interface syntax
         shell: powershell
         run: |
@@ -57,6 +58,9 @@ jobs:
       - name: Validate migration regressions
         shell: powershell
         run: py -3 .\tests\run_migration_ci.py
+      - name: Validate managed helper exact-ref integration
+        shell: powershell
+        run: py -3 .\tests\run_managed_tools_integration.py
       - name: Validate installed toolchainctl bootstrap contract
         shell: powershell
         run: |
@@ -145,7 +149,8 @@ jobs:
             ./setup_tool_skills_impl.py \
             ./setup_path.py \
             ./setup_inventory.py \
-            ./setup_tools.py
+            ./setup_tools.py \
+            ./tests/run_managed_tools_integration.py
       - name: Validate shell bootstrap and retired interface syntax
         run: |
           bash -n ./bootstrap_linux.sh
@@ -154,6 +159,8 @@ jobs:
           bash -n ./validate_setup.sh
       - name: Validate migration regressions
         run: python3 ./tests/run_migration_ci.py
+      - name: Validate managed helper exact-ref integration
+        run: python3 ./tests/run_managed_tools_integration.py
       - name: Validate installed toolchainctl bootstrap contract
         shell: bash
         run: |
