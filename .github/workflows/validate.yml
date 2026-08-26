@@ -101,8 +101,9 @@ jobs:
             throw "repeat bootstrap created a core backup despite unchanged fingerprint"
           }
 
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup_windows.ps1
-          if ($LASTEXITCODE -ne 2) { throw "retired setup_windows.ps1 must fail with exit 2, got $LASTEXITCODE" }
+          $tombstone = (Resolve-Path ".\setup_windows.ps1").Path
+          $tombstoneProc = Start-Process powershell.exe -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $tombstone) -Wait -PassThru -NoNewWindow
+          if ($tombstoneProc.ExitCode -ne 2) { throw "retired setup_windows.ps1 must fail with exit 2, got $($tombstoneProc.ExitCode)" }
       - name: Validate OpenCode core and BMAD regressions
         shell: powershell
         run: |
