@@ -1,14 +1,27 @@
-# ToolSpec и ownership manifest schema 2
+# ToolSpec, installed runtime и ownership manifest schema 2
 
 ## Статус
 
-Этот документ описывает **реализованный фундамент** toolchain deployment. Он не означает, что `bundle`, `tunnelctl` или `proxy-tools` уже развертываются текущим setup.
+Документ описывает реализованный фундамент `agent-toolchain` на переходной ветке переименования `opencode_setup → agent-toolchain`.
 
-Подробная целевая архитектура принадлежит `opencode_setup_toolchain_deployment_design_ru.md` в Sources проекта.
+Реализованы:
+
+- stdlib-only bootstrap управляющего core без общего Python venv;
+- `toolchainctl check/apply`;
+- manifest schema 2;
+- ToolSpec schema 1;
+- первый production deployer `git + pinned-tested + python-venv`;
+- отдельные runtime для `ssh_relay` и `agent-safe`;
+- stable public entrypoints `ssh_relay` и `safe`;
+- exact-ref skill reconciliation из того же commit, что runtime;
+- Windows user PATH ownership и Linux PATH diagnostics;
+- one-way import legacy `opencode_setup` state.
+
+Не реализованы пока `go-binary` deployment для `tunnelctl`, deployment `bundle` и `proxy-tools`.
 
 ## Manifest schema 2
 
-Текущий ownership manifest содержит обязательные разделы:
+Ownership manifest содержит обязательные разделы:
 
 ```json
 {
@@ -20,81 +33,171 @@
 }
 ```
 
-Назначение новых разделов:
+### `managed_files`
 
-- `managed_tools` — ownership установленного runtime, source/ref/version, scope, install method, runtime path, checksum, entrypoints и health metadata;
-- `managed_path_entries` — только PATH entries, которыми setup доказанно владеет и которые вправе поддерживать.
+Управляемые файлы: path/source/SHA-256 установленного содержимого. Сюда относятся OpenCode managed files и опубликованные skills.
 
-На текущем этапе оба раздела могут быть пустыми.
+Для pinned external skill `source` содержит точный tool/ref/path, например:
 
-### Миграция v1 → v2
+```text
+tool:ssh_relay@<40-hex-sha>:opencode/skills/ssh-relay/SKILL.md
+```
 
-Миграция автоматическая и nondestructive:
+### `credentials`
 
-1. schema 1 проверяется как известный legacy-формат;
-2. существующие `managed_files`, `credentials` и дополнительные top-level metadata сохраняются;
-3. в памяти добавляются `managed_tools` и `managed_path_entries`;
-4. `-Check`/`--check` сообщает `outdated`, но **не пишет manifest**;
-5. обычный apply сохраняет schema 2;
-6. следующий apply не должен менять уже сохранённый v2 manifest.
+Хранит только metadata credential (`provider`, `mode`, `path`). Secret и его hash в manifest не записываются.
 
-Неизвестная schema, нечитаемый JSON или неверный тип обязательной секции дают `modified/conflict`. Setup не пытается восстанавливать такой manifest destructive-операциями.
+### `managed_tools`
+
+Фиксирует доказанное владение installed runtime:
+
+- owner;
+- source/repository;
+- exact source ref;
+- runtime family;
+- runtime path;
+- public entrypoints и их targets;
+- health contract;
+- supported platforms.
+
+Developer checkout в ownership installed runtime не входит.
+
+### `managed_path_entries`
+
+Содержит только PATH entries, которые toolchain сам добавил и которыми вправе управлять. Уже существующий совпадающий PATH entry не присваивается задним числом.
+
+### Migration schema 1 → 2
+
+Известный schema 1 мигрируется в памяти без destructive действий. `check` только сообщает необходимость migration. `apply` сохраняет schema 2 после успешного reconciliation. Неизвестная schema или неверные типы секций дают conflict.
 
 ## ToolSpec schema 1
 
-`config_data.json` содержит:
+ToolSpec описывает production contract инструмента:
 
-```json
-"managed_environment": {
-  "manifest_schema": 2,
-  "tool_spec_schema": 1,
-  "tools": {}
-}
+- `source`;
+- `repo` / immutable `ref` для Git source;
+- `runtime`;
+- `update_policy`;
+- `entrypoints`;
+- `health_contract`;
+- `platforms`;
+- `project_directory` как metadata source/developer project, а не runtime location.
+
+Для production Python tools текущий deployer принимает только:
+
+```text
+source=git
+runtime=python-venv
+update_policy=pinned-tested
+ref=<exact 40-hex commit>
 ```
 
-`tools` намеренно пуст до подключения первого реального managed tool.
+Unsupported combinations fail closed.
 
-Один ToolSpec schema 1 описывает:
+## Bootstrap core
 
-- `source`: только `git` или `builtin`;
-- `runtime`;
-- `update_policy`: `latest`, `pinned-tested` или `bundled-with-setup`;
-- `entrypoints`;
-- `health_contract` как безопасные argv-проверки;
-- `platforms`;
-- для `git`: `repo`, `ref`, `project_directory`.
+`bootstrap_linux.sh` / `bootstrap_windows.ps1` используют базовый Python 3.10+ и `bootstrap_core.py`.
 
-Для `pinned-tested` обязательна явная `ref`. Для `git` обязательны repository и project directory. Один публичный entrypoint не может принадлежать двум ToolSpec одновременно.
+Цель bootstrap — установить/обновить сам управляющий core:
 
-`package` и `release` намеренно **не объявлены поддерживаемыми source type в schema 1**: их нужно добавлять вместе с точным deploy/update/checksum contract, а не заранее создавать ложное обещание поддержки.
+```text
+repository checkout
+      ↓ fingerprint + compile validation
+staging core
+      ↓ atomic publish
+agent-toolchain/core
+      ↓
+stable toolchainctl entrypoint
+```
 
-Registry валидируется при каждом запуске setup до mutations. Ошибка schema/spec является conflict и останавливает reconciliation.
+Общий bootstrap venv отсутствует. Bootstrap не устанавливает Paramiko или другие helper dependencies.
 
-## Bootstrap Python runtime
+Core принимается только при точном `.agent-toolchain-managed-core.json`. Чужой core path или чужой `toolchainctl` не перезаписывается. Preflight entrypoint выполняется до core mutation. Повторный bootstrap неизменного fingerprint — no-op; backup создаётся только при реальном обновлении доказанно managed core.
 
-Платформенные wrappers используют отдельный bootstrap Python `venv`, чтобы текущие Python-зависимости setup и helper runtime не устанавливались в системный Python:
+## Python managed runtime
 
-- Linux: `${XDG_DATA_HOME:-$HOME/.local/share}/opencode_setup/runtime/python`;
-- Windows: `%LOCALAPPDATA%\opencode_setup\runtime\python`;
-- путь можно переопределить через `OPENCODE_SETUP_RUNTIME_DIR` (Windows также принимает параметр `-RuntimeDir`).
+Для `ssh_relay` и `agent-safe` lifecycle:
 
-Обычный apply создаёт отсутствующий runtime во временном соседнем каталоге, проверяет `python` и `pip`, записывает точный ownership-marker и только затем перемещает готовый runtime на целевой путь. `--check`/`-Check` не создаёт runtime: до первого apply он использует базовый Python только для read-only диагностики.
+```text
+ToolSpec repo@exact-ref
+   ↓
+temporary isolated venv
+   ↓ pip install git+repo@exact-ref (non-editable)
+health внутри staging runtime
+   ↓
+versioned release directory
+   ↓
+stable managed entrypoint
+   ↓
+manifest.managed_tools
+```
 
-Существующий каталог принимается только при доказанном ownership-marker и рабочем runtime Python. Неизвестный или неполный каталог не усыновляется и не заменяется автоматически. Это сохраняет инвариант `unknown != ours`.
+Release path включает exact ref, поэтому новая версия публикуется рядом с предыдущей, а не модифицирует source checkout.
 
-Bootstrap venv — **промежуточный слой изоляции**, а не реализация `managed_tools`: текущие `ssh_relay` и `agent-safe` пока могут исполняться из source checkout, не имеют общего stable-entrypoint reconciliation и не записываются как ToolSpec runtime в manifest. Его задача на этом этапе — убрать зависимость от системного `pip` без преждевременного переписывания helper deployment.
+Health выполняется через реальный установленный entrypoint. Для `ssh_relay` `doctor` реально импортирует `paramiko` без network/SSH, что предотвращает прежний false-positive `--version`/`--help` health.
 
-## Что пока не реализовано
+Если базовый Python не имеет `venv/ensurepip`, `check` сообщает prerequisite read-only, а `apply` прекращается до создания runtime directory.
 
-Текущий фундамент и bootstrap runtime **не** реализуют:
+## Stable entrypoint
 
-- generic получение/сборку tool runtime по ToolSpec;
-- stable entrypoint reconciliation;
-- изменение PATH;
-- user/system tool deployment через общий reconciler;
-- generic health execution по ToolSpec;
-- запись фактического helper runtime в `managed_tools`;
-- `bundle`, `tunnelctl`, `proxy-tools` как реальные ToolSpec;
-- окончательное разделение installed runtime `ssh_relay`/`agent-safe` и их source checkout.
+Linux public command — symlink в `~/.local/bin` на command внутри versioned venv.
 
-Следующий этап должен добавить generic reconciler поверх уже существующих ToolSpec + manifest v2, а затем подключить первый инструмент (`bundle`) с pinned-tested ref и изолированным runtime. После стабилизации общего механизма следует оценить миграцию существующих Python helper tools без дублирования уже работающей логики.
+Windows public command — owned `.cmd` в `%LOCALAPPDATA%\agent-toolchain\bin`, вызывающий command внутри versioned venv.
+
+Если public path уже существует и ownership не доказан, toolchain сохраняет его и сообщает conflict. PATH shadowing диагностируется отдельно.
+
+## Skills и source/runtime consistency
+
+External helper skills больше не берутся из tracking checkout.
+
+Для каждого ToolSpec skill paths связываются с tool metadata, затем:
+
+1. во временном каталоге инициализируется Git repository;
+2. fetch выполняется по exact ToolSpec SHA;
+3. checkout detached `FETCH_HEAD`;
+4. `rev-parse HEAD` обязан совпасть с pinned SHA;
+5. SKILL.md проходит validation;
+6. source checkout удаляется;
+7. validated payload публикуется как owned versioned skill bundle;
+8. destination reconciles через `managed_files`.
+
+Таким образом runtime и skill происходят из одного exact commit.
+
+Монолитный legacy `setup_core` пока сохраняется для уже проверенной OpenCode/npm/config policy. При штатном вызове из `toolchainctl` внутренний adapter отключает только старую helper-repository/skill секцию, чтобы developer tracking checkout не становился production dependency. Прямой вызов `setup_core` остаётся внутренним regression contract, не пользовательским интерфейсом.
+
+## PATH
+
+### Windows
+
+`toolchainctl apply` добавляет `%LOCALAPPDATA%\agent-toolchain\bin` в user PATH только если entry отсутствует, не меняя порядок и другие entries. Собственное изменение записывается в manifest.
+
+### Linux
+
+Target — `~/.local/bin`. Toolchain не редактирует произвольные `.profile`, `.bashrc`, `.zshrc` и т.п.; отсутствие target в текущем PATH выдаёт manual action и не создаёт ownership metadata.
+
+## One-way state migration
+
+Если нового `agent-toolchain` state нет, но известный legacy `opencode_setup` state содержит валидный manifest:
+
+- `check` использует legacy state только для read-only диагностики;
+- `apply` copytree в уникальный temporary path;
+- копия manifest валидируется;
+- temporary атомарно публикуется как новый state;
+- legacy оригинал остаётся нетронутым;
+- после появления нового state он становится единственным production state.
+
+Это migration bridge для перехода двух машин, а не долгосрочный compatibility namespace.
+
+## Retired interface
+
+`setup_linux.sh` / `setup_windows.ps1` больше не выполняют reconciliation. На переходный период они оставлены только как hard tombstones, которые немедленно завершаются кодом 2 и указывают `bootstrap_*` + `toolchainctl`. После миграции последней legacy-машины их можно удалить физически.
+
+## Следующие расширения
+
+Следующий архитектурный шаг после завершения rename/migration двух машин:
+
+1. `tunnelctl` как `go-binary` ToolSpec consumer;
+2. затем `bundle`;
+3. затем `proxy-tools`.
+
+Новые runtime families должны расширять общий ToolSpec/deployer и health/ownership contracts, а не создавать отдельные ad-hoc install scripts.

@@ -1,4 +1,4 @@
-name: Validate setup
+name: Validate agent-toolchain
 
 on:
   push:
@@ -27,46 +27,79 @@ jobs:
           & (Join-Path $scripts "uv.exe") --version
       - name: Validate Python modules compile
         shell: powershell
-        run: py -3 -m py_compile .\setup_core.py .\setup_lib.py .\setup_manifest.py .\setup_migration.py .\setup_runtime.py .\setup_inventory.py .\setup_tools.py
-      - name: Validate Windows PowerShell 5.1 wrapper
+        run: |
+          py -3 -m py_compile `
+            .\bootstrap_core.py `
+            .\toolchainctl.py `
+            .\setup_core.py `
+            .\setup_core_adapter.py `
+            .\setup_lib.py `
+            .\setup_manifest.py `
+            .\setup_migration.py `
+            .\setup_runtime.py `
+            .\setup_runtime_legacy.py `
+            .\setup_managed_tools.py `
+            .\setup_tool_skills.py `
+            .\setup_tool_skills_impl.py `
+            .\setup_path.py `
+            .\setup_inventory.py `
+            .\setup_tools.py
+      - name: Validate PowerShell bootstrap and retired interface syntax
         shell: powershell
         run: |
-          $wrapper = (Resolve-Path ".\setup_windows.ps1").Path
-          $bytes = [System.IO.File]::ReadAllBytes($wrapper)
-          if ($bytes.Length -lt 3 -or $bytes[0] -ne 0xEF -or $bytes[1] -ne 0xBB -or $bytes[2] -ne 0xBF) {
-            throw "setup_windows.ps1 must use UTF-8 BOM for Windows PowerShell 5.1 compatibility."
-          }
-
-          $root = Join-Path $env:RUNNER_TEMP "ps51-wrapper-check"
-          $configDir = Join-Path $root "config"
-          $stashDir = Join-Path $root "stash"
-          $credentialDir = Join-Path $configDir "credentials"
-          $skillsDir = Join-Path $root "skills"
-          $stateDir = Join-Path $root "state"
-          $projectsDir = Join-Path $root "projects"
-          $expectedAbsent = @($configDir, $stashDir, $skillsDir, $stateDir, $projectsDir)
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $wrapper `
-            -ConfigDir $configDir `
-            -StashDir $stashDir `
-            -CredentialDir $credentialDir `
-            -SkillsDir $skillsDir `
-            -StateDir $stateDir `
-            -ProjectsDir $projectsDir `
-            -Check `
-            -SkipPackageInstall `
-            -SkipDependencyInstall
-          if ($LASTEXITCODE -ne 0) { throw "Windows PowerShell 5.1 wrapper check failed with exit code $LASTEXITCODE." }
-
-          foreach ($path in $expectedAbsent) {
-            if (Test-Path -LiteralPath $path) {
-              throw "Read-only wrapper check unexpectedly created: $path"
-            }
+          foreach ($script in @("bootstrap_windows.ps1", "setup_windows.ps1", "install_bmad_windows.ps1", "validate_setup.ps1")) {
+            $path = (Resolve-Path ".\$script").Path
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -ne 0) { throw "PowerShell parse failed for $script`: $($errors -join '; ')" }
           }
       - name: Validate migration regressions
         shell: powershell
         run: py -3 .\tests\run_migration_ci.py
-      - name: Validate Windows setup and BMAD
+      - name: Validate installed toolchainctl bootstrap contract
+        shell: powershell
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP ("agent-toolchain-bootstrap-" + [guid]::NewGuid().ToString("N"))
+          $data = Join-Path $root "data"
+          $bin = Join-Path $root "bin"
+          $state = Join-Path $root "state"
+          $config = Join-Path $root "config"
+          $credential = Join-Path $config "credentials"
+          $skills = Join-Path $root "skills"
+          $projects = Join-Path $root "projects"
+          $stash = Join-Path $root "stash"
+
+          $env:AGENT_TOOLCHAIN_DATA_DIR = $data
+          $env:AGENT_TOOLCHAIN_BIN_DIR = $bin
+          $env:AGENT_TOOLCHAIN_STATE_DIR = $state
+          $env:OPENCODE_CONFIG_DIR = $config
+          $env:OPENCODE_CREDENTIAL_DIR = $credential
+          $env:OPENCODE_SKILLS_DIR = $skills
+          $env:OPENCODE_PROJECTS_DIR = $projects
+          $env:OPENCODE_STASH_DIR = $stash
+          $env:PATH = "$bin;$env:PATH"
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\bootstrap_windows.ps1
+          if ($LASTEXITCODE -ne 0) { throw "bootstrap_windows.ps1 failed: $LASTEXITCODE" }
+          $tool = Join-Path $bin "toolchainctl.cmd"
+          if (-not (Test-Path -LiteralPath $tool -PathType Leaf)) { throw "toolchainctl entrypoint was not published: $tool" }
+
+          & $tool check --skip-package-install --skip-dependency-install
+          if ($LASTEXITCODE -ne 0) { throw "installed toolchainctl check failed: $LASTEXITCODE" }
+          foreach ($path in @($state, $config, $skills, $projects, $stash)) {
+            if (Test-Path -LiteralPath $path) { throw "read-only toolchainctl check unexpectedly created: $path" }
+          }
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\bootstrap_windows.ps1
+          if ($LASTEXITCODE -ne 0) { throw "repeat bootstrap_windows.ps1 failed: $LASTEXITCODE" }
+          if (Get-ChildItem -LiteralPath $data -Filter "core.previous.*" -ErrorAction SilentlyContinue) {
+            throw "repeat bootstrap created a core backup despite unchanged fingerprint"
+          }
+
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup_windows.ps1
+          if ($LASTEXITCODE -ne 2) { throw "retired setup_windows.ps1 must fail with exit 2, got $LASTEXITCODE" }
+      - name: Validate OpenCode core and BMAD regressions
         shell: powershell
         run: |
           $out = Join-Path $env:RUNNER_TEMP "validate-out.txt"
@@ -96,10 +129,76 @@ jobs:
       - name: Validate diff whitespace
         run: git diff --check HEAD^ HEAD
       - name: Validate Python modules compile
-        run: python3 -m py_compile ./setup_core.py ./setup_lib.py ./setup_manifest.py ./setup_migration.py ./setup_runtime.py ./setup_inventory.py ./setup_tools.py
+        run: |
+          python3 -m py_compile \
+            ./bootstrap_core.py \
+            ./toolchainctl.py \
+            ./setup_core.py \
+            ./setup_core_adapter.py \
+            ./setup_lib.py \
+            ./setup_manifest.py \
+            ./setup_migration.py \
+            ./setup_runtime.py \
+            ./setup_runtime_legacy.py \
+            ./setup_managed_tools.py \
+            ./setup_tool_skills.py \
+            ./setup_tool_skills_impl.py \
+            ./setup_path.py \
+            ./setup_inventory.py \
+            ./setup_tools.py
+      - name: Validate shell bootstrap and retired interface syntax
+        run: |
+          bash -n ./bootstrap_linux.sh
+          bash -n ./setup_linux.sh
+          bash -n ./install_bmad_linux.sh
+          bash -n ./validate_setup.sh
       - name: Validate migration regressions
         run: python3 ./tests/run_migration_ci.py
-      - name: Validate Linux setup and BMAD
+      - name: Validate installed toolchainctl bootstrap contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(mktemp -d)"
+          data="$root/data"
+          bin="$root/bin"
+          state="$root/state"
+          config="$root/config"
+          credential="$config/credentials"
+          skills="$root/skills"
+          projects="$root/projects"
+          stash="$root/stash"
+
+          export AGENT_TOOLCHAIN_DATA_DIR="$data"
+          export AGENT_TOOLCHAIN_BIN_DIR="$bin"
+          export AGENT_TOOLCHAIN_STATE_DIR="$state"
+          export OPENCODE_CONFIG_DIR="$config"
+          export OPENCODE_CREDENTIAL_DIR="$credential"
+          export OPENCODE_SKILLS_DIR="$skills"
+          export OPENCODE_PROJECTS_DIR="$projects"
+          export OPENCODE_STASH_DIR="$stash"
+          export PATH="$bin:$PATH"
+
+          bash ./bootstrap_linux.sh
+          test -x "$bin/toolchainctl"
+          "$bin/toolchainctl" check --skip-package-install --skip-dependency-install
+          for path in "$state" "$config" "$skills" "$projects" "$stash"; do
+            test ! -e "$path"
+          done
+
+          bash ./bootstrap_linux.sh
+          if compgen -G "$data/core.previous.*" >/dev/null; then
+            echo "repeat bootstrap created a core backup despite unchanged fingerprint" >&2
+            exit 1
+          fi
+
+          set +e
+          tombstone_output="$(bash ./setup_linux.sh 2>&1)"
+          tombstone_rc=$?
+          set -e
+          printf '%s\n' "$tombstone_output"
+          test "$tombstone_rc" -eq 2
+          grep -q 'removed as a supported interface' <<<"$tombstone_output"
+      - name: Validate OpenCode core and BMAD regressions
         shell: bash
         run: |
           set +e
