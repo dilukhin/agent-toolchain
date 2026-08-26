@@ -90,7 +90,14 @@ def _owned_core(core: Path) -> dict[str, object] | None:
         return None
     if not isinstance(data, dict) or data.get("schema") != 1 or data.get("owner") != "agent-toolchain":
         return None
-    if not isinstance(data.get("fingerprint"), str):
+    fingerprint = data.get("fingerprint")
+    if not isinstance(fingerprint, str):
+        return None
+    try:
+        actual = source_fingerprint(core)
+    except (OSError, RuntimeError):
+        return None
+    if actual != fingerprint:
         return None
     return data
 
@@ -179,7 +186,7 @@ def _publish_core(source: Path, core: Path, fingerprint: str) -> tuple[bool, Pat
     core_present = core.exists() or core.is_symlink()
     current = _owned_core(core) if core_present else None
     if core_present and current is None:
-        raise RuntimeError(f"Refusing to replace core directory without exact ownership marker: {core}")
+        raise RuntimeError(f"Refusing to replace modified or unowned core directory: {core}")
     if current is not None and current.get("fingerprint") == fingerprint:
         return False, None
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -94,6 +93,8 @@ def _marker_payload(spec: ToolSpec) -> dict[str, object]:
 
 
 def _owned_release(release: Path, spec: ToolSpec) -> bool:
+    if release.is_symlink():
+        return False
     try:
         data = json.loads(_marker_path(release).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -164,11 +165,14 @@ def _pip_source(spec: ToolSpec) -> str:
 
 def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Path | None:
     release = _release_dir(spec)
-    if release.exists():
+    if release.exists() or release.is_symlink():
         if _owned_release(release, spec):
             return release
-        reporter.add(f"{spec.name} runtime", STATE_CONFLICT,
-                     f"target runtime path exists but ownership is not proven: {release}")
+        reporter.add(
+            f"{spec.name} runtime",
+            STATE_CONFLICT,
+            f"target runtime path exists but ownership is not proven: {release}",
+        )
         return None
 
     prerequisite_ok, version = _venv_prerequisite(python_exe)
@@ -188,37 +192,76 @@ def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Pat
         return None
 
     releases = release.parent
-    releases.mkdir(parents=True, exist_ok=True)
-    temporary: Path | None = Path(tempfile.mkdtemp(prefix=f".{spec.ref}.tmp-", dir=str(releases)))
     try:
-        venv = temporary / "venv"
+        releases.mkdir(parents=True, exist_ok=True)
+        release.mkdir()
+    except FileExistsError:
+        if _owned_release(release, spec):
+            return release
+        reporter.add(
+            f"{spec.name} runtime",
+            STATE_CONFLICT,
+            f"runtime path appeared concurrently and ownership is not proven: {release}",
+        )
+        return None
+    except OSError as exc:
+        reporter.add(f"{spec.name} runtime", STATE_FAILED, f"cannot create runtime path {release}: {exc}")
+        return None
+
+    complete = False
+    try:
+        # A Python venv is not relocatable: POSIX console-script shebangs and some
+        # Windows launchers embed the interpreter path. Build directly at the final
+        # immutable release path, then remove this exact same-run directory on failure.
+        venv = release / "venv"
         create = run([python_exe, "-B", "-m", "venv", str(venv)])
         if create.returncode != 0:
-            reporter.add(f"{spec.name} runtime", STATE_FAILED,
-                         "failed to create isolated venv: " + create.stderr.strip()[-400:])
+            reporter.add(
+                f"{spec.name} runtime",
+                STATE_FAILED,
+                "failed to create isolated venv: " + create.stderr.strip()[-400:],
+            )
             return None
+
         runtime_python = _venv_python(venv)
         install = run([
-            str(runtime_python), "-m", "pip", "install",
-            "--disable-pip-version-check", "--no-input", _pip_source(spec),
+            str(runtime_python),
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-input",
+            _pip_source(spec),
         ])
         if install.returncode != 0:
-            reporter.add(f"{spec.name} runtime", STATE_FAILED,
-                         "pinned package installation failed: " + install.stderr.strip()[-400:])
+            reporter.add(
+                f"{spec.name} runtime",
+                STATE_FAILED,
+                "pinned package installation failed: " + install.stderr.strip()[-400:],
+            )
             return None
-        marker = json.dumps(_marker_payload(spec), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-        atomic_write(_marker_path(temporary), marker.encode("utf-8"))
-        ok, detail = _health(spec, temporary)
+
+        ok, detail = _health(spec, release)
         if not ok:
-            reporter.add(f"{spec.name} runtime", STATE_FAILED,
-                         "new isolated runtime failed health validation: " + detail)
+            reporter.add(
+                f"{spec.name} runtime",
+                STATE_FAILED,
+                "new isolated runtime failed health validation: " + detail,
+            )
             return None
-        if release.exists():
-            reporter.add(f"{spec.name} runtime", STATE_FAILED,
-                         f"runtime path appeared concurrently; refusing to replace it: {release}")
+
+        marker = json.dumps(_marker_payload(spec), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        try:
+            atomic_write(_marker_path(release), marker.encode("utf-8"))
+        except OSError as exc:
+            reporter.add(
+                f"{spec.name} runtime",
+                STATE_FAILED,
+                f"runtime passed health validation but ownership marker could not be written: {exc}",
+            )
             return None
-        os.replace(temporary, release)
-        temporary = None
+
+        complete = True
         reporter.add(
             f"{spec.name} runtime",
             STATE_CONFIGURED,
@@ -226,8 +269,8 @@ def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Pat
         )
         return release
     finally:
-        if temporary is not None and temporary.exists():
-            shutil.rmtree(temporary, ignore_errors=True)
+        if not complete and release.exists() and not release.is_symlink():
+            shutil.rmtree(release, ignore_errors=True)
 
 
 def _public_entrypoint(spec: ToolSpec, command: str) -> Path:
@@ -327,8 +370,11 @@ def _reconcile_entrypoint(
     else:
         temporary = public.with_name(public.name + f".tmp-{os.getpid()}")
         if temporary.exists() or temporary.is_symlink():
-            reporter.add(f"{spec.name} entrypoint", STATE_FAILED,
-                         f"temporary entrypoint path already exists: {temporary}")
+            reporter.add(
+                f"{spec.name} entrypoint",
+                STATE_FAILED,
+                f"temporary entrypoint path already exists: {temporary}",
+            )
             return False, False
         try:
             os.symlink(str(target), str(temporary))
@@ -404,9 +450,12 @@ def reconcile_python_tool(
         return False
 
     release = _release_dir(spec)
-    if release.exists() and not _owned_release(release, spec):
-        reporter.add(f"{spec.name} runtime", STATE_CONFLICT,
-                     f"runtime path exists but ownership is not proven: {release}")
+    if (release.exists() or release.is_symlink()) and not _owned_release(release, spec):
+        reporter.add(
+            f"{spec.name} runtime",
+            STATE_CONFLICT,
+            f"runtime path exists but ownership is not proven: {release}",
+        )
         return False
     if not release.exists():
         if check:
@@ -432,8 +481,11 @@ def reconcile_python_tool(
 
     ok, detail = _health(spec, release)
     if not ok:
-        reporter.add(f"{spec.name} health", STATE_CONFLICT,
-                     "installed managed runtime failed health validation: " + detail)
+        reporter.add(
+            f"{spec.name} health",
+            STATE_CONFLICT,
+            "installed managed runtime failed health validation: " + detail,
+        )
         return False
     reporter.add(f"{spec.name} health", STATE_OK, detail)
 
@@ -476,6 +528,11 @@ def reconcile_tool_specs(
     changed = False
     for name in sorted(specs):
         changed |= reconcile_python_tool(
-            specs[name], python_exe, reporter, check=check, skip_install=skip_install, manifest=manifest
+            specs[name],
+            python_exe,
+            reporter,
+            check=check,
+            skip_install=skip_install,
+            manifest=manifest,
         )
     return changed

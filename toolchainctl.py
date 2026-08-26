@@ -58,32 +58,46 @@ def legacy_state_dir() -> Path:
     return base / LEGACY_PRODUCT
 
 
-def _validate_legacy_state(path: Path) -> None:
+def _path_present(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+
+def _validate_owned_state(path: Path, label: str) -> None:
+    if path.is_symlink():
+        raise StateMigrationError(f"{label} state path is a symlink; refusing to adopt ambiguous ownership: {path}")
+    if not path.is_dir():
+        raise StateMigrationError(f"{label} state path exists but is not a directory: {path}")
     manifest_path = path / "manifest.json"
     if not manifest_path.is_file():
         raise StateMigrationError(
-            f"legacy state exists but has no ownership manifest: {manifest_path}; refusing to adopt unknown state"
+            f"{label} state exists but has no ownership manifest: {manifest_path}; refusing to adopt unknown state"
         )
     _manifest, error, _pending = load_manifest(manifest_path)
     if error:
-        raise StateMigrationError(f"legacy ownership manifest is not valid: {error}")
+        raise StateMigrationError(f"{label} ownership manifest is not valid: {error}")
+
+
+def _validate_legacy_state(path: Path) -> None:
+    _validate_owned_state(path, "legacy")
 
 
 def _validate_copied_state(path: Path) -> None:
-    _manifest, error, _pending = load_manifest(path / "manifest.json")
-    if error:
-        raise StateMigrationError(f"copied ownership manifest failed validation: {error}")
+    _validate_owned_state(path, "copied")
 
 
 def prepare_state(*, check: bool) -> tuple[Path, str | None, str | None]:
     """Select current state and perform the one-way legacy import only on apply."""
     new = default_state_dir()
     legacy = legacy_state_dir()
-    if new.exists():
-        if legacy.exists():
+    new_present = _path_present(new)
+    legacy_present = _path_present(legacy)
+
+    if new_present:
+        _validate_owned_state(new, "agent-toolchain")
+        if legacy_present:
             return new, "info", f"legacy state retained as inactive backup: {legacy}"
         return new, None, None
-    if not legacy.exists():
+    if not legacy_present:
         return new, None, None
 
     _validate_legacy_state(legacy)
@@ -92,12 +106,12 @@ def prepare_state(*, check: bool) -> tuple[Path, str | None, str | None]:
 
     new.parent.mkdir(parents=True, exist_ok=True)
     temporary = new.parent / f".{new.name}.migration-{os.getpid()}-{uuid.uuid4().hex}"
-    if temporary.exists():
+    if _path_present(temporary):
         raise StateMigrationError(f"temporary migration path already exists: {temporary}")
     try:
         shutil.copytree(legacy, temporary, symlinks=True)
         _validate_copied_state(temporary)
-        if new.exists():
+        if _path_present(new):
             raise StateMigrationError(f"new state path appeared concurrently; refusing to replace it: {new}")
         os.replace(temporary, new)
     finally:
