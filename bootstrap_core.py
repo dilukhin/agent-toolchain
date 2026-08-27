@@ -10,7 +10,7 @@ import shutil
 import sys
 import tempfile
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 SOURCE_ROOT = Path(__file__).resolve().parent
 CORE_MARKER = ".agent-toolchain-managed-core.json"
@@ -81,6 +81,63 @@ def source_fingerprint(root: Path) -> str:
     return digest.hexdigest()
 
 
+def source_payload(root: Path) -> list[dict[str, str]]:
+    payload: list[dict[str, str]] = []
+    for relative, path in _iter_source_files(root):
+        payload.append({"path": relative, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+    return payload
+
+
+def _payload_fingerprint(root: Path, payload: object) -> str | None:
+    if not isinstance(payload, list) or not payload:
+        return None
+    digest = hashlib.sha256()
+    seen: set[str] = set()
+    try:
+        for item in payload:
+            if not isinstance(item, dict):
+                return None
+            relative = item.get("path")
+            expected = item.get("sha256")
+            if not isinstance(relative, str) or not isinstance(expected, str):
+                return None
+            if "\\" in relative or len(expected) != 64 or any(ch not in "0123456789abcdef" for ch in expected):
+                return None
+            posix = PurePosixPath(relative)
+            if posix.is_absolute() or not posix.parts or any(part in {"", ".", ".."} for part in posix.parts):
+                return None
+            normalized = posix.as_posix()
+            if normalized in seen:
+                return None
+            seen.add(normalized)
+            path = root.joinpath(*posix.parts)
+            if path.is_symlink() or not path.is_file():
+                return None
+            content = path.read_bytes()
+            if hashlib.sha256(content).hexdigest() != expected:
+                return None
+            digest.update(normalized.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(content)
+            digest.update(b"\0")
+
+        actual: set[str] = set()
+        for path in root.rglob("*"):
+            if "__pycache__" in path.parts:
+                continue
+            if path.is_symlink():
+                return None
+            if path.is_file():
+                relative = path.relative_to(root).as_posix()
+                if relative != CORE_MARKER:
+                    actual.add(relative)
+        if actual != seen:
+            return None
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
 def _owned_core(core: Path) -> dict[str, object] | None:
     if core.is_symlink():
         return None
@@ -93,10 +150,14 @@ def _owned_core(core: Path) -> dict[str, object] | None:
     fingerprint = data.get("fingerprint")
     if not isinstance(fingerprint, str):
         return None
-    try:
-        actual = source_fingerprint(core)
-    except (OSError, RuntimeError):
-        return None
+    payload = data.get("payload")
+    if payload is not None:
+        actual = _payload_fingerprint(core, payload)
+    else:
+        try:
+            actual = source_fingerprint(core)
+        except (OSError, RuntimeError):
+            return None
     if actual != fingerprint:
         return None
     return data
@@ -170,7 +231,11 @@ def _copy_payload(source: Path, staging: Path, fingerprint: str) -> None:
         "schema": 1,
         "owner": "agent-toolchain",
         "fingerprint": fingerprint,
+        "payload": source_payload(source),
     }
+    update_ref = os.environ.get("AGENT_TOOLCHAIN_UPDATE_REF")
+    if update_ref and len(update_ref) == 40 and all(ch in "0123456789abcdef" for ch in update_ref):
+        marker["source_ref"] = update_ref
     (staging / CORE_MARKER).write_text(
         json.dumps(marker, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

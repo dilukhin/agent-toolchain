@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
@@ -69,6 +70,38 @@ class ToolchainUpdateTests(unittest.TestCase):
             with mock.patch.object(toolchainctl, "__file__", str(core / "toolchainctl.py")):
                 self.assertEqual(toolchainctl._owned_installed_core()["fingerprint"], fingerprint)
                 (core / "config_data.json").write_text("tampered\n", encoding="utf-8")
+                with self.assertRaises(toolchainctl.SelfUpdateError):
+                    toolchainctl._owned_installed_core()
+
+    def test_payload_marker_survives_future_required_set_growth(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            core = Path(temporary) / "core"
+            core.mkdir()
+            path = core / "toolchainctl.py"
+            content = b"# managed current toolchain\n"
+            path.write_bytes(content)
+            relative = "toolchainctl.py"
+            digest = hashlib.sha256()
+            digest.update(relative.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(content)
+            digest.update(b"\0")
+            fingerprint = digest.hexdigest()
+            marker = {
+                "schema": 1,
+                "owner": "agent-toolchain",
+                "fingerprint": fingerprint,
+                "payload": [{"path": relative, "sha256": hashlib.sha256(content).hexdigest()}],
+            }
+            (core / ".agent-toolchain-managed-core.json").write_text(json.dumps(marker), encoding="utf-8")
+
+            with mock.patch.object(toolchainctl, "__file__", str(path)), mock.patch.object(
+                toolchainctl, "_CORE_REQUIRED_FILES", ("future-required.py",)
+            ):
+                self.assertEqual(toolchainctl._owned_installed_core()["fingerprint"], fingerprint)
+
+            path.write_text("tampered\n", encoding="utf-8")
+            with mock.patch.object(toolchainctl, "__file__", str(path)):
                 with self.assertRaises(toolchainctl.SelfUpdateError):
                     toolchainctl._owned_installed_core()
 

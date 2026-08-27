@@ -558,6 +558,43 @@ def _installed_core_fingerprint(core: Path) -> str:
     return digest.hexdigest()
 
 
+def _installed_core_fingerprint_from_payload(core: Path, payload: object) -> str:
+    if not isinstance(payload, list) or not payload:
+        raise SelfUpdateError("installed core ownership payload is invalid")
+    digest = hashlib.sha256()
+    seen: set[str] = set()
+    try:
+        for item in payload:
+            if not isinstance(item, dict):
+                raise SelfUpdateError("installed core ownership payload entry is invalid")
+            relative = item.get("path")
+            expected = item.get("sha256")
+            if not isinstance(relative, str) or not isinstance(expected, str):
+                raise SelfUpdateError("installed core ownership payload entry is invalid")
+            if "\\" in relative or len(expected) != 64 or any(ch not in "0123456789abcdef" for ch in expected):
+                raise SelfUpdateError(f"installed core ownership payload entry is invalid: {relative!r}")
+            posix = PurePosixPath(relative)
+            if posix.is_absolute() or not posix.parts or any(part in {"", ".", ".."} for part in posix.parts):
+                raise SelfUpdateError(f"installed core ownership payload path is unsafe: {relative!r}")
+            normalized = posix.as_posix()
+            if normalized in seen:
+                raise SelfUpdateError(f"installed core ownership payload path is duplicated: {normalized}")
+            seen.add(normalized)
+            path = core.joinpath(*posix.parts)
+            if path.is_symlink() or not path.is_file():
+                raise SelfUpdateError(f"installed core payload is incomplete: {path}")
+            content = path.read_bytes()
+            if hashlib.sha256(content).hexdigest() != expected:
+                raise SelfUpdateError(f"installed core managed file was modified: {path}")
+            digest.update(normalized.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(content)
+            digest.update(b"\0")
+    except OSError as exc:
+        raise SelfUpdateError(f"cannot validate installed core payload: {exc}") from exc
+    return digest.hexdigest()
+
+
 def _owned_installed_core() -> dict[str, object]:
     core = Path(__file__).resolve().parent
     if core.is_symlink():
@@ -572,7 +609,12 @@ def _owned_installed_core() -> dict[str, object]:
     fingerprint = marker.get("fingerprint")
     if marker.get("schema") != 1 or marker.get("owner") != PRODUCT or not isinstance(fingerprint, str):
         raise SelfUpdateError(f"installed core ownership marker is invalid: {marker_path}")
-    actual = _installed_core_fingerprint(core)
+    payload = marker.get("payload")
+    actual = (
+        _installed_core_fingerprint_from_payload(core, payload)
+        if payload is not None
+        else _installed_core_fingerprint(core)
+    )
     if actual != fingerprint:
         raise SelfUpdateError(
             "installed core payload differs from its ownership fingerprint; local changes are preserved and update is blocked"

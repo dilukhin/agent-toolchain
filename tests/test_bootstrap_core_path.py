@@ -54,9 +54,11 @@ class BootstrapCoreTests(unittest.TestCase):
                 self.assertIn("configured", first_out.getvalue())
                 self.assertFalse(list(data.glob("core.previous.*")))
 
-                fingerprint_before = json.loads(
+                marker_before = json.loads(
                     (data / "core" / bootstrap_core.CORE_MARKER).read_text(encoding="utf-8")
-                )["fingerprint"]
+                )
+                fingerprint_before = marker_before["fingerprint"]
+                self.assertTrue(marker_before.get("payload"), "new managed core marker must record its exact payload")
                 second_out = io.StringIO()
                 with contextlib.redirect_stdout(second_out):
                     self.assertEqual(bootstrap_core.main(), 0)
@@ -72,6 +74,30 @@ class BootstrapCoreTests(unittest.TestCase):
                 )["fingerprint"]
                 self.assertNotEqual(fingerprint_before, fingerprint_after)
                 self.assertEqual(len(list(data.glob("core.previous.*"))), 1)
+
+    def test_payload_marker_remains_verifiable_if_future_required_set_grows(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source = self._source(root)
+            data = root / "data"
+            bin_dir = root / "bin"
+            env = {
+                "AGENT_TOOLCHAIN_DATA_DIR": str(data),
+                "AGENT_TOOLCHAIN_BIN_DIR": str(bin_dir),
+            }
+            with mock.patch.object(bootstrap_core, "SOURCE_ROOT", source), mock.patch.dict(os.environ, env, clear=False):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(bootstrap_core.main(), 0)
+
+            core = data / "core"
+            original_required = bootstrap_core.REQUIRED_FILES
+            with mock.patch.object(bootstrap_core, "REQUIRED_FILES", original_required + ("future-required.py",)):
+                owned = bootstrap_core._owned_core(core)
+            self.assertIsNotNone(owned)
+            self.assertTrue(owned.get("payload"))
+
+            (core / "config_data.json").write_text("tampered\n", encoding="utf-8")
+            self.assertIsNone(bootstrap_core._owned_core(core))
 
     def test_foreign_toolchainctl_is_preserved_and_blocks_bootstrap_before_publish(self) -> None:
         with tempfile.TemporaryDirectory() as td:
