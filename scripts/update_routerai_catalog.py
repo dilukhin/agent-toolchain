@@ -145,6 +145,13 @@ def _dedupe_strings(values: list[Any]) -> list[str]:
     return result
 
 
+def _mark_price_unavailable(target: dict[str, Any], display_name: str, role: str) -> None:
+    target.pop("price_input_rub_per_1m", None)
+    target.pop("price_output_rub_per_1m", None)
+    target.pop("price_cache_read_rub_per_1m", None)
+    target["name"] = f"{display_name} [{role}, цена недоступна]"
+
+
 def build_outputs(
     payload: dict[str, Any],
     policy: dict[str, Any],
@@ -187,8 +194,7 @@ def build_outputs(
 
         if live is None:
             missing.append(model_id)
-            if "name" not in target:
-                target["name"] = f"{display_name} [{role}, цена недоступна]"
+            _mark_price_unavailable(target, display_name, role)
         else:
             pricing = live.get("pricing", {})
             pricing = pricing if isinstance(pricing, dict) else {}
@@ -197,9 +203,10 @@ def build_outputs(
             if input_price is not None and output_price is not None:
                 target["price_input_rub_per_1m"] = input_price
                 target["price_output_rub_per_1m"] = output_price
+                target.pop("price_cache_read_rub_per_1m", None)
                 target["name"] = f"{display_name} [{role}, {input_price}/{output_price} ₽]"
-            elif "name" not in target:
-                target["name"] = f"{display_name} [{role}, цена недоступна]"
+            else:
+                _mark_price_unavailable(target, display_name, role)
 
         new_models[model_id] = target
         aliases: list[Any] = []
