@@ -109,9 +109,9 @@ class ToolchainUpdateTests(unittest.TestCase):
         desired = json.loads((Path(toolchainctl.__file__).resolve().parent / "config_data.json").read_text(encoding="utf-8"))
         qwen_target = desired["models"]["qwen/qwen3.6-plus"]["name"]
         with tempfile.TemporaryDirectory() as temporary:
-            base = Path(temporary)
-            config_dir = base / "config"
-            state_dir = base / "state"
+            base = Path(temporary).resolve()
+            config_dir = (base / "config").resolve()
+            state_dir = (base / "state").resolve()
             config_dir.mkdir()
             state_dir.mkdir()
             config = {
@@ -151,9 +151,9 @@ class ToolchainUpdateTests(unittest.TestCase):
 
     def test_routerai_label_check_is_read_only(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            base = Path(temporary)
-            config_dir = base / "config"
-            state_dir = base / "state"
+            base = Path(temporary).resolve()
+            config_dir = (base / "config").resolve()
+            state_dir = (base / "state").resolve()
             config_dir.mkdir()
             state_dir.mkdir()
             config_path = config_dir / "opencode.jsonc"
