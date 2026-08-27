@@ -34,7 +34,7 @@ def main() -> int:
     if result.wasSuccessful():
         return 0
     annotation = output.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
-    print(f"::error title=Setup regression::{annotation}")
+    _write_console(f"::error title=Setup regression::{annotation}\n")
     return 1
 
 
