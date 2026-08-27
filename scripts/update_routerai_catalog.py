@@ -148,6 +148,7 @@ def _dedupe_strings(values: list[Any]) -> list[str]:
 def _mark_price_unavailable(target: dict[str, Any], display_name: str, role: str) -> None:
     target.pop("price_input_rub_per_1m", None)
     target.pop("price_output_rub_per_1m", None)
+    target.pop("cache_read_rub_per_1m", None)
     target.pop("price_cache_read_rub_per_1m", None)
     target["name"] = f"{display_name} [{role}, цена недоступна]"
 
@@ -203,6 +204,11 @@ def build_outputs(
             if input_price is not None and output_price is not None:
                 target["price_input_rub_per_1m"] = input_price
                 target["price_output_rub_per_1m"] = output_price
+                cache_read_price = _per_million(pricing, "input_cache_read")
+                if cache_read_price is None:
+                    target.pop("cache_read_rub_per_1m", None)
+                else:
+                    target["cache_read_rub_per_1m"] = cache_read_price
                 target.pop("price_cache_read_rub_per_1m", None)
                 target["name"] = f"{display_name} [{role}, {input_price}/{output_price} ₽]"
             else:

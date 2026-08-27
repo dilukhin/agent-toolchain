@@ -33,7 +33,11 @@ class RouterAiCatalogTests(unittest.TestCase):
                     "name": "Qwen 3.6 Plus",
                     "context_length": 262144,
                     "architecture": {"input_modalities": ["text"], "output_modalities": ["text"]},
-                    "pricing": {"prompt": "0.0000314", "completion": "0.0001804"},
+                    "pricing": {
+                        "prompt": "0.0000314",
+                        "completion": "0.0001804",
+                        "input_cache_read": "0.0000054",
+                    },
                 },
                 {
                     "id": "vendor/new-model",
@@ -51,6 +55,7 @@ class RouterAiCatalogTests(unittest.TestCase):
                     "description": "old",
                     "price_input_rub_per_1m": 30,
                     "price_output_rub_per_1m": 180,
+                    "cache_read_rub_per_1m": 4,
                     "price_cache_read_rub_per_1m": 5,
                 }
             }
@@ -63,6 +68,7 @@ class RouterAiCatalogTests(unittest.TestCase):
         spec = generated_config["models"]["qwen/qwen3.6-plus"]
         self.assertEqual(spec["price_input_rub_per_1m"], 31)
         self.assertEqual(spec["price_output_rub_per_1m"], 180)
+        self.assertEqual(spec["cache_read_rub_per_1m"], 5)
         self.assertNotIn("price_cache_read_rub_per_1m", spec)
         self.assertEqual(spec["name"], "Qwen 3.6 Plus [основная, 31/180 ₽]")
         self.assertEqual(
@@ -81,6 +87,7 @@ class RouterAiCatalogTests(unittest.TestCase):
                     "name": "Missing [роль, 1/2 ₽]",
                     "price_input_rub_per_1m": 1,
                     "price_output_rub_per_1m": 2,
+                    "cache_read_rub_per_1m": 1,
                 }
             }
         }
@@ -93,6 +100,7 @@ class RouterAiCatalogTests(unittest.TestCase):
         self.assertEqual(spec["name"], "Missing [роль, цена недоступна]")
         self.assertNotIn("price_input_rub_per_1m", spec)
         self.assertNotIn("price_output_rub_per_1m", spec)
+        self.assertNotIn("cache_read_rub_per_1m", spec)
         self.assertIn("missing/model", generated_template["provider"]["routerai"]["models"])
         self.assertIn("other/model", snapshot["models"])
 
@@ -111,6 +119,7 @@ class RouterAiCatalogTests(unittest.TestCase):
                     "name": "Qwen 3.6 Plus [основная, 30/180 ₽]",
                     "price_input_rub_per_1m": 30,
                     "price_output_rub_per_1m": 180,
+                    "cache_read_rub_per_1m": 4,
                 }
             }
         }
@@ -127,6 +136,7 @@ class RouterAiCatalogTests(unittest.TestCase):
         self.assertEqual(spec["name"], "Qwen 3.6 Plus [основная, цена недоступна]")
         self.assertNotIn("price_input_rub_per_1m", spec)
         self.assertNotIn("price_output_rub_per_1m", spec)
+        self.assertNotIn("cache_read_rub_per_1m", spec)
         self.assertEqual(snapshot["models"]["qwen/qwen3.6-plus"]["pricing"]["prompt"], "0.00003")
 
 
