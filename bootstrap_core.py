@@ -15,7 +15,10 @@ from pathlib import Path, PurePosixPath
 SOURCE_ROOT = Path(__file__).resolve().parent
 CORE_MARKER = ".agent-toolchain-managed-core.json"
 ENTRYPOINT_MARKER = "agent-toolchain:managed-core-entrypoint:v1"
-REQUIRED_FILES = (
+
+# Immutable contract used by schema-1 markers that predate the self-describing payload list.
+# Keep this list stable so a machine can skip releases and still prove ownership of its old core.
+LEGACY_REQUIRED_FILES_V1 = (
     "toolchainctl.py",
     "setup_core.py",
     "setup_core_adapter.py",
@@ -32,7 +35,11 @@ REQUIRED_FILES = (
     "setup_tools.py",
     "config_data.json",
 )
-REQUIRED_TREES = ("templates", "skills/remote-long-running")
+LEGACY_REQUIRED_TREES_V1 = ("templates", "skills/remote-long-running")
+
+# Current publish contract. Future versions may extend these without changing legacy validation.
+REQUIRED_FILES = LEGACY_REQUIRED_FILES_V1
+REQUIRED_TREES = LEGACY_REQUIRED_TREES_V1
 
 
 def data_root() -> Path:
@@ -56,13 +63,13 @@ def bin_dir() -> Path:
     return (Path.home() / ".local" / "bin").resolve()
 
 
-def _iter_source_files(root: Path):
-    for relative in REQUIRED_FILES:
+def _iter_contract_files(root: Path, required_files: tuple[str, ...], required_trees: tuple[str, ...]):
+    for relative in required_files:
         path = root / relative
         if not path.is_file():
             raise RuntimeError(f"Missing bootstrap source file: {path}")
         yield relative.replace("\\", "/"), path
-    for tree in REQUIRED_TREES:
+    for tree in required_trees:
         base = root / tree
         if not base.is_dir():
             raise RuntimeError(f"Missing bootstrap source directory: {base}")
@@ -71,14 +78,26 @@ def _iter_source_files(root: Path):
                 yield path.relative_to(root).as_posix(), path
 
 
-def source_fingerprint(root: Path) -> str:
+def _iter_source_files(root: Path):
+    yield from _iter_contract_files(root, REQUIRED_FILES, REQUIRED_TREES)
+
+
+def _fingerprint_files(files) -> str:
     digest = hashlib.sha256()
-    for relative, path in _iter_source_files(root):
+    for relative, path in files:
         digest.update(relative.encode("utf-8"))
         digest.update(b"\0")
         digest.update(path.read_bytes())
         digest.update(b"\0")
     return digest.hexdigest()
+
+
+def source_fingerprint(root: Path) -> str:
+    return _fingerprint_files(_iter_source_files(root))
+
+
+def _legacy_v1_fingerprint(root: Path) -> str:
+    return _fingerprint_files(_iter_contract_files(root, LEGACY_REQUIRED_FILES_V1, LEGACY_REQUIRED_TREES_V1))
 
 
 def source_payload(root: Path) -> list[dict[str, str]]:
@@ -155,7 +174,7 @@ def _owned_core(core: Path) -> dict[str, object] | None:
         actual = _payload_fingerprint(core, payload)
     else:
         try:
-            actual = source_fingerprint(core)
+            actual = _legacy_v1_fingerprint(core)
         except (OSError, RuntimeError):
             return None
     if actual != fingerprint:
@@ -227,11 +246,16 @@ def _copy_payload(source: Path, staging: Path, fingerprint: str) -> None:
         shutil.copy2(source / relative, target)
     for tree in REQUIRED_TREES:
         shutil.copytree(source / tree, staging / tree, dirs_exist_ok=False)
+
+    staged_fingerprint = source_fingerprint(staging)
+    if staged_fingerprint != fingerprint:
+        raise RuntimeError("Bootstrap source changed while its managed core payload was being staged")
+
     marker = {
         "schema": 1,
         "owner": "agent-toolchain",
-        "fingerprint": fingerprint,
-        "payload": source_payload(source),
+        "fingerprint": staged_fingerprint,
+        "payload": source_payload(staging),
     }
     update_ref = os.environ.get("AGENT_TOOLCHAIN_UPDATE_REF")
     if update_ref and len(update_ref) == 40 and all(ch in "0123456789abcdef" for ch in update_ref):

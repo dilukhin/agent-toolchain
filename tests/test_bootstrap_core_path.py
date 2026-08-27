@@ -99,6 +99,23 @@ class BootstrapCoreTests(unittest.TestCase):
             (core / "config_data.json").write_text("tampered\n", encoding="utf-8")
             self.assertIsNone(bootstrap_core._owned_core(core))
 
+    def test_legacy_marker_remains_verifiable_if_future_required_set_grows(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            core = self._source(root)
+            fingerprint = bootstrap_core._legacy_v1_fingerprint(core)
+            marker = {"schema": 1, "owner": "agent-toolchain", "fingerprint": fingerprint}
+            (core / bootstrap_core.CORE_MARKER).write_text(json.dumps(marker), encoding="utf-8")
+
+            original_required = bootstrap_core.REQUIRED_FILES
+            with mock.patch.object(bootstrap_core, "REQUIRED_FILES", original_required + ("future-required.py",)):
+                owned = bootstrap_core._owned_core(core)
+            self.assertIsNotNone(owned)
+            self.assertNotIn("payload", owned)
+
+            (core / "config_data.json").write_text("tampered\n", encoding="utf-8")
+            self.assertIsNone(bootstrap_core._owned_core(core))
+
     def test_foreign_toolchainctl_is_preserved_and_blocks_bootstrap_before_publish(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
