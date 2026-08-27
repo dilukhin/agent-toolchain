@@ -1,0 +1,81 @@
+# Обновление каталога RouterAI и `agent-toolchain`
+
+## Назначение
+
+Цены и другие объективные сведения о моделях RouterAI обновляются отдельно от ручной политики выбора моделей.
+
+Ручная политика находится в `templates/routerai_model_policy.json` и определяет:
+
+- какие модели входят в управляемый список OpenCode;
+- человекочитаемое имя;
+- назначение модели (`основная`, `архитектор`, `код/агент` и т. п.);
+- описание;
+- прежние управляемые имена, которые можно безопасно заменить.
+
+Объективный снимок RouterAI находится в `templates/routerai_catalog.generated.json`.
+
+## Автоматическое обновление
+
+`.github/workflows/routerai_catalog.yml` запускается ежедневно и вручную через `workflow_dispatch`.
+
+Процесс:
+
+```text
+RouterAI GET /api/v1/models
+→ нормализация каталога
+→ пересчёт цен за 1 млн токенов
+→ обновление config_data.json и templates/opencode.jsonc
+→ Python regression tests
+→ automation/routerai-catalog
+→ pull request
+→ отдельный запуск полного Windows/Linux validate.yml
+```
+
+Новые модели RouterAI попадают в снимок, но не добавляются в управляемый список автоматически. Если модель из ручной политики исчезла из каталога, её текущая конфигурация сохраняется, а workflow печатает предупреждение.
+
+## Локальная проверка генератора
+
+```text
+python3 scripts/update_routerai_catalog.py --check
+python3 scripts/update_routerai_catalog.py --write
+```
+
+Для тестов без сети можно передать сохранённый ответ `GET /api/v1/models`:
+
+```text
+python3 scripts/update_routerai_catalog.py --write --input path/to/models.json
+```
+
+## Получение обновления на клиенте
+
+Установленный `toolchainctl` получает новый core независимо от developer checkout:
+
+```text
+toolchainctl update
+toolchainctl apply
+```
+
+Одной командой:
+
+```text
+toolchainctl update --apply
+```
+
+`toolchainctl update`:
+
+1. запрашивает у GitHub точный SHA актуального `main`;
+2. скачивает ZIP именно этого SHA;
+3. отклоняет небезопасную структуру архива и symlink-элементы;
+4. запускает штатный `bootstrap_core.py` из скачанного exact ref;
+5. принимает обновление только для уже установленного core с валидным ownership marker;
+6. после bootstrap проверяет валидность marker установленного core.
+
+Рабочая копия репозитория для этого не нужна и не изменяется.
+
+## Обновление подписей моделей
+
+`toolchainctl check` только сообщает, если известные управляемые подписи устарели.
+
+`toolchainctl apply` меняет подпись только если текущее имя распознано как одно из ранее управляемых имён. Пользовательское нестандартное имя сохраняется. Остальные поля модели также сохраняются.
+
+Если управляемый `opencode.jsonc` содержит комментарии или trailing commas и для подписи требуется изменение, автоматическое переформатирование не выполняется.

@@ -1,0 +1,113 @@
+name: Refresh RouterAI catalog
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: routerai-catalog-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: automation/routerai-catalog
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Prepare owned automation branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+
+          if git ls-remote --exit-code --heads origin "refs/heads/$BRANCH" >/dev/null 2>&1; then
+            git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+            git switch -c "$BRANCH" --track "origin/$BRANCH"
+            git merge --no-edit origin/main
+            echo "BRANCH_EXISTED=1" >> "$GITHUB_ENV"
+            echo "REMOTE_BRANCH_SHA=$(git rev-parse "origin/$BRANCH")" >> "$GITHUB_ENV"
+          else
+            git switch -c "$BRANCH" origin/main
+            echo "BRANCH_EXISTED=0" >> "$GITHUB_ENV"
+            echo "REMOTE_BRANCH_SHA=" >> "$GITHUB_ENV"
+          fi
+
+          unexpected="$(git diff --name-only origin/main...HEAD | grep -Ev '^(config_data\.json|templates/opencode\.jsonc|templates/routerai_catalog\.generated\.json)$' || true)"
+          if [[ -n "$unexpected" ]]; then
+            echo "Automation branch contains unexpected changes; refusing to modify it:" >&2
+            printf '%s\n' "$unexpected" >&2
+            exit 2
+          fi
+
+      - name: Refresh RouterAI data
+        run: python3 ./scripts/update_routerai_catalog.py --write
+
+      - name: Validate generated data and regressions
+        run: |
+          python3 -m py_compile ./toolchainctl.py ./scripts/update_routerai_catalog.py
+          python3 ./tests/run_migration_ci.py
+
+      - name: Commit generated changes
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- \
+              config_data.json \
+              templates/opencode.jsonc \
+              templates/routerai_catalog.generated.json; then
+            git add \
+              config_data.json \
+              templates/opencode.jsonc \
+              templates/routerai_catalog.generated.json
+            git commit -m "Refresh RouterAI model catalog"
+          fi
+
+          if git diff --quiet origin/main...HEAD; then
+            echo "push_required=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          local_sha="$(git rev-parse HEAD)"
+          if [[ "$BRANCH_EXISTED" == "1" && "$local_sha" == "$REMOTE_BRANCH_SHA" ]]; then
+            echo "push_required=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git push origin "HEAD:refs/heads/$BRANCH"
+          echo "push_required=1" >> "$GITHUB_OUTPUT"
+
+      - name: Open or reuse pull request
+        if: steps.commit.outputs.push_required == '1'
+        id: pr
+        shell: bash
+        run: |
+          set -euo pipefail
+          number="$(gh pr list --state open --base main --head "$BRANCH" --json number --jq '.[0].number // empty')"
+          if [[ -z "$number" ]]; then
+            url="$(gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "Refresh RouterAI model catalog" \
+              --body $'Automated refresh from the public RouterAI `GET /api/v1/models` catalog.\n\nThe workflow updates objective model data and generated price labels only. Curated model roles remain in `templates/routerai_model_policy.json` and are not selected automatically.\n\nThe refresh workflow runs Python regressions before pushing. Full Windows/Linux validation is dispatched explicitly for the automation branch.')"
+            number="${url##*/}"
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch full Windows/Linux validation
+        if: steps.commit.outputs.push_required == '1'
+        run: gh workflow run validate.yml --ref "$BRANCH"
