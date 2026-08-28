@@ -14,7 +14,7 @@ import setup_manifest  # noqa: E402
 from setup_lib import Reporter, STATE_CONFLICT, STATE_FAILED  # noqa: E402
 from setup_managed_tools import reconcile_tool_specs  # noqa: E402
 from setup_tool_skills_impl import reconcile_pinned_tool_skills, tool_skill_bindings  # noqa: E402
-from setup_tools import parse_tool_specs  # noqa: E402
+from setup_tools import load_effective_config, parse_tool_specs  # noqa: E402
 
 _BAD_STATES = {STATE_CONFLICT, STATE_FAILED}
 
@@ -33,7 +33,7 @@ def _snapshot(value: object) -> str:
 
 
 def main() -> int:
-    config = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
+    config = load_effective_config(ROOT, profile="dilukhin")
     env_cfg = config["managed_environment"]
     specs, error = parse_tool_specs(env_cfg)
     if error:

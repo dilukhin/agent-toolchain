@@ -19,6 +19,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 import setup_core
+import setup_core_adapter
 from setup_lib import (
     Reporter,
     STATE_CONFIGURED,
@@ -35,7 +36,15 @@ from setup_managed_tools import reconcile_tool_specs
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
 from setup_path import reconcile_public_bin_path
 from setup_tool_skills import reconcile_pinned_tool_skills
-from setup_tools import parse_tool_specs
+from setup_tools import (
+    GENERIC_PROFILE,
+    ProfileConfigError,
+    load_effective_config,
+    parse_tool_specs,
+    resolve_repo_relative_path,
+)
+
+setup_core_adapter.install()
 
 PRODUCT = "agent-toolchain"
 LEGACY_PRODUCT = "opencode_setup"
@@ -65,6 +74,8 @@ _CORE_REQUIRED_FILES = (
 )
 _CORE_REQUIRED_TREES = ("templates", "skills/remote-long-running")
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+_PROFILE_FIELD = "configuration_profile"
+_AUTHOR_PROFILE = "dilukhin"
 
 
 class StateMigrationError(RuntimeError):
@@ -169,13 +180,121 @@ def prepare_state(*, check: bool) -> tuple[Path, str | None, str | None]:
     return new, "configured", f"legacy state imported to {new}; original retained unchanged at {legacy}"
 
 
-def _default_paths() -> dict[str, Path]:
+def _manifest_has_managed_state(manifest: dict[str, object]) -> bool:
+    for key in ("managed_files", "credentials", "managed_tools", "managed_path_entries"):
+        value = manifest.get(key)
+        if isinstance(value, dict) and value:
+            return True
+    return False
+
+
+def _legacy_author_evidence(manifest: dict[str, object]) -> bool:
+    credentials = manifest.get("credentials")
+    if isinstance(credentials, dict):
+        router = credentials.get("routerai")
+        if isinstance(router, dict) and router.get("provider") in {None, "routerai"}:
+            return True
+    tools = manifest.get("managed_tools")
+    if isinstance(tools, dict) and set(tools).intersection({"ssh_relay", "agent-safe"}):
+        return True
+    files = manifest.get("managed_files")
+    if isinstance(files, dict):
+        for value in files.values():
+            if not isinstance(value, dict):
+                continue
+            source = value.get("source")
+            if isinstance(source, str) and (
+                source.startswith("opencode_setup:")
+                or source.startswith("ssh_relay:")
+                or source.startswith("agent-safe:")
+            ):
+                return True
+    return False
+
+
+def _resolve_configuration(args: argparse.Namespace, state_dir: Path) -> tuple[str, Path | None, bool]:
+    manifest, error, _pending = load_manifest(state_dir / "manifest.json")
+    if error:
+        raise StateMigrationError(f"cannot select configuration profile from ownership manifest: {error}")
+    recorded = manifest.get(_PROFILE_FIELD)
+    if recorded is not None and (not isinstance(recorded, str) or not recorded.strip()):
+        raise StateMigrationError(f"manifest field {_PROFILE_FIELD!r} is invalid")
+    recorded_profile = recorded.strip() if isinstance(recorded, str) else None
+    evidence = _legacy_author_evidence(manifest)
+
+    explicit = args.profile or os.environ.get("AGENT_TOOLCHAIN_PROFILE")
+    explicit_profile = explicit.strip() if isinstance(explicit, str) and explicit.strip() else None
+    inferred = False
+    if recorded_profile is not None:
+        selected = recorded_profile
+    elif evidence:
+        selected = _AUTHOR_PROFILE
+        inferred = True
+    elif _manifest_has_managed_state(manifest):
+        raise StateMigrationError(
+            "existing managed state has no recorded configuration profile and does not match the known legacy author policy; "
+            "refusing to guess ownership"
+        )
+    else:
+        selected = GENERIC_PROFILE
+
+    if explicit_profile is not None and explicit_profile != selected:
+        if recorded_profile == GENERIC_PROFILE and not evidence:
+            selected = explicit_profile
+        elif recorded_profile is None and selected == GENERIC_PROFILE and not _manifest_has_managed_state(manifest):
+            selected = explicit_profile
+        else:
+            raise StateMigrationError(
+                f"requested profile {explicit_profile!r} conflicts with existing/inferred profile {selected!r}; "
+                "automatic profile transition is not proven safe"
+            )
+
+    local_value = args.local_config or os.environ.get("AGENT_TOOLCHAIN_LOCAL_CONFIG")
+    local_path = Path(local_value).expanduser().resolve() if local_value else None
+    return selected, local_path, inferred
+
+
+def _persist_profile(state_dir: Path, profile: str) -> None:
+    manifest_path = state_dir / "manifest.json"
+    manifest, error, _pending = load_manifest(manifest_path)
+    if error:
+        raise StateMigrationError(f"cannot record configuration profile: {error}")
+    if manifest.get(_PROFILE_FIELD) == profile:
+        return
+    manifest[_PROFILE_FIELD] = profile
+    state_dir.mkdir(parents=True, exist_ok=True)
+    save_manifest(manifest_path, manifest)
+
+
+def _configured_path(config: dict, platform: str, key: str) -> str | None:
+    platforms = config.get("platform_specific")
+    if not isinstance(platforms, dict):
+        return None
+    current = platforms.get(platform)
+    if not isinstance(current, dict):
+        return None
+    value = current.get(key)
+    return value if isinstance(value, str) and value else None
+
+
+def _resolve_local_path(value: str | Path) -> Path:
+    expanded = os.path.expandvars(os.path.expanduser(str(value)))
+    return Path(expanded).resolve()
+
+
+def _default_paths(config: dict, state_dir: Path) -> dict[str, Path]:
     home = Path.home()
-    config_dir = Path(os.environ.get("OPENCODE_CONFIG_DIR", str(home / ".config" / "opencode"))).expanduser().resolve()
-    credential_dir = Path(os.environ.get("OPENCODE_CREDENTIAL_DIR", str(config_dir / "credentials"))).expanduser().resolve()
-    stash_dir = Path(os.environ.get("OPENCODE_STASH_DIR", str(home / "projects" / "stash" / "opencode.ai"))).expanduser().resolve()
-    skills_dir = Path(os.environ.get("OPENCODE_SKILLS_DIR", str(home / ".agents" / "skills"))).expanduser().resolve()
-    projects_dir = Path(os.environ.get("OPENCODE_PROJECTS_DIR", str(home / "projects"))).expanduser().resolve()
+    platform = "windows" if os.name == "nt" else "linux"
+    config_default = _configured_path(config, platform, "config_dir") or str(home / ".config" / "opencode")
+    config_dir = _resolve_local_path(os.environ.get("OPENCODE_CONFIG_DIR", config_default))
+    credential_default = _configured_path(config, platform, "credential_dir") or str(config_dir / "credentials")
+    credential_dir = _resolve_local_path(os.environ.get("OPENCODE_CREDENTIAL_DIR", credential_default))
+    skills_default = _configured_path(config, platform, "global_skills_dir") or str(home / ".agents" / "skills")
+    skills_dir = _resolve_local_path(os.environ.get("OPENCODE_SKILLS_DIR", skills_default))
+    stash_default = _configured_path(config, platform, "stash_dir") or str(state_dir / "legacy-stash-unused")
+    projects_default = _configured_path(config, platform, "projects_dir") or str(state_dir / "source-checkouts-unused")
+    stash_dir = _resolve_local_path(os.environ.get("OPENCODE_STASH_DIR", stash_default))
+    projects_dir = _resolve_local_path(os.environ.get("OPENCODE_PROJECTS_DIR", projects_default))
     return {
         "config": config_dir,
         "credential": credential_dir,
@@ -191,6 +310,8 @@ def build_parser() -> argparse.ArgumentParser:
     for name in ("check", "apply"):
         cmd = sub.add_parser(name, help="read-only state check" if name == "check" else "apply desired state")
         cmd.add_argument("--force", action="store_true", help="replace only already-owned modified content with backup")
+        cmd.add_argument("--profile", help="explicit distribution/profile policy; default is generic unless existing managed state proves another profile")
+        cmd.add_argument("--local-config", help="explicit machine/user JSON override applied after the selected profile")
         cmd.add_argument("--skip-package-install", action="store_true", help=argparse.SUPPRESS)
         cmd.add_argument("--skip-dependency-install", action="store_true", help=argparse.SUPPRESS)
         cmd.add_argument("--ssh-relay-url", help=argparse.SUPPRESS)
@@ -200,8 +321,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
-    paths = _default_paths()
+def _core_argv(
+    args: argparse.Namespace,
+    state_dir: Path,
+    config: dict,
+    profile: str,
+    local_config: Path | None,
+) -> list[str]:
+    paths = _default_paths(config, state_dir)
     argv = [
         "--repo-root", str(Path(__file__).resolve().parent),
         "--config-dir", str(paths["config"]),
@@ -211,8 +338,11 @@ def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
         "--state-dir", str(state_dir),
         "--projects-dir", str(paths["projects"]),
         "--python", sys.executable,
+        "--profile", profile,
         "--skip-dependency-install",
     ]
+    if local_config is not None:
+        argv.extend(["--local-config", str(local_config)])
     if args.command == "check":
         argv.append("--check")
     if args.force:
@@ -226,13 +356,11 @@ def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
     return argv
 
 
-def _managed_phase(state_dir: Path, *, check: bool, skip_install: bool, force: bool) -> int:
+def _managed_phase(state_dir: Path, config: dict, *, check: bool, skip_install: bool, force: bool) -> int:
     reporter = Reporter()
-    repo_root = Path(__file__).resolve().parent
     try:
-        config = json.loads((repo_root / "config_data.json").read_text(encoding="utf-8"))
         env_cfg = config["managed_environment"]
-    except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+    except (KeyError, TypeError) as exc:
         reporter.add("ToolSpec registry", STATE_CONFLICT, f"cannot load managed_environment config: {exc}")
         reporter.render()
         return 2
@@ -250,9 +378,7 @@ def _managed_phase(state_dir: Path, *, check: bool, skip_install: bool, force: b
         reporter.render()
         return 2
     if not specs:
-        reporter.add("ToolSpec registry", STATE_CONFLICT, "no managed production tools are declared")
-        reporter.render()
-        return 2
+        reporter.add("ToolSpec registry", STATE_INFO, "selected configuration declares no managed production helper tools")
 
     manifest_path = state_dir / "manifest.json"
     manifest, error, migration_pending = load_manifest(manifest_path)
@@ -277,7 +403,7 @@ def _managed_phase(state_dir: Path, *, check: bool, skip_install: bool, force: b
         skip_install=skip_install,
         manifest=manifest,
     )
-    paths = _default_paths()
+    paths = _default_paths(config, state_dir)
     changed |= reconcile_pinned_tool_skills(
         env_cfg,
         specs,
@@ -303,7 +429,10 @@ def _managed_phase(state_dir: Path, *, check: bool, skip_install: bool, force: b
 
 
 def _managed_model_aliases(repo_root: Path, config: dict) -> dict[str, set[str]]:
-    policy_path = repo_root / "templates" / "routerai_model_policy.json"
+    router_policy = config.get("routerai")
+    if not isinstance(router_policy, dict):
+        return {}
+    policy_path = resolve_repo_relative_path(repo_root, router_policy.get("policy"), label="RouterAI model policy")
     catalog_path = repo_root / "templates" / "routerai_catalog.generated.json"
     policy = json.loads(policy_path.read_text(encoding="utf-8"))
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
@@ -330,10 +459,13 @@ def _managed_model_aliases(repo_root: Path, config: dict) -> dict[str, set[str]]
     return aliases
 
 
-def _reconcile_routerai_model_labels(state_dir: Path, *, check: bool) -> int:
+def _reconcile_routerai_model_labels(state_dir: Path, config: dict, *, check: bool) -> int:
     """Update only known managed RouterAI display names, preserving custom names and fields."""
+    router_policy = config.get("routerai")
+    if not isinstance(router_policy, dict) or router_policy.get("enabled") is not True:
+        return 0
     repo_root = Path(__file__).resolve().parent
-    config_path = _default_paths()["config"] / "opencode.jsonc"
+    config_path = _default_paths(config, state_dir)["config"] / "opencode.jsonc"
     if not config_path.is_file():
         return 0
 
@@ -355,9 +487,8 @@ def _reconcile_routerai_model_labels(state_dir: Path, *, check: bool) -> int:
         if previous.get("sha256") != sha256_bytes(current_data):
             return 0
         existing, parse_error, has_jsonc_features = parse_jsonc_object(current_data)
-        desired_config = json.loads((repo_root / "config_data.json").read_text(encoding="utf-8"))
-        aliases = _managed_model_aliases(repo_root, desired_config)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        aliases = _managed_model_aliases(repo_root, config)
+    except (OSError, json.JSONDecodeError, ValueError, ProfileConfigError) as exc:
         reporter.add("RouterAI model labels", STATE_CONFLICT, f"cannot load managed model policy: {exc}")
         reporter.render()
         return 2
@@ -373,9 +504,9 @@ def _reconcile_routerai_model_labels(state_dir: Path, *, check: bool) -> int:
     models = routerai.get("models")
     if not isinstance(models, dict):
         return 0
-    target_models = desired_config.get("models")
+    target_models = config.get("models")
     if not isinstance(target_models, dict):
-        reporter.add("RouterAI model labels", STATE_CONFLICT, "config_data.json models is not an object")
+        reporter.add("RouterAI model labels", STATE_CONFLICT, "selected profile models is not an object")
         reporter.render()
         return 2
 
@@ -661,32 +792,63 @@ def main(argv: list[str] | None = None) -> int:
 
     check = args.command == "check"
     try:
+        profile_state_dir, _profile_migration_state, _profile_migration_detail = prepare_state(check=True)
+        profile, local_config, inferred = _resolve_configuration(args, profile_state_dir)
+        config = load_effective_config(
+            Path(__file__).resolve().parent,
+            profile=profile,
+            local_override=local_config,
+        )
         state_dir, migration_state, migration_detail = prepare_state(check=check)
-    except StateMigrationError as exc:
-        print(f"modified/conflict  agent-toolchain state migration  {exc}", file=sys.stderr)
+    except (StateMigrationError, ProfileConfigError) as exc:
+        print(f"modified/conflict  agent-toolchain configuration  {exc}", file=sys.stderr)
         return 2
 
     if migration_detail and migration_state:
         print(f"{migration_state:<18}agent-toolchain state migration  {migration_detail}")
+    if inferred:
+        print(
+            f"{'outdated' if check else 'configured':<18}configuration profile  "
+            f"legacy managed state proves {_AUTHOR_PROFILE!r}; "
+            + ("ordinary apply will record this selection" if check else "selection will be recorded after successful apply")
+        )
+    else:
+        print(f"info              configuration profile  {profile}")
+    if local_config is not None:
+        print(f"info              local configuration override  {local_config}")
 
-    managed_rc = _managed_phase(state_dir, check=check, skip_install=bool(args.skip_dependency_install), force=bool(args.force))
+    managed_rc = _managed_phase(
+        state_dir,
+        config,
+        check=check,
+        skip_install=bool(args.skip_dependency_install),
+        force=bool(args.force),
+    )
     if managed_rc != 0 and not check:
         return managed_rc
 
-    labels_rc = _reconcile_routerai_model_labels(state_dir, check=check)
+    labels_rc = _reconcile_routerai_model_labels(state_dir, config, check=check)
     if labels_rc != 0 and not check:
         return labels_rc
 
     previous = os.environ.get("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED")
     os.environ["AGENT_TOOLCHAIN_RUNTIME_PRECONCILED"] = "1"
     try:
-        core_rc = int(setup_core.main(_core_argv(args, state_dir)))
+        core_rc = int(setup_core.main(_core_argv(args, state_dir, config, profile, local_config)))
     finally:
         if previous is None:
             os.environ.pop("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED", None)
         else:
             os.environ["AGENT_TOOLCHAIN_RUNTIME_PRECONCILED"] = previous
-    return 2 if managed_rc != 0 or labels_rc != 0 or core_rc != 0 else 0
+
+    result = 2 if managed_rc != 0 or labels_rc != 0 or core_rc != 0 else 0
+    if not check and result == 0:
+        try:
+            _persist_profile(state_dir, profile)
+        except (StateMigrationError, OSError, ValueError) as exc:
+            print(f"failed            configuration profile  cannot persist selection: {exc}", file=sys.stderr)
+            return 2
+    return result
 
 
 if __name__ == "__main__":

@@ -1,14 +1,27 @@
-"""Declarative ToolSpec model and validation for managed helper runtimes."""
+"""Declarative ToolSpec model, profile overlays, and validation."""
 from __future__ import annotations
 
+import copy
+import json
+import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 TOOL_SPEC_SCHEMA = 1
+PROFILE_SCHEMA = 1
+GENERIC_PROFILE = "generic"
 VALID_SOURCES = {"git", "builtin"}
 VALID_UPDATE_POLICIES = {"latest", "pinned-tested", "bundled-with-setup"}
 VALID_RUNTIMES = {"python-venv", "python", "go-binary", "binary", "external"}
 VALID_PLATFORMS = {"windows", "linux"}
+_PROFILE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_PROFILE_METADATA = {"profile_schema", "name", "description"}
+_SECRET_KEYS = {"api_key", "apikey", "authorization", "password", "private_key", "secret", "token"}
+
+
+class ProfileConfigError(ValueError):
+    pass
 
 
 @dataclass(frozen=True)
@@ -28,6 +41,107 @@ class ToolSpec:
     repo: str | None = None
     ref: str | None = None
     project_directory: str | None = None
+
+
+def _load_json_object(path: Path, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ProfileConfigError(f"cannot load {label} {path}: {exc}") from exc
+    if not isinstance(value, dict):
+        raise ProfileConfigError(f"{label} {path} must contain a JSON object")
+    return value
+
+
+def _merge_overlay(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+    result = copy.deepcopy(base)
+    for key, value in overlay.items():
+        if value is None:
+            result.pop(key, None)
+            continue
+        previous = result.get(key)
+        if isinstance(previous, dict) and isinstance(value, dict):
+            result[key] = _merge_overlay(previous, value)
+        else:
+            result[key] = copy.deepcopy(value)
+    return result
+
+
+def _profile_payload(value: dict[str, Any], *, expected_name: str | None, label: str) -> dict[str, Any]:
+    schema = value.get("profile_schema")
+    if schema is not None and schema != PROFILE_SCHEMA:
+        raise ProfileConfigError(f"{label} has unsupported profile_schema {schema!r}")
+    if expected_name is not None:
+        if schema != PROFILE_SCHEMA:
+            raise ProfileConfigError(f"profile {expected_name!r} must declare profile_schema {PROFILE_SCHEMA}")
+        declared = value.get("name")
+        if declared != expected_name:
+            raise ProfileConfigError(f"profile file declares name {declared!r}, expected {expected_name!r}")
+    return {key: copy.deepcopy(item) for key, item in value.items() if key not in _PROFILE_METADATA}
+
+
+def _find_secret_key(value: Any, prefix: str = "") -> str | None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized = str(key).strip().lower().replace("-", "_")
+            path = f"{prefix}.{key}" if prefix else str(key)
+            if normalized in _SECRET_KEYS:
+                return path
+            found = _find_secret_key(item, path)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            found = _find_secret_key(item, f"{prefix}[{index}]")
+            if found:
+                return found
+    return None
+
+
+def load_effective_config(
+    repo_root: Path,
+    *,
+    profile: str = GENERIC_PROFILE,
+    local_override: Path | None = None,
+) -> dict[str, Any]:
+    """Load deterministic desired state: public base -> named profile -> local override."""
+    root = repo_root.resolve()
+    base = _load_json_object(root / "config_data.json", "base configuration")
+    selected = profile.strip() if isinstance(profile, str) and profile.strip() else GENERIC_PROFILE
+    if selected != GENERIC_PROFILE:
+        if _PROFILE_RE.fullmatch(selected) is None:
+            raise ProfileConfigError(f"unsafe profile name: {selected!r}")
+        profile_path = root / "templates" / "profiles" / f"{selected}.json"
+        profile_data = _load_json_object(profile_path, "profile")
+        payload = _profile_payload(profile_data, expected_name=selected, label=f"profile {selected!r}")
+        secret_key = _find_secret_key(payload)
+        if secret_key:
+            raise ProfileConfigError(
+                f"repository profile {selected!r} contains a secret-like key {secret_key!r}; keep secrets in external local state"
+            )
+        base = _merge_overlay(base, payload)
+
+    if local_override is not None:
+        local_path = local_override.expanduser().resolve()
+        if local_path.is_symlink() or not local_path.is_file():
+            raise ProfileConfigError(f"local override must be an existing regular non-symlink file: {local_path}")
+        local_data = _load_json_object(local_path, "local override")
+        payload = _profile_payload(local_data, expected_name=None, label="local override")
+        base = _merge_overlay(base, payload)
+    return base
+
+
+def resolve_repo_relative_path(repo_root: Path, value: object, *, label: str) -> Path:
+    if not isinstance(value, str) or not value.strip():
+        raise ProfileConfigError(f"{label} must be a non-empty repository-relative path")
+    relative = Path(value)
+    if relative.is_absolute():
+        raise ProfileConfigError(f"{label} must be repository-relative: {value!r}")
+    root = repo_root.resolve()
+    target = (root / relative).resolve()
+    if target != root and root not in target.parents:
+        raise ProfileConfigError(f"{label} escapes repository root: {value!r}")
+    return target
 
 
 def _nonempty_string(value: Any) -> bool:

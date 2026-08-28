@@ -13,10 +13,10 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-POLICY_PATH = ROOT / "templates" / "routerai_model_policy.json"
+POLICY_PATH = ROOT / "templates" / "profiles" / "dilukhin" / "routerai_model_policy.json"
 SNAPSHOT_PATH = ROOT / "templates" / "routerai_catalog.generated.json"
-CONFIG_PATH = ROOT / "config_data.json"
-TEMPLATE_PATH = ROOT / "templates" / "opencode.jsonc"
+CONFIG_PATH = ROOT / "templates" / "profiles" / "dilukhin.json"
+TEMPLATE_PATH = ROOT / "templates" / "profiles" / "dilukhin" / "opencode.jsonc"
 MODELS_URL = "https://routerai.ru/api/v1/models"
 MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 
@@ -168,7 +168,7 @@ def build_outputs(
     if not isinstance(policy_models, dict):
         raise CatalogError("RouterAI policy models is not an object")
     if not isinstance(current_models, dict):
-        raise CatalogError("config_data.json models is not an object")
+        raise CatalogError("author profile models is not an object")
 
     old_managed = previous_snapshot.get("managed_names", {})
     if not isinstance(old_managed, dict):
@@ -235,9 +235,9 @@ def build_outputs(
     try:
         template_models = new_template["provider"]["routerai"]["models"]
     except (KeyError, TypeError) as exc:
-        raise CatalogError("templates/opencode.jsonc has no provider.routerai.models object") from exc
+        raise CatalogError("author OpenCode template has no provider.routerai.models object") from exc
     if not isinstance(template_models, dict):
-        raise CatalogError("templates/opencode.jsonc provider.routerai.models is not an object")
+        raise CatalogError("author OpenCode template provider.routerai.models is not an object")
     new_template["provider"]["routerai"]["models"] = {
         model_id: {"name": spec["name"]} for model_id, spec in new_models.items()
     }
@@ -271,7 +271,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Refresh RouterAI model catalog and managed OpenCode labels.")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true", help="report whether generated data is stale; do not write")
-    mode.add_argument("--write", action="store_true", help="write regenerated catalog/config/template")
+    mode.add_argument("--write", action="store_true", help="write regenerated catalog/profile/template")
     parser.add_argument("--input", type=Path, help="read RouterAI /models JSON from a local fixture instead of the network")
     return parser
 

@@ -1,0 +1,238 @@
+{
+  "profile_schema": 1,
+  "name": "dilukhin",
+  "description": "Explicit author distribution policy preserving the pre-profile agent-toolchain defaults.",
+  "routerai": {
+    "enabled": true,
+    "template": "templates/profiles/dilukhin/opencode.jsonc",
+    "policy": "templates/profiles/dilukhin/routerai_model_policy.json"
+  },
+  "global_environment": {
+    "agents": true,
+    "remote_long_running": true
+  },
+  "settings": {
+    "provider_name": "RouterAI",
+    "npm_package": "@ai-sdk/openai-compatible",
+    "base_url": "https://routerai.ru/api/v1"
+  },
+  "models": {
+    "openai/gpt-4o": {
+      "name": "OpenAI GPT-4o [дорогая универсальная, 274/1096 ₽]",
+      "description": "Дорогая универсальная модель, запасной вариант для сложных задач",
+      "price_input_rub_per_1m": 274,
+      "price_output_rub_per_1m": 1096,
+      "cache_read_rub_per_1m": 137
+    },
+    "openai/gpt-4o-mini": {
+      "name": "OpenAI GPT-4o mini [дешёвая быстрая, 16/66 ₽]",
+      "description": "Быстрая и дешёвая модель для простых задач",
+      "price_input_rub_per_1m": 16,
+      "price_output_rub_per_1m": 66,
+      "cache_read_rub_per_1m": 8
+    },
+    "deepseek/deepseek-chat": {
+      "name": "DeepSeek Chat [дешёвая code/chat, 35/98 ₽]",
+      "description": "Недорогая модель для анализа кода и повседневных задач",
+      "price_input_rub_per_1m": 35,
+      "price_output_rub_per_1m": 98
+    },
+    "anthropic/claude-opus-4.7": {
+      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 548/2739 ₽]",
+      "description": "Топовая модель для сложного агентного программирования",
+      "price_input_rub_per_1m": 548,
+      "price_output_rub_per_1m": 2739,
+      "cache_read_rub_per_1m": 55
+    },
+    "qwen/qwen3.6-plus": {
+      "name": "Qwen 3.6 Plus [основная, 36/214 ₽]",
+      "description": "Основная рабочая модель для OpenCode",
+      "price_input_rub_per_1m": 36,
+      "price_output_rub_per_1m": 214,
+      "cache_read_rub_per_1m": 4
+    },
+    "deepseek/deepseek-v4-pro": {
+      "name": "DeepSeek V4 Pro [reasoning, 121/243 ₽]",
+      "description": "Сильная reasoning/code модель",
+      "price_input_rub_per_1m": 121,
+      "price_output_rub_per_1m": 243,
+      "cache_read_rub_per_1m": 10
+    },
+    "minimax/minimax-m2.7": {
+      "name": "MiniMax M2.7 [дешёвая, 26/105 ₽]",
+      "description": "Дешёвая рабочая модель",
+      "price_input_rub_per_1m": 26,
+      "price_output_rub_per_1m": 105
+    },
+    "z-ai/glm-5": {
+      "name": "GLM-5 [архитектор, 66/210 ₽]",
+      "description": "Для архитектора/ревьюера: планирование, декомпозиция",
+      "price_input_rub_per_1m": 66,
+      "price_output_rub_per_1m": 210,
+      "cache_read_rub_per_1m": 13
+    },
+    "moonshotai/kimi-k2.5": {
+      "name": "Kimi K2.5 [агентная, 49/247 ₽]",
+      "description": "Запасная агентная для tool-use и анализа кода",
+      "price_input_rub_per_1m": 49,
+      "price_output_rub_per_1m": 247,
+      "cache_read_rub_per_1m": 8
+    },
+    "z-ai/glm-5-turbo": {
+      "name": "GLM-5 Turbo [fallback, 131/438 ₽]",
+      "description": "Дорогой fallback для длинных цепочек",
+      "price_input_rub_per_1m": 131,
+      "price_output_rub_per_1m": 438,
+      "cache_read_rub_per_1m": 26
+    },
+    "openai/gpt-5.2-codex": {
+      "name": "GPT-5.2-Codex [код/агент, 192/1534 ₽]",
+      "description": "Оптимизированная для программной инженерии",
+      "price_input_rub_per_1m": 192,
+      "price_output_rub_per_1m": 1534,
+      "cache_read_rub_per_1m": 19
+    },
+    "qwen/qwen3-coder-next": {
+      "name": "Qwen 3 Coder Next [код/агент, 13/88 ₽]",
+      "description": "Новая модель RouterAI для кодинга",
+      "price_input_rub_per_1m": 13,
+      "price_output_rub_per_1m": 88,
+      "cache_read_rub_per_1m": 8
+    },
+    "qwen/qwen3.5-122b-a10b": {
+      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 28/228 ₽]",
+      "description": "Мультимодальная модель с reasoning, контекст 262K токенов",
+      "price_input_rub_per_1m": 28,
+      "price_output_rub_per_1m": 228
+    }
+  },
+  "config_defaults": {
+    "model": "opencode/deepseek-v4-flash-free",
+    "small_model": "opencode/gpt-5-nano"
+  },
+  "managed_environment": {
+    "tools": {
+      "agent-safe": {
+        "source": "git",
+        "repo": "https://github.com/dilukhin/agent-safe.git",
+        "ref": "95545d20533b2dfa1de7d75a30fa1bbfb1d428e3",
+        "project_directory": "agent-safe",
+        "runtime": "python-venv",
+        "update_policy": "pinned-tested",
+        "entrypoints": [
+          "safe"
+        ],
+        "health_contract": [
+          {
+            "argv": [
+              "safe",
+              "--help"
+            ]
+          }
+        ],
+        "platforms": [
+          "windows",
+          "linux"
+        ]
+      },
+      "ssh_relay": {
+        "source": "git",
+        "repo": "https://github.com/dilukhin/ssh_relay.git",
+        "ref": "1a794f84bb3664fe580716195ee939bbe2295675",
+        "project_directory": "ssh_relay",
+        "runtime": "python-venv",
+        "update_policy": "pinned-tested",
+        "entrypoints": [
+          "ssh_relay"
+        ],
+        "health_contract": [
+          {
+            "argv": [
+              "ssh_relay",
+              "--version"
+            ]
+          },
+          {
+            "argv": [
+              "ssh_relay",
+              "doctor"
+            ]
+          },
+          {
+            "argv": [
+              "ssh_relay",
+              "--help"
+            ]
+          }
+        ],
+        "platforms": [
+          "windows",
+          "linux"
+        ]
+      }
+    },
+    "owned_skills": [
+      "remote-long-running"
+    ],
+    "external_skills": [
+      "ssh-relay",
+      "recovery-mode",
+      "risk-gate",
+      "safe-cli",
+      "unknown-system-safety"
+    ],
+    "dependencies": {
+      "ssh_relay": {
+        "repo": "https://github.com/dilukhin/ssh_relay.git",
+        "branch": "main",
+        "directory": "ssh_relay",
+        "skill": "opencode/skills/ssh-relay/SKILL.md"
+      },
+      "agent_safe": {
+        "repo": "https://github.com/dilukhin/agent-safe.git",
+        "branch": "master",
+        "directory": "agent-safe",
+        "skills": {
+          "recovery-mode": "opencode/skills/recovery-mode/SKILL.md",
+          "risk-gate": "opencode/skills/risk-gate/SKILL.md",
+          "safe-cli": "opencode/skills/safe-cli/SKILL.md",
+          "unknown-system-safety": "opencode/skills/unknown-system-safety/SKILL.md"
+        }
+      }
+    }
+  },
+  "helper_tools": {
+    "ssh_relay": {
+      "location_hint": "~/projects/ssh_relay/",
+      "dependencies": [
+        "Python 3.10+",
+        "paramiko"
+      ],
+      "github_repo": "https://github.com/dilukhin/ssh_relay.git"
+    },
+    "agent_safe": {
+      "location_hint": "~/projects/agent-safe/",
+      "dependencies": [
+        "Python 3.10+"
+      ],
+      "github_repo": "https://github.com/dilukhin/agent-safe.git"
+    },
+    "bundle": {
+      "location_hint": "~/projects/bundle/",
+      "github_repo": "https://github.com/dilukhin/bundle.git",
+      "script": "bundle.py"
+    }
+  },
+  "platform_specific": {
+    "windows": {
+      "stash_dir": "%USERPROFILE%\\projects\\stash\\opencode.ai",
+      "projects_dir": "%USERPROFILE%\\projects",
+      "session_files": "%LOCALAPPDATA%\\ssh_relay\\sessions\\"
+    },
+    "linux": {
+      "stash_dir": "~/projects/stash/opencode.ai",
+      "projects_dir": "~/projects",
+      "session_files": "~/.local/share/ssh_relay/sessions/"
+    }
+  }
+}

@@ -30,6 +30,7 @@ class RouterAiCredentialPolicyTests(unittest.TestCase):
             "--skills-dir", str(home / ".agents" / "skills"),
             "--state-dir", str(home / "state"),
             "--projects-dir", str(projects),
+            "--profile", "dilukhin",
             "--skip-package-install", "--skip-dependency-install",
         ]
         env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}

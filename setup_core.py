@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import shutil
 import stat
@@ -18,6 +17,7 @@ from setup_lib import (
     STATE_MISSING,
     STATE_OK,
     STATE_OUTDATED,
+    STATE_SKIPPED,
     inspect_repo,
     parse_jsonc_object,
     reconcile_agents_file,
@@ -33,7 +33,7 @@ from setup_lib import (
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
 from setup_migration import reconcile_opencode_config
 from setup_runtime import ensure_agent_safe_runtime, ensure_ssh_relay_runtime, reconcile_npm
-from setup_tools import parse_tool_specs
+from setup_tools import ProfileConfigError, load_effective_config, parse_tool_specs, resolve_repo_relative_path
 
 LEGACY_AGENTS = """# Global OpenCode instructions
 
@@ -71,6 +71,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--skip-dependency-install", action="store_true")
     p.add_argument("--ssh-relay-url")
     p.add_argument("--agent-safe-url")
+    p.add_argument("--profile", default=os.environ.get("AGENT_TOOLCHAIN_PROFILE", "generic"))
+    p.add_argument("--local-config", default=os.environ.get("AGENT_TOOLCHAIN_LOCAL_CONFIG"))
     return p
 
 
@@ -98,11 +100,7 @@ def _record_credential(manifest: dict, path: Path, mode: str) -> bool:
 
 
 def _has_nonfile_routerai_credential(config: dict | None) -> bool:
-    """Return True when an existing RouterAI apiKey is present but is not {file:...}.
-
-    Such values may be inline secrets or another credential mechanism. The setup must
-    never print, migrate, or replace them automatically with a placeholder file.
-    """
+    """Return True when an existing RouterAI apiKey is present but is not {file:...}."""
     if config is None:
         return False
     routerai = routerai_provider(config)
@@ -202,62 +200,27 @@ def reconcile_agent_safe_repo(*, component: str, path: Path, url: str, branch: s
     return True, STATE_OK
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
-    repo_root = Path(args.repo_root).resolve()
-    config_dir = Path(args.config_dir).expanduser().resolve()
-    stash_dir = Path(args.stash_dir).expanduser().resolve()
-    credential_dir = (Path(args.credential_dir).expanduser().resolve()
-                      if args.credential_dir else stash_dir)
-    skills_dir = Path(args.skills_dir).expanduser().resolve()
-    state_dir = Path(args.state_dir).expanduser().resolve()
-    projects_dir = Path(args.projects_dir).expanduser().resolve()
-    manifest_path = state_dir / "manifest.json"
+def _reconcile_routerai(
+    *,
+    repo_root: Path,
+    config: dict,
+    profile: str,
+    config_dir: Path,
+    stash_dir: Path,
+    credential_dir: Path,
+    credential_dir_explicit: bool,
+    state_dir: Path,
+    manifest: dict,
+    reporter: Reporter,
+    check: bool,
+    force: bool,
+) -> bool:
+    router_policy = config.get("routerai")
+    if not isinstance(router_policy, dict) or router_policy.get("enabled") is not True:
+        reporter.add("RouterAI credential", STATE_SKIPPED, "not selected by configuration profile")
+        reporter.add("OpenCode config", STATE_SKIPPED, "no provider/model policy selected by configuration profile")
+        return False
 
-    config = json.loads((repo_root / "config_data.json").read_text(encoding="utf-8"))
-    env_cfg = config["managed_environment"]
-    ssh_spec = env_cfg["dependencies"]["ssh_relay"]
-    safe_spec = env_cfg["dependencies"]["agent_safe"]
-    ssh_url = args.ssh_relay_url or os.environ.get("OPENCODE_SETUP_SSH_RELAY_URL") or ssh_spec["repo"]
-    safe_url = args.agent_safe_url or os.environ.get("OPENCODE_SETUP_AGENT_SAFE_URL") or safe_spec["repo"]
-
-    reporter = Reporter()
-    if env_cfg.get("manifest_schema") != MANIFEST_SCHEMA:
-        reporter.add(
-            "manifest schema policy",
-            STATE_CONFLICT,
-            f"config_data.json requires manifest schema {env_cfg.get('manifest_schema')!r}; runtime supports {MANIFEST_SCHEMA}",
-        )
-        reporter.render()
-        return 2
-    _tool_specs, tool_spec_error = parse_tool_specs(env_cfg)
-    if tool_spec_error:
-        reporter.add("ToolSpec registry", STATE_CONFLICT, tool_spec_error)
-        reporter.render()
-        return 2
-
-    manifest, manifest_error, manifest_migration_pending = load_manifest(manifest_path)
-    if manifest_error:
-        reporter.add("ownership manifest", STATE_CONFLICT, manifest_error)
-        reporter.render()
-        return 2
-    if manifest_migration_pending:
-        if args.check:
-            reporter.add(
-                "ownership manifest schema",
-                STATE_OUTDATED,
-                "schema 1 распознана; обычный apply мигрирует manifest в schema 2 без удаления существующих metadata",
-            )
-        else:
-            reporter.add(
-                "ownership manifest schema",
-                STATE_CONFIGURED,
-                "schema 1 мигрирована в памяти в schema 2; результат будет сохранён после reconciliation",
-            )
-
-    reconcile_npm(config_dir, config, reporter, args.check, args.skip_package_install)
-
-    manifest_changed = manifest_migration_pending
     config_path = config_dir / "opencode.jsonc"
     existing_config = None
     config_parse_error = None
@@ -298,7 +261,7 @@ def main(argv: list[str] | None = None) -> int:
         api_key_file = manifest_credential
         credential_mode = manifest_mode or "external-file"
     elif config_can_be_managed and config_parse_error is None:
-        if args.credential_dir:
+        if credential_dir_explicit:
             api_key_file = credential_dir / "routerai-api-key.txt"
             credential_mode = "managed-path"
         else:
@@ -334,7 +297,7 @@ def main(argv: list[str] | None = None) -> int:
                                      f"не удалось проверить permissions credential file {api_key_file}: {exc}")
                     else:
                         if current_mode != 0o600:
-                            if args.check:
+                            if check:
                                 reporter.add(
                                     "RouterAI credential",
                                     STATE_OUTDATED,
@@ -365,7 +328,7 @@ def main(argv: list[str] | None = None) -> int:
             reporter.add("RouterAI credential", STATE_CONFLICT, f"path exists but is not a regular file: {api_key_file}")
     else:
         if credential_mode == "external-file":
-            state = STATE_MISSING if args.check else STATE_CONFLICT
+            state = STATE_MISSING if check else STATE_CONFLICT
             reporter.add(
                 "RouterAI credential",
                 state,
@@ -380,42 +343,141 @@ def main(argv: list[str] | None = None) -> int:
                 f"{api_key_file}",
             )
 
-    if api_key_file is not None and not args.check:
-        manifest_changed |= _record_credential(manifest, api_key_file, credential_mode or "external-file")
+    changed = False
+    if api_key_file is not None and not check:
+        changed |= _record_credential(manifest, api_key_file, credential_mode or "external-file")
 
     if api_key_file is not None:
-        config_data = render_config(repo_root / "templates" / "opencode.jsonc", api_key_file)
-        manifest_changed |= reconcile_opencode_config(
+        try:
+            template_path = resolve_repo_relative_path(repo_root, router_policy.get("template"), label="RouterAI template")
+            config_data = render_config(template_path, api_key_file)
+        except (ProfileConfigError, OSError) as exc:
+            reporter.add("OpenCode config", STATE_CONFLICT, f"cannot load selected RouterAI template: {exc}")
+            return changed
+        changed |= reconcile_opencode_config(
             destination=config_path,
             desired_data=config_data,
-            source_label="opencode_setup:managed-merge:templates/opencode.jsonc",
-            manifest=manifest, reporter=reporter, check=args.check, force=args.force, state_dir=state_dir,
+            source_label=f"agent-toolchain:profile:{profile}:{template_path.relative_to(repo_root).as_posix()}",
+            manifest=manifest, reporter=reporter, check=check, force=force, state_dir=state_dir,
         )
     else:
         reporter.add("OpenCode config", STATE_CONFLICT, "preserved because RouterAI credential path is unresolved")
+    return changed
 
-    agents_data = (repo_root / "templates" / "AGENTS.md").read_bytes()
-    manifest_changed |= reconcile_agents_file(
-        destination=config_dir / "AGENTS.md", template_data=agents_data,
-        source_label="opencode_setup:templates/AGENTS.md",
-        manifest=manifest, reporter=reporter, check=args.check, force=args.force, state_dir=state_dir,
-        legacy_hashes=[sha256_bytes(LEGACY_AGENTS.encode("utf-8"))],
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    repo_root = Path(args.repo_root).resolve()
+    config_dir = Path(args.config_dir).expanduser().resolve()
+    stash_dir = Path(args.stash_dir).expanduser().resolve()
+    credential_dir = (Path(args.credential_dir).expanduser().resolve()
+                      if args.credential_dir else stash_dir)
+    skills_dir = Path(args.skills_dir).expanduser().resolve()
+    state_dir = Path(args.state_dir).expanduser().resolve()
+    projects_dir = Path(args.projects_dir).expanduser().resolve()
+    manifest_path = state_dir / "manifest.json"
+
+    reporter = Reporter()
+    try:
+        local_override = Path(args.local_config) if args.local_config else None
+        config = load_effective_config(repo_root, profile=args.profile, local_override=local_override)
+        env_cfg = config["managed_environment"]
+    except (ProfileConfigError, KeyError, TypeError) as exc:
+        reporter.add("configuration profile", STATE_CONFLICT, str(exc))
+        reporter.render()
+        return 2
+
+    if env_cfg.get("manifest_schema") != MANIFEST_SCHEMA:
+        reporter.add(
+            "manifest schema policy",
+            STATE_CONFLICT,
+            f"effective configuration requires manifest schema {env_cfg.get('manifest_schema')!r}; runtime supports {MANIFEST_SCHEMA}",
+        )
+        reporter.render()
+        return 2
+    _tool_specs, tool_spec_error = parse_tool_specs(env_cfg)
+    if tool_spec_error:
+        reporter.add("ToolSpec registry", STATE_CONFLICT, tool_spec_error)
+        reporter.render()
+        return 2
+
+    manifest, manifest_error, manifest_migration_pending = load_manifest(manifest_path)
+    if manifest_error:
+        reporter.add("ownership manifest", STATE_CONFLICT, manifest_error)
+        reporter.render()
+        return 2
+    if manifest_migration_pending:
+        if args.check:
+            reporter.add(
+                "ownership manifest schema",
+                STATE_OUTDATED,
+                "schema 1 распознана; обычный apply мигрирует manifest в schema 2 без удаления существующих metadata",
+            )
+        else:
+            reporter.add(
+                "ownership manifest schema",
+                STATE_CONFIGURED,
+                "schema 1 мигрирована в памяти в schema 2; результат будет сохранён после reconciliation",
+            )
+
+    reconcile_npm(config_dir, config, reporter, args.check, args.skip_package_install)
+
+    manifest_changed = manifest_migration_pending
+    manifest_changed |= _reconcile_routerai(
+        repo_root=repo_root,
+        config=config,
+        profile=args.profile,
+        config_dir=config_dir,
+        stash_dir=stash_dir,
+        credential_dir=credential_dir,
+        credential_dir_explicit=bool(args.credential_dir),
+        state_dir=state_dir,
+        manifest=manifest,
+        reporter=reporter,
+        check=args.check,
+        force=args.force,
     )
 
-    remote_skill = repo_root / "skills" / "remote-long-running" / "SKILL.md"
-    valid, detail = validate_skill(remote_skill, "remote-long-running")
-    if not valid:
-        reporter.add("skill remote-long-running", STATE_CONFLICT, f"source invalid: {detail}")
-    else:
-        manifest_changed |= reconcile_file(
-            component="skill remote-long-running",
-            destination=skills_dir / "remote-long-running" / "SKILL.md",
-            source_data=remote_skill.read_bytes(),
-            source_label="opencode_setup:skills/remote-long-running/SKILL.md",
+    global_policy = config.get("global_environment")
+    global_policy = global_policy if isinstance(global_policy, dict) else {}
+    if global_policy.get("agents") is True:
+        agents_data = (repo_root / "templates" / "AGENTS.md").read_bytes()
+        manifest_changed |= reconcile_agents_file(
+            destination=config_dir / "AGENTS.md", template_data=agents_data,
+            source_label=f"agent-toolchain:profile:{args.profile}:templates/AGENTS.md",
             manifest=manifest, reporter=reporter, check=args.check, force=args.force, state_dir=state_dir,
+            legacy_hashes=[sha256_bytes(LEGACY_AGENTS.encode("utf-8"))],
         )
+    else:
+        reporter.add("global AGENTS.md", STATE_SKIPPED, "not selected by configuration profile")
 
-    if not shutil.which("git"):
+    if global_policy.get("remote_long_running") is True:
+        remote_skill = repo_root / "skills" / "remote-long-running" / "SKILL.md"
+        valid, detail = validate_skill(remote_skill, "remote-long-running")
+        if not valid:
+            reporter.add("skill remote-long-running", STATE_CONFLICT, f"source invalid: {detail}")
+        else:
+            manifest_changed |= reconcile_file(
+                component="skill remote-long-running",
+                destination=skills_dir / "remote-long-running" / "SKILL.md",
+                source_data=remote_skill.read_bytes(),
+                source_label=f"agent-toolchain:profile:{args.profile}:skills/remote-long-running/SKILL.md",
+                manifest=manifest, reporter=reporter, check=args.check, force=args.force, state_dir=state_dir,
+            )
+    else:
+        reporter.add("skill remote-long-running", STATE_SKIPPED, "not selected by configuration profile")
+
+    dependency_cfg = env_cfg.get("dependencies")
+    dependency_cfg = dependency_cfg if isinstance(dependency_cfg, dict) else {}
+    ssh_spec = dependency_cfg.get("ssh_relay")
+    safe_spec = dependency_cfg.get("agent_safe")
+    if ssh_spec is None and safe_spec is None:
+        reporter.add("dependency repositories", STATE_SKIPPED,
+                     "tracking helper checkouts are not selected by configuration profile")
+    elif not isinstance(ssh_spec, dict) or not isinstance(safe_spec, dict):
+        reporter.add("dependency repositories", STATE_CONFLICT,
+                     "selected profile must define both legacy helper dependency records or neither")
+    elif not shutil.which("git"):
         reporter.add(
             "dependency repositories",
             STATE_CONFLICT,
@@ -424,7 +486,11 @@ def main(argv: list[str] | None = None) -> int:
         )
         ssh_usable = safe_usable = False
         ssh_repo_state = safe_repo_state = STATE_CONFLICT
+        for skill_name in ("ssh-relay", "recovery-mode", "risk-gate", "safe-cli", "unknown-system-safety"):
+            reporter.add(f"skill {skill_name}", STATE_CONFLICT, "authoritative dependency repository is not usable")
     else:
+        ssh_url = args.ssh_relay_url or os.environ.get("OPENCODE_SETUP_SSH_RELAY_URL") or ssh_spec["repo"]
+        safe_url = args.agent_safe_url or os.environ.get("OPENCODE_SETUP_AGENT_SAFE_URL") or safe_spec["repo"]
         ssh_repo = projects_dir / ssh_spec["directory"]
         safe_repo = projects_dir / safe_spec["directory"]
         ssh_usable, ssh_repo_state = reconcile_repo(
@@ -462,12 +528,8 @@ def main(argv: list[str] | None = None) -> int:
                 )
         else:
             state = STATE_MISSING if ssh_repo_state == STATE_MISSING else STATE_CONFLICT
-            if state == STATE_MISSING:
-                detail = ("authoritative repository is missing; обычный apply клонирует его и затем установит "
-                          "управляемый skill автоматически")
-            else:
-                detail = ("authoritative repository is not usable; исправьте конфликт repository, указанный выше, "
-                          "затем повторите setup")
+            detail = ("authoritative repository is missing; ordinary apply will obtain it" if state == STATE_MISSING
+                      else "authoritative repository is not usable; resolve the repository conflict first")
             reporter.add("skill ssh-relay", state, detail)
 
         if safe_usable:
@@ -482,8 +544,7 @@ def main(argv: list[str] | None = None) -> int:
                     reporter.add(
                         component,
                         STATE_OUTDATED,
-                        "dependency repository has upstream changes; обычный apply сначала выполнит безопасный ff-only "
-                        "update репозитория, затем обновит управляемый skill автоматически",
+                        "dependency repository has upstream changes; ordinary apply first performs a safe ff-only update",
                     )
                     continue
                 manifest_changed |= reconcile_file(
@@ -493,12 +554,8 @@ def main(argv: list[str] | None = None) -> int:
                 )
         else:
             state = STATE_MISSING if safe_repo_state == STATE_MISSING else STATE_CONFLICT
-            if state == STATE_MISSING:
-                detail = ("authoritative repository is missing; обычный apply клонирует его и затем установит "
-                          "управляемый skill автоматически")
-            else:
-                detail = ("authoritative repository is not usable; исправьте конфликт repository, указанный выше, "
-                          "затем повторите setup")
+            detail = ("authoritative repository is missing; ordinary apply will obtain it" if state == STATE_MISSING
+                      else "authoritative repository is not usable; resolve the repository conflict first")
             for skill_name in safe_spec["skills"]:
                 reporter.add(f"skill {skill_name}", state, detail)
 

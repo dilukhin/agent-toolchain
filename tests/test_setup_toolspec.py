@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import sys
 import unittest
 from pathlib import Path
@@ -9,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from setup_tools import TOOL_SPEC_SCHEMA, parse_tool_spec, parse_tool_specs  # noqa: E402
+from setup_tools import TOOL_SPEC_SCHEMA, load_effective_config, parse_tool_spec, parse_tool_specs  # noqa: E402
 
 SSH_RELAY_REF = "1a794f84bb3664fe580716195ee939bbe2295675"
 AGENT_SAFE_REF = "95545d20533b2dfa1de7d75a30fa1bbfb1d428e3"
@@ -100,11 +99,18 @@ class ToolSpecTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(parsed, {})
 
-    def test_repository_config_declares_exact_pinned_production_tools(self) -> None:
-        data = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
+    def test_public_base_declares_no_author_helper_tools(self) -> None:
+        data = load_effective_config(ROOT)
         env = data["managed_environment"]
         self.assertEqual(env["manifest_schema"], 2)
         self.assertEqual(env["tool_spec_schema"], TOOL_SPEC_SCHEMA)
+        parsed, error = parse_tool_specs(env)
+        self.assertIsNone(error)
+        self.assertEqual(parsed, {})
+
+    def test_author_profile_declares_exact_pinned_production_tools(self) -> None:
+        data = load_effective_config(ROOT, profile="dilukhin")
+        env = data["managed_environment"]
         parsed, error = parse_tool_specs(env)
         self.assertIsNone(error)
         self.assertEqual(set(parsed), {"ssh_relay", "agent-safe"})
