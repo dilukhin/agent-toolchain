@@ -29,7 +29,9 @@ REQUIRED_FILES = (
     "setup_tool_skills_impl.py",
     "setup_path.py",
     "setup_inventory.py",
+    "setup_external_updates.py",
     "setup_tools.py",
+    "proxy_tools.py",
     "config_data.json",
 )
 REQUIRED_TREES = ("templates", "skills/remote-long-running")
