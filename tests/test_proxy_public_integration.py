@@ -4,12 +4,14 @@ import json
 import os
 import socket
 import socketserver
+import stat
 import subprocess
 import sys
 import tempfile
 import threading
 import unittest
 from unittest import mock
+from urllib.parse import urlsplit
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,9 +59,24 @@ class PublicProxyIntegrationTests(unittest.TestCase):
                     self.assertEqual({path: path.read_bytes() for path in release_a.rglob("*") if path.is_file()}, before)
                     snapshot = json.dumps(manifest, sort_keys=True)
                     check_report = Reporter()
-                    with mock.patch.object(setup_managed_tools, "_builtin_payload", return_value=payload_b):
-                        self.assertFalse(reconcile_builtin_tool(spec, check_report, check=True, manifest=manifest))
+                    self.assertFalse(reconcile_builtin_tool(spec, check_report, check=True, manifest=manifest))
                     self.assertEqual(json.dumps(manifest, sort_keys=True), snapshot)
+
+                    tampered_target = release_b / "proxy_tools.py"
+                    tampered = tampered_target.read_bytes() + b"\n# tampered\n"
+                    tampered_target.write_bytes(tampered)
+                    tamper_report = Reporter()
+                    self.assertFalse(reconcile_builtin_tool(spec, tamper_report, check=True, manifest=manifest))
+                    self.assertTrue(tamper_report.has_conflict)
+                    self.assertEqual(tampered_target.read_bytes(), tampered)
+
+                    tampered_target.write_bytes(payload_b["proxy_tools.py"])
+                    if os.name != "nt":
+                        executable = release_b / "opencode-proxied.py"
+                        executable.chmod(executable.stat().st_mode & ~(stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
+                        mode_report = Reporter()
+                        self.assertFalse(reconcile_builtin_tool(spec, mode_report, check=True, manifest=manifest))
+                        self.assertTrue(mode_report.has_conflict)
             finally:
                 if old_data is None: os.environ.pop("AGENT_TOOLCHAIN_DATA_DIR", None)
                 else: os.environ["AGENT_TOOLCHAIN_DATA_DIR"] = old_data
@@ -114,8 +131,10 @@ class PublicProxyIntegrationTests(unittest.TestCase):
                 manifest = setup_manifest.empty_manifest()
                 report = Reporter()
                 self.assertTrue(reconcile_builtin_tool(spec, report, check=False, manifest=manifest))
-                for command, external in (("opencode-proxied", "opencode"), ("codex-proxied", "codex")):
+                public_paths: list[Path] = []
+                for command in ("opencode-proxied", "codex-proxied"):
                     public = bindir / (command + (".cmd" if os.name == "nt" else ""))
+                    public_paths.append(public)
                     completed = subprocess.run([str(public), "--help", "--test"], cwd=root, env=os.environ, check=False)
                     self.assertEqual(completed.returncode, 37)
                     payload = json.loads(result.read_text(encoding="utf-8"))
@@ -123,8 +142,23 @@ class PublicProxyIntegrationTests(unittest.TestCase):
                     self.assertEqual(payload["cwd"], str(root))
                     self.assertTrue(payload["http"].startswith("http://127.0.0.1:"))
                     self.assertTrue(payload["all"].startswith("socks5://127.0.0.1:"))
+                    bridge = urlsplit(payload["http"])
+                    self.assertIsNotNone(bridge.hostname)
+                    self.assertIsNotNone(bridge.port)
+                    with self.assertRaises(OSError):
+                        socket.create_connection((bridge.hostname, bridge.port), timeout=0.25)
                     result.unlink()
                     self.assertEqual(subprocess.run([str(public), "--health"], cwd=root, env=os.environ).returncode, 0)
+                    self.assertFalse(result.exists())
+
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as unavailable:
+                    unavailable.bind(("127.0.0.1", 0))
+                    os.environ["AGENT_TOOLCHAIN_SOCKS_PORT"] = str(unavailable.getsockname()[1])
+                    for public in public_paths:
+                        result.unlink(missing_ok=True)
+                        completed = subprocess.run([str(public), "--missing-socks"], cwd=root, env=os.environ, check=False)
+                        self.assertEqual(completed.returncode, 78)
+                        self.assertFalse(result.exists())
             finally:
                 os.environ.clear()
                 os.environ.update(old_env)

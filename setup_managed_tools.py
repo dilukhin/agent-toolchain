@@ -109,8 +109,10 @@ def _builtin_payload(spec: ToolSpec) -> dict[str, bytes]:
     for command in spec.entrypoints:
         script = (
             "#!/usr/bin/env python3\n"
+            "import sys as _sys\n"
+            "_sys.dont_write_bytecode = True\n"
             f"from {spec.module} import main\n"
-            f"raise SystemExit(main([\"{command.removesuffix('-proxied')}\", *__import__('sys').argv[1:]]))\n"
+            f"raise SystemExit(main([\"{command.removesuffix('-proxied')}\", *_sys.argv[1:]]))\n"
         )
         payload[f"{command}.py"] = script.encode("utf-8")
     return payload
@@ -126,6 +128,31 @@ def _builtin_fingerprint(spec: ToolSpec) -> str:
     return digest.hexdigest()
 
 
+def _builtin_release_payload_matches(release: Path, spec: ToolSpec) -> bool:
+    desired = _builtin_payload(spec)
+    expected_files = set(desired) | {_RUNTIME_MARKER}
+    required_exec = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+    try:
+        actual_files: set[str] = set()
+        for path in release.rglob("*"):
+            if path.is_symlink():
+                return False
+            if path.is_file():
+                actual_files.add(path.relative_to(release).as_posix())
+        if actual_files != expected_files:
+            return False
+        for relative, content in desired.items():
+            target = release / relative
+            if target.read_bytes() != content:
+                return False
+            if os.name != "nt" and relative.endswith("-proxied.py"):
+                if target.stat().st_mode & required_exec != required_exec:
+                    return False
+    except OSError:
+        return False
+    return True
+
+
 def _owned_release(release: Path, spec: ToolSpec) -> bool:
     if release.is_symlink():
         return False
@@ -133,7 +160,7 @@ def _owned_release(release: Path, spec: ToolSpec) -> bool:
         data = json.loads(_marker_path(release).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
-    return (
+    base_owned = (
         isinstance(data, dict)
         and data.get("schema") == 1
         and data.get("owner") == "agent-toolchain"
@@ -141,10 +168,17 @@ def _owned_release(release: Path, spec: ToolSpec) -> bool:
         and data.get("repo") == spec.repo
         and data.get("source_ref") == (spec.ref.lower() if spec.ref else None)
         and data.get("runtime") == spec.runtime
-        and (
-            spec.runtime != "python-builtin"
-            or data.get("payload_sha256") == release.name.removeprefix("builtin-")
-        )
+    )
+    if not base_owned:
+        return False
+    if spec.runtime != "python-builtin":
+        return True
+    desired_fingerprint = _builtin_fingerprint(spec)
+    return (
+        data == _marker_payload(spec)
+        and data.get("payload_sha256") == desired_fingerprint
+        and release.name == f"builtin-{desired_fingerprint}"
+        and _builtin_release_payload_matches(release, spec)
     )
 
 
@@ -510,7 +544,15 @@ def reconcile_builtin_tool(spec: ToolSpec, reporter: Reporter, *, check: bool, m
         reporter.add(f"{spec.name} runtime", STATE_CONFLICT, error)
         return False
     release = _release_dir(spec)
-    if not release.exists():
+    release_present = release.exists() or release.is_symlink()
+    if release_present and not _owned_release(release, spec):
+        reporter.add(
+            f"{spec.name} runtime",
+            STATE_CONFLICT,
+            f"builtin runtime payload or ownership integrity check failed: {release}",
+        )
+        return False
+    if not release_present:
         if check:
             reporter.add(f"{spec.name} runtime", STATE_MISSING, f"toolchainctl apply will install bundled runtime {release}")
             return False
@@ -524,7 +566,7 @@ def reconcile_builtin_tool(spec: ToolSpec, reporter: Reporter, *, check: bool, m
         if not target.is_file():
             reporter.add(f"{spec.name} health", STATE_CONFLICT, f"builtin entrypoint is missing: {target}")
             return False
-        cp = run([sys.executable, str(target), *check_spec.argv[1:]])
+        cp = run([sys.executable, "-B", str(target), *check_spec.argv[1:]])
         if cp.returncode != 0:
             reporter.add(f"{spec.name} health", STATE_CONFLICT, f"health command failed: {cp.stderr.strip()[-240:]}")
             return False
