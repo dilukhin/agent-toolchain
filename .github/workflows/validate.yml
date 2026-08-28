@@ -3,6 +3,7 @@ name: Validate agent-toolchain
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

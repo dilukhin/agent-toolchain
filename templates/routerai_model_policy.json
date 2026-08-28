@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "source": "manual-policy",
+  "models": {
+    "openai/gpt-4o": {
+      "display_name": "OpenAI GPT-4o",
+      "role": "дорогая универсальная",
+      "description": "Дорогая универсальная модель, запасной вариант для сложных задач",
+      "legacy_names": [
+        "OpenAI GPT-4o"
+      ]
+    },
+    "openai/gpt-4o-mini": {
+      "display_name": "OpenAI GPT-4o mini",
+      "role": "дешёвая быстрая",
+      "description": "Быстрая и дешёвая модель для простых задач",
+      "legacy_names": [
+        "OpenAI GPT-4o mini"
+      ]
+    },
+    "deepseek/deepseek-chat": {
+      "display_name": "DeepSeek Chat",
+      "role": "дешёвая code/chat",
+      "description": "Недорогая модель для анализа кода и повседневных задач",
+      "legacy_names": [
+        "DeepSeek Chat"
+      ]
+    },
+    "anthropic/claude-opus-4.7": {
+      "display_name": "Anthropic Claude Opus 4.7",
+      "role": "топ код/агент",
+      "description": "Топовая модель для сложного агентного программирования",
+      "legacy_names": [
+        "Claude Opus 4.7",
+        "Anthropic Claude Opus 4.7"
+      ]
+    },
+    "qwen/qwen3.6-plus": {
+      "display_name": "Qwen 3.6 Plus",
+      "role": "основная",
+      "description": "Основная рабочая модель для OpenCode",
+      "legacy_names": [
+        "Qwen 3.6 Plus"
+      ]
+    },
+    "deepseek/deepseek-v4-pro": {
+      "display_name": "DeepSeek V4 Pro",
+      "role": "reasoning",
+      "description": "Сильная reasoning/code модель",
+      "legacy_names": [
+        "DeepSeek V4 Pro"
+      ]
+    },
+    "minimax/minimax-m2.7": {
+      "display_name": "MiniMax M2.7",
+      "role": "дешёвая",
+      "description": "Дешёвая рабочая модель",
+      "legacy_names": [
+        "MiniMax M2.7"
+      ]
+    },
+    "z-ai/glm-5": {
+      "display_name": "GLM-5",
+      "role": "архитектор",
+      "description": "Для архитектора/ревьюера: планирование, декомпозиция",
+      "legacy_names": [
+        "GLM-5"
+      ]
+    },
+    "moonshotai/kimi-k2.5": {
+      "display_name": "Kimi K2.5",
+      "role": "агентная",
+      "description": "Запасная агентная для tool-use и анализа кода",
+      "legacy_names": [
+        "Kimi K2.5"
+      ]
+    },
+    "z-ai/glm-5-turbo": {
+      "display_name": "GLM-5 Turbo",
+      "role": "fallback",
+      "description": "Дорогой fallback для длинных цепочек",
+      "legacy_names": [
+        "GLM-5 Turbo"
+      ]
+    },
+    "openai/gpt-5.2-codex": {
+      "display_name": "GPT-5.2-Codex",
+      "role": "код/агент",
+      "description": "Оптимизированная для программной инженерии",
+      "legacy_names": [
+        "GPT-5.2-Codex"
+      ]
+    },
+    "qwen/qwen3-coder-next": {
+      "display_name": "Qwen 3 Coder Next",
+      "role": "код/агент",
+      "description": "Новая модель RouterAI для кодинга",
+      "legacy_names": [
+        "Qwen 3 Coder Next"
+      ]
+    },
+    "qwen/qwen3.5-122b-a10b": {
+      "display_name": "Qwen 3.5 122B A10B",
+      "role": "мультимод. reasoning",
+      "description": "Мультимодальная модель с reasoning, контекст 262K токенов",
+      "legacy_names": [
+        "Qwen 3.5 122B A10B"
+      ]
+    }
+  }
+}

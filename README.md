@@ -6,7 +6,7 @@
 
 ## Быстрый старт
 
-Bootstrap выполняется один раз или при обновлении самого управляющего core.
+Bootstrap выполняется один раз для первоначальной установки управляющего core.
 
 Linux:
 
@@ -26,6 +26,19 @@ toolchainctl apply
 toolchainctl check
 ```
 
+После первоначальной установки свежий управляющий core можно получать без обновления developer checkout:
+
+```text
+toolchainctl update
+toolchainctl apply
+```
+
+или одной командой:
+
+```text
+toolchainctl update --apply
+```
+
 `bootstrap_*` использует только базовый Python 3.10+ и стандартную библиотеку. Общий bootstrap `venv` больше не создаётся. Python helper tools получают собственные изолированные runtimes.
 
 Старые `setup_linux.sh` и `setup_windows.ps1` больше не являются интерфейсом: они являются hard tombstones, всегда завершаются ошибкой и только указывают перейти на `bootstrap_*` + `toolchainctl`.
@@ -33,11 +46,15 @@ toolchainctl check
 ## Команды
 
 ```text
-toolchainctl check   read-only диагностика target state
-toolchainctl apply   привести управляемое состояние к target state
+toolchainctl check           read-only диагностика target state
+toolchainctl apply           привести управляемое состояние к target state
+toolchainctl update          обновить установленный управляющий core из актуального main
+toolchainctl update --apply  обновить core и затем применить новый target state
 ```
 
 `check` не создаёт state/runtime/skills, не выполняет package install, clone/pull, chmod или backup. `apply` меняет только доказанно управляемые ресурсы. Неизвестное содержимое не усыновляется автоматически.
+
+`update` запрашивает точный SHA актуального `dilukhin/agent-toolchain@main`, скачивает архив именно этого SHA и публикует его штатным bootstrap-механизмом. Перед заменой повторно проверяется ownership и fingerprint фактического установленного core; локально изменённый или неизвестный core сохраняется и блокирует автоматическое обновление. Developer checkout при этом не читается и не изменяется.
 
 Состояния отчёта:
 
@@ -147,7 +164,13 @@ Windows: %USERPROFILE%\.config\opencode\credentials\routerai-api-key.txt
 
 Если существующий config уже ссылается на другой `{file:...}`, этот путь считается фактическим и сохраняется. Содержимое external credential не читается и не печатается. Fake/placeholder key для fresh install не создаётся. Linux-файл, которым toolchain доказанно управляет, получает mode `0600` без изменения байтов.
 
-Подробности: [`setup_instructions.md`](setup_instructions.md) и [`docs/software_ownership_policy_ru.md`](docs/software_ownership_policy_ru.md).
+### Каталог моделей RouterAI
+
+Объективные сведения о моделях RouterAI, включая цены, обновляются отдельным ежедневным GitHub Actions-процессом из публичного API и проходят через PR/CI перед попаданием в `main`. Роли моделей (`основная`, `архитектор`, `код/агент` и т. п.) остаются ручной политикой и автоматически не выбираются.
+
+После появления свежего снимка в `main` клиент получает его через `toolchainctl update` и применяет новые известные управляемые подписи через `toolchainctl apply`. Пользовательские нестандартные названия моделей сохраняются.
+
+Подробности: [`docs/routerai_catalog_updates_ru.md`](docs/routerai_catalog_updates_ru.md), [`setup_instructions.md`](setup_instructions.md) и [`docs/software_ownership_policy_ru.md`](docs/software_ownership_policy_ru.md).
 
 ## BMAD
 
