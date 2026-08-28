@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import unittest
 from pathlib import Path
 
@@ -77,6 +76,10 @@ class RouterAiCatalogTests(unittest.TestCase):
         )
         self.assertIn("vendor/new-model", snapshot["models"])
         self.assertIn("Qwen 3.6 Plus [основная, 30/180 ₽]", snapshot["managed_names"]["qwen/qwen3.6-plus"])
+        self.assertIn("_managed_notice", snapshot)
+        self.assertIn("_managed_notice", generated_config)
+        self.assertIn(catalog.STATUS_DOC, snapshot["_managed_notice"])
+        self.assertIn(catalog.MANUAL_REFRESH_COMMAND, generated_config["_managed_notice"]["models"])
 
     def test_missing_policy_model_keeps_model_but_drops_stale_price(self) -> None:
         payload = {"data": [{"id": "other/model", "pricing": {"prompt": "0.1", "completion": "0.2"}}]}
@@ -138,6 +141,80 @@ class RouterAiCatalogTests(unittest.TestCase):
         self.assertNotIn("price_output_rub_per_1m", spec)
         self.assertNotIn("cache_read_rub_per_1m", spec)
         self.assertEqual(snapshot["models"]["qwen/qwen3.6-plus"]["pricing"]["prompt"], "0.00003")
+
+    def test_generated_models_do_not_preserve_manual_unknown_fields(self) -> None:
+        payload = {
+            "data": [{
+                "id": "qwen/qwen3.6-plus",
+                "pricing": {"prompt": "0.00003", "completion": "0.00018"},
+            }]
+        }
+        config = {
+            "models": {
+                "qwen/qwen3.6-plus": {
+                    "name": "manual",
+                    "description": "manual",
+                    "unexpected_manual_field": "must not survive",
+                }
+            }
+        }
+        _snapshot, generated_config, _template, _missing = catalog.build_outputs(
+            payload,
+            self._policy(),
+            {"managed_names": {}},
+            config,
+            {"provider": {"routerai": {"models": {}}}},
+            observed_at="2026-08-27T00:00:00Z",
+        )
+        self.assertNotIn("unexpected_manual_field", generated_config["models"]["qwen/qwen3.6-plus"])
+
+    def test_offline_verification_detects_manual_model_edit(self) -> None:
+        payload = {
+            "data": [{
+                "id": "qwen/qwen3.6-plus",
+                "pricing": {"prompt": "0.00003", "completion": "0.00018"},
+            }]
+        }
+        policy = self._policy()
+        snapshot, generated_config, generated_template, _missing = catalog.build_outputs(
+            payload,
+            policy,
+            {"managed_names": {}},
+            {"models": {}},
+            {"provider": {"routerai": {"models": {}}}},
+            observed_at="2026-08-27T00:00:00Z",
+        )
+        self.assertEqual(
+            catalog.verify_generated_state(policy, snapshot, generated_config, generated_template),
+            [],
+        )
+        generated_config["models"]["qwen/qwen3.6-plus"]["price_input_rub_per_1m"] = 999
+        self.assertIn(
+            "config_data.json -> models",
+            catalog.verify_generated_state(policy, snapshot, generated_config, generated_template),
+        )
+
+    def test_offline_verification_detects_manual_template_edit(self) -> None:
+        payload = {
+            "data": [{
+                "id": "qwen/qwen3.6-plus",
+                "pricing": {"prompt": "0.00003", "completion": "0.00018"},
+            }]
+        }
+        policy = self._policy()
+        snapshot, generated_config, generated_template, _missing = catalog.build_outputs(
+            payload,
+            policy,
+            {"managed_names": {}},
+            {"models": {}},
+            {"provider": {"routerai": {"models": {}}}},
+            observed_at="2026-08-27T00:00:00Z",
+        )
+        generated_template["provider"]["routerai"]["models"]["qwen/qwen3.6-plus"]["name"] = "manual"
+        self.assertIn(
+            "templates/opencode.jsonc -> provider.routerai.models",
+            catalog.verify_generated_state(policy, snapshot, generated_config, generated_template),
+        )
 
 
 if __name__ == "__main__":

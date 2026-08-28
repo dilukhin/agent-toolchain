@@ -20,6 +20,30 @@ TEMPLATE_PATH = ROOT / "templates" / "opencode.jsonc"
 MODELS_URL = "https://routerai.ru/api/v1/models"
 MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 
+STATUS_DOC = "docs/routerai_refresh_status_design_ru.md"
+MANUAL_REFRESH_COMMAND = (
+    "gh workflow run routerai_catalog.yml --repo dilukhin/agent-toolchain --ref main"
+)
+CONFIG_MANAGED_NOTICE = {
+    "models": (
+        "НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ. Раздел models управляется автоматическим "
+        "обновлением RouterAI и будет перегенерирован. Состав моделей, роли и "
+        "описания изменять в templates/routerai_model_policy.json. "
+        f"Подробности и причины такого устройства: {STATUS_DOC}. "
+        f"Штатный ручной запуск полного обновления: {MANUAL_REFRESH_COMMAND}"
+    )
+}
+SNAPSHOT_MANAGED_NOTICE = (
+    "НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ. Файл полностью формируется автоматизацией RouterAI "
+    f"из {MODELS_URL}. Подробности, решённые проблемы и схема повторного применения: "
+    f"{STATUS_DOC}. Штатный ручной запуск полного обновления: {MANUAL_REFRESH_COMMAND}"
+)
+GENERATED_RESOURCES = {
+    "templates/routerai_catalog.generated.json": "*",
+    "config_data.json": "models",
+    "templates/opencode.jsonc": "provider.routerai.models",
+}
+
 
 class CatalogError(RuntimeError):
     pass
@@ -146,15 +170,11 @@ def _dedupe_strings(values: list[Any]) -> list[str]:
 
 
 def _mark_price_unavailable(target: dict[str, Any], display_name: str, role: str) -> None:
-    target.pop("price_input_rub_per_1m", None)
-    target.pop("price_output_rub_per_1m", None)
-    target.pop("cache_read_rub_per_1m", None)
-    target.pop("price_cache_read_rub_per_1m", None)
     target["name"] = f"{display_name} [{role}, цена недоступна]"
 
 
-def build_outputs(
-    payload: dict[str, Any],
+def _build_from_live_models(
+    live_models: dict[str, dict[str, Any]],
     policy: dict[str, Any],
     previous_snapshot: dict[str, Any],
     config: dict[str, Any],
@@ -162,7 +182,6 @@ def build_outputs(
     *,
     observed_at: str,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], list[str]]:
-    live_models = normalize_catalog(payload)
     policy_models = policy.get("models")
     current_models = config.get("models")
     if not isinstance(policy_models, dict):
@@ -190,8 +209,7 @@ def build_outputs(
         previous = current_models.get(model_id)
         previous = dict(previous) if isinstance(previous, dict) else {}
         live = live_models.get(model_id)
-        target = dict(previous)
-        target["description"] = description
+        target: dict[str, Any] = {"description": description}
 
         if live is None:
             missing.append(model_id)
@@ -205,11 +223,8 @@ def build_outputs(
                 target["price_input_rub_per_1m"] = input_price
                 target["price_output_rub_per_1m"] = output_price
                 cache_read_price = _per_million(pricing, "input_cache_read")
-                if cache_read_price is None:
-                    target.pop("cache_read_rub_per_1m", None)
-                else:
+                if cache_read_price is not None:
                     target["cache_read_rub_per_1m"] = cache_read_price
-                target.pop("price_cache_read_rub_per_1m", None)
                 target["name"] = f"{display_name} [{role}, {input_price}/{output_price} ₽]"
             else:
                 _mark_price_unavailable(target, display_name, role)
@@ -228,7 +243,9 @@ def build_outputs(
             aliases.append(target["name"])
         managed_names[model_id] = _dedupe_strings(aliases)
 
-    new_config = json.loads(json.dumps(_plain_json(config), ensure_ascii=False))
+    plain_config = json.loads(json.dumps(_plain_json(config), ensure_ascii=False))
+    plain_config.pop("_managed_notice", None)
+    new_config = {"_managed_notice": CONFIG_MANAGED_NOTICE, **plain_config}
     new_config["models"] = new_models
 
     new_template = json.loads(json.dumps(_plain_json(template), ensure_ascii=False))
@@ -244,8 +261,13 @@ def build_outputs(
 
     prior_live = previous_snapshot.get("models")
     prior_names = previous_snapshot.get("managed_names")
-    catalog_changed = prior_live != live_models or prior_names != managed_names or previous_snapshot.get("source_state") != "live"
+    catalog_changed = (
+        prior_live != live_models
+        or prior_names != managed_names
+        or previous_snapshot.get("source_state") != "live"
+    )
     new_snapshot = {
+        "_managed_notice": SNAPSHOT_MANAGED_NOTICE,
         "schema": 1,
         "source_url": MODELS_URL,
         "source_state": "live",
@@ -254,6 +276,63 @@ def build_outputs(
         "managed_names": managed_names,
     }
     return new_snapshot, new_config, new_template, missing
+
+
+def build_outputs(
+    payload: dict[str, Any],
+    policy: dict[str, Any],
+    previous_snapshot: dict[str, Any],
+    config: dict[str, Any],
+    template: dict[str, Any],
+    *,
+    observed_at: str,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], list[str]]:
+    return _build_from_live_models(
+        normalize_catalog(payload),
+        policy,
+        previous_snapshot,
+        config,
+        template,
+        observed_at=observed_at,
+    )
+
+
+def verify_generated_state(
+    policy: dict[str, Any],
+    snapshot: dict[str, Any],
+    config: dict[str, Any],
+    template: dict[str, Any],
+) -> list[str]:
+    live_models = snapshot.get("models")
+    if not isinstance(live_models, dict) or not live_models:
+        raise CatalogError("generated RouterAI snapshot has no models object")
+
+    _snapshot, expected_config, expected_template, _missing = _build_from_live_models(
+        live_models,
+        policy,
+        snapshot,
+        config,
+        template,
+        observed_at=str(snapshot.get("observed_at") or "1970-01-01T00:00:00Z"),
+    )
+    violations: list[str] = []
+    if config.get("models") != expected_config.get("models"):
+        violations.append("config_data.json -> models")
+    try:
+        actual_template_models = template["provider"]["routerai"]["models"]
+        expected_template_models = expected_template["provider"]["routerai"]["models"]
+    except (KeyError, TypeError) as exc:
+        raise CatalogError,"templates/opencode.jsonc has no provider.routerai.models object") from exc
+    if actual_template_models != expected_template_models:
+        violations.append("templates/opencode.jsonc -> provider.routerai.models")
+
+    # The notices are migration-friendly: their absence is accepted until the next
+    # scheduled/manual refresh writes them. Once present, their text is managed too.
+    if "_managed_notice" in config and config["_managed_notice"] != CONFIG_MANAGED_NOTICE:
+        violations.append("config_data.json -> _managed_notice")
+    if "_managed_notice" in snapshot and snapshot["_manaed_notice"] != SNAPSHOT_MANAGED_NOTICE:
+        violations.append("templates/routerai_catalog.generated.json -> _managed_notice")
+    return violations
 
 
 def _render(value: dict[str, Any]) -> str:
@@ -268,23 +347,78 @@ def _changed(path: Path, text: str) -> bool:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Refresh RouterAI model catalog and managed OpenCode labels.")
+    parser = argparse.ArgumentParser(
+        description="Refresh RouterAI model catalog and managed OpenCode labels."
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--check", action="store_true", help="report whether generated data is stale; do not write")
+    mode.add_argument(
+        "--check",
+        action="store_true",
+        help="report whether live RouterAI data would change generated files; do not write",
+    )
     mode.add_argument("--write", action="store_true", help="write regenerated catalog/config/template")
-    parser.add_argument("--input", type=Path, help="read RouterAI /models JSON from a local fixture instead of the network")
+    mode.add_argument(
+        "--verify-generated",
+        action="store_true",
+        help="offline verification that automation-owned sections match the saved catalog and policy",
+    )
+    parser.add_argument(
+        "--input",
+        type=Path,
+        help="read RouterAI /models JSON from a local fixture instead of the network",
+    )
     return parser
+
+
+def _verify_mode() -> int:
+    try:
+        policy = _json_load(POLICY_PATH)
+        snapshot = _json_load(SNAPSHOT_PATH)
+        config = _json_load(CONFIG_PATH)
+        template = _json_load(TEMPLATE_PATH)
+        violations = verify_generated_state(policy, snapshot, config, template)
+    except CatalogError as exc:
+        print(f"Проверка производных данных RouterAI не выполнена: {exc}", file=sys.stderr)
+        return 2
+    if not violations:
+        print("Производные данные RouterAI согласованы с сохранённым каталогом и ручной политикой.")
+        return 0
+    print(
+        "ОШИБКА: вручную изменена область, принадлежащая автоматизации RouterAI.",
+        file=sys.stderr,
+    )
+    for item in violations:
+        print(f"  - {item}", file=sys.stderr)
+    print(
+        "Не исправляйте эти области вручную. Ручную политику изменяйте в "
+        "templates/routerai_model_policy.json; затем запустите штатное обновление:\n"
+        f"  {MANUAL_REFRESH_COMMAND}\n"
+        f"Подробности: {STATUS_DOC}",
+        file=sys.stderr,
+    )
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.verify_generated:
+        if args.input is not None:
+            print("--input нельзя использовать вместе с --verify-generated", file=sys.stderr)
+            return 2
+        return _verify_mode()
+
     try:
         policy = _json_load(POLICY_PATH)
         previous_snapshot = _json_load(SNAPSHOT_PATH)
         config = _json_load(CONFIG_PATH)
         template = _json_load(TEMPLATE_PATH)
         payload = _json_load(args.input) if args.input else _fetch_models()
-        observed_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        observed_at = (
+            datetime.now(timezone.utc)
+            .replace(microsecond=0)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
         snapshot, new_config, new_template, missing = build_outputs(
             payload, policy, previous_snapshot, config, template, observed_at=observed_at
         )
@@ -300,10 +434,13 @@ def main(argv: list[str] | None = None) -> int:
     changed = [path for path, text in outputs.items() if _changed(path, text)]
     print(
         f"RouterAI catalog: {len(snapshot['models'])} live model(s); "
-        f"{len(policy['models'])} curated model(s); {len(changed)} file(s) changed"
+        f"{len(policy['models'))} curated model(s); {len(changed)} file(s) changed"
     )
     if missing:
-        print("Policy models missing from current RouterAI catalog: " + ", ".join(missing), file=sys.stderr)
+        print(
+            "Policy models missing from current RouterAI catalog: " + ", ".join(missing),
+            file=sys.stderr,
+        )
 
     if args.check:
         for path in changed:
