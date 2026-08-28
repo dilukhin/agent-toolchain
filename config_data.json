@@ -216,6 +216,34 @@
           "windows",
           "linux"
         ]
+      },
+      "proxy-tools": {
+        "source": "builtin",
+        "module": "proxy_tools",
+        "runtime": "python-builtin",
+        "update_policy": "bundled-with-setup",
+        "entrypoints": [
+          "opencode-proxied",
+          "codex-proxied"
+        ],
+        "health_contract": [
+          {
+            "argv": [
+              "opencode-proxied",
+              "--health"
+            ]
+          },
+          {
+            "argv": [
+              "codex-proxied",
+              "--health"
+            ]
+          }
+        ],
+        "platforms": [
+          "windows",
+          "linux"
+        ]
       }
     },
     "global_skills_dir": "~/.agents/skills",

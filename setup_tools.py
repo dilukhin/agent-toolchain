@@ -7,7 +7,7 @@ from typing import Any
 TOOL_SPEC_SCHEMA = 1
 VALID_SOURCES = {"git", "builtin"}
 VALID_UPDATE_POLICIES = {"latest", "pinned-tested", "bundled-with-setup"}
-VALID_RUNTIMES = {"python-venv", "python", "go-binary", "binary", "external"}
+VALID_RUNTIMES = {"python-venv", "python-builtin", "python", "go-binary", "binary", "external"}
 VALID_PLATFORMS = {"windows", "linux"}
 
 
@@ -28,6 +28,7 @@ class ToolSpec:
     repo: str | None = None
     ref: str | None = None
     project_directory: str | None = None
+    module: str | None = None
 
 
 def _nonempty_string(value: Any) -> bool:
@@ -95,6 +96,7 @@ def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
     repo = raw.get("repo")
     ref = raw.get("ref")
     project_directory = raw.get("project_directory")
+    module = raw.get("module")
     if source == "git" and not _nonempty_string(repo):
         return None, f"ToolSpec {name!r}: git source requires repo"
     if update_policy == "pinned-tested" and not _nonempty_string(ref):
@@ -103,6 +105,12 @@ def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
         return None, f"ToolSpec {name!r}: git source requires project_directory"
     if source == "builtin" and any(value is not None for value in (repo, ref, project_directory)):
         return None, f"ToolSpec {name!r}: builtin source must not define repo/ref/project_directory"
+    if module is not None and not _nonempty_string(module):
+        return None, f"ToolSpec {name!r}: module must be a non-empty string"
+    if source == "builtin" and runtime == "python-builtin" and not _nonempty_string(module):
+        return None, f"ToolSpec {name!r}: python-builtin source requires module"
+    if source != "builtin" and module is not None:
+        return None, f"ToolSpec {name!r}: module is only valid for builtin source"
 
     return ToolSpec(
         name=name,
@@ -115,6 +123,7 @@ def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
         repo=repo.strip() if _nonempty_string(repo) else None,
         ref=ref.strip() if _nonempty_string(ref) else None,
         project_directory=project_directory.strip() if _nonempty_string(project_directory) else None,
+        module=module.strip() if _nonempty_string(module) else None,
     ), None
 
 

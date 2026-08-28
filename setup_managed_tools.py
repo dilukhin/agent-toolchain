@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -73,8 +75,8 @@ def _venv_command(venv: Path, command: str) -> Path:
 
 
 def _release_dir(spec: ToolSpec) -> Path:
-    assert spec.ref is not None
-    return data_root() / "tools" / spec.name / "releases" / spec.ref.lower()
+    ref = spec.ref.lower() if spec.ref else "builtin"
+    return data_root() / "tools" / spec.name / "releases" / ref
 
 
 def _marker_path(release: Path) -> Path:
@@ -112,6 +114,10 @@ def _owned_release(release: Path, spec: ToolSpec) -> bool:
 
 def _validate_supported_spec(spec: ToolSpec) -> str | None:
     if platform_name() not in spec.platforms:
+        return None
+    if spec.source == "builtin" and spec.runtime == "python-builtin" and spec.update_policy == "bundled-with-setup":
+        if len(spec.entrypoints) < 1 or not spec.module:
+            return "builtin Python tool requires module and entrypoints"
         return None
     if spec.source != "git" or spec.runtime != "python-venv" or spec.update_policy != "pinned-tested":
         return (
@@ -279,6 +285,10 @@ def _public_entrypoint(spec: ToolSpec, command: str) -> Path:
 
 
 def _render_windows_entrypoint(spec: ToolSpec, target: Path) -> bytes:
+    if spec.runtime == "python-builtin":
+        text = (f"@REM {_ENTRYPOINT_MARKER}:{spec.name}\r\n@echo off\r\n"
+                f'@"{sys.executable}" "{target}" {spec.entrypoints[0]} %*\r\n')
+        return text.encode("utf-8-sig")
     text = (
         f"@REM {_ENTRYPOINT_MARKER}:{spec.name}\r\n"
         "@echo off\r\n"
@@ -414,7 +424,7 @@ def _manifest_record(spec: ToolSpec, release: Path) -> dict[str, object]:
     for command in spec.entrypoints:
         entries[command] = {
             "public_path": str(_public_entrypoint(spec, command)),
-            "target": str(_venv_command(venv, command)),
+            "target": str(_venv_command(venv, command) if spec.runtime == "python-venv" else release / f"{command}.py"),
         }
     return {
         "owner": "agent-toolchain",
@@ -427,6 +437,85 @@ def _manifest_record(spec: ToolSpec, release: Path) -> dict[str, object]:
         "health_contract": [list(check.argv) for check in spec.health_contract],
         "platforms": list(spec.platforms),
     }
+
+
+def _install_builtin(spec: ToolSpec, reporter: Reporter) -> Path | None:
+    release = _release_dir(spec)
+    if release.exists() or release.is_symlink():
+        if _owned_release(release, spec):
+            return release
+        reporter.add(f"{spec.name} runtime", STATE_CONFLICT, f"runtime path exists but ownership is not proven: {release}")
+        return None
+    try:
+        release.mkdir(parents=True)
+        source_dir = Path(__file__).resolve().parent
+        source = source_dir / f"{spec.module}.py"
+        if not source.is_file():
+            reporter.add(f"{spec.name} runtime", STATE_FAILED, f"builtin module is missing: {source}")
+            return None
+        atomic_write(release / f"{spec.module}.py", source.read_bytes())
+        if spec.name == "proxy-tools":
+            # Bundle the imported setup modules so the runtime is checkout-independent.
+            for dependency in ("setup_inventory.py", "setup_external_updates.py", "setup_lib.py"):
+                atomic_write(release / dependency, (source_dir / dependency).read_bytes())
+        for command in spec.entrypoints:
+            script = f"from {spec.module} import main\nraise SystemExit(main([\"{command.removesuffix('-proxied')}\", *__import__('sys').argv[1:]]))\n"
+            target = release / f"{command}.py"
+            atomic_write(target, script.encode("utf-8"))
+            if os.name != "nt":
+                target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        atomic_write(_marker_path(release), (json.dumps(_marker_payload(spec), sort_keys=True) + "\n").encode("utf-8"))
+        reporter.add(f"{spec.name} runtime", STATE_CONFIGURED, f"installed bundled runtime: {release}")
+        return release
+    except OSError as exc:
+        reporter.add(f"{spec.name} runtime", STATE_FAILED, f"cannot install builtin runtime: {exc}")
+        return None
+
+
+def reconcile_builtin_tool(spec: ToolSpec, reporter: Reporter, *, check: bool, manifest: dict[str, Any]) -> bool:
+    if platform_name() not in spec.platforms:
+        reporter.add(f"{spec.name} runtime", STATE_SKIPPED, f"not enabled on {platform_name()}")
+        return False
+    error = _validate_supported_spec(spec)
+    if error:
+        reporter.add(f"{spec.name} runtime", STATE_CONFLICT, error)
+        return False
+    release = _release_dir(spec)
+    if not release.exists():
+        if check:
+            reporter.add(f"{spec.name} runtime", STATE_MISSING, f"toolchainctl apply will install bundled runtime {release}")
+            return False
+        release = _install_builtin(spec, reporter)
+        if release is None:
+            return False
+    else:
+        reporter.add(f"{spec.name} runtime", STATE_OK, f"bundled runtime: {release}")
+    for check_spec in spec.health_contract:
+        target = release / f"{check_spec.argv[0]}.py"
+        if not target.is_file():
+            reporter.add(f"{spec.name} health", STATE_CONFLICT, f"builtin entrypoint is missing: {target}")
+            return False
+        cp = run([sys.executable, str(target), *check_spec.argv[1:]])
+        if cp.returncode != 0:
+            reporter.add(f"{spec.name} health", STATE_CONFLICT, f"health command failed: {cp.stderr.strip()[-240:]}")
+            return False
+    reporter.add(f"{spec.name} health", STATE_OK, "builtin runtime checks passed")
+    for command in spec.entrypoints:
+        target = release / f"{command}.py"
+        ok, changed = _reconcile_entrypoint(spec, command, target, manifest.get("managed_tools", {}).get(spec.name), reporter, check)
+        if not ok:
+            return False
+        _report_resolution(spec, command, target, reporter)
+    desired = _manifest_record(spec, release)
+    previous = manifest.setdefault("managed_tools", {}).get(spec.name)
+    if previous != desired:
+        if check:
+            reporter.add(f"{spec.name} ownership metadata", STATE_OUTDATED, "managed_tools metadata will be recorded by apply")
+            return False
+        manifest["managed_tools"][spec.name] = desired
+        reporter.add(f"{spec.name} ownership metadata", STATE_CONFIGURED, "recorded in ownership manifest")
+        return True
+    return False
 
 
 def reconcile_python_tool(
@@ -527,12 +616,9 @@ def reconcile_tool_specs(
 ) -> bool:
     changed = False
     for name in sorted(specs):
-        changed |= reconcile_python_tool(
-            specs[name],
-            python_exe,
-            reporter,
-            check=check,
-            skip_install=skip_install,
-            manifest=manifest,
-        )
+        spec = specs[name]
+        if spec.runtime == "python-builtin":
+            changed |= reconcile_builtin_tool(spec, reporter, check=check, manifest=manifest)
+        else:
+            changed |= reconcile_python_tool(spec, python_exe, reporter, check=check, skip_install=skip_install, manifest=manifest)
     return changed
