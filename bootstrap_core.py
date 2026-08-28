@@ -32,7 +32,9 @@ LEGACY_REQUIRED_FILES_V1 = (
     "setup_tool_skills_impl.py",
     "setup_path.py",
     "setup_inventory.py",
+    "setup_external_updates.py",
     "setup_tools.py",
+    "proxy_tools.py",
     "config_data.json",
 )
 LEGACY_REQUIRED_TREES_V1 = ("templates", "skills/remote-long-running")

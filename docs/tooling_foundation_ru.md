@@ -17,7 +17,15 @@
 - Windows user PATH ownership и Linux PATH diagnostics;
 - one-way import legacy `opencode_setup` state.
 
-Не реализованы пока `go-binary` deployment для `tunnelctl`, deployment `bundle` и `proxy-tools`.
+Реализован stdlib-only builtin `proxy-tools` с командами `opencode-proxied` и `codex-proxied`.
+`tunnelctl` по-прежнему не управляется и не изменяется этим проектом.
+
+External CLI inventory (`opencode`, `codex`) остаётся read-only и не записывается
+как owned state. `toolchainctl updates refresh/show` использует отдельный
+атомарный cache с TTL 24 часа; `check` cache не обновляет. При запуске proxy
+launcher выполняется SOCKS5 handshake, затем создаётся отдельный ephemeral
+HTTP-to-SOCKS bridge и после завершения дочернего CLI закрывается. Ошибка
+SOCKS не запускает VPN или `tunnelctl`.
 
 ## Manifest schema 2
 

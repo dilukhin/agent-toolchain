@@ -107,7 +107,7 @@ class ToolSpecTests(unittest.TestCase):
         self.assertEqual(env["tool_spec_schema"], TOOL_SPEC_SCHEMA)
         parsed, error = parse_tool_specs(env)
         self.assertIsNone(error)
-        self.assertEqual(set(parsed), {"ssh_relay", "agent-safe"})
+        self.assertEqual(set(parsed), {"ssh_relay", "agent-safe", "proxy-tools"})
 
         ssh = parsed["ssh_relay"]
         self.assertEqual(ssh.update_policy, "pinned-tested")
@@ -121,6 +121,12 @@ class ToolSpecTests(unittest.TestCase):
         self.assertEqual(safe.runtime, "python-venv")
         self.assertEqual(safe.ref, AGENT_SAFE_REF)
         self.assertEqual(safe.entrypoints, ("safe",))
+
+        proxy = parsed["proxy-tools"]
+        self.assertEqual(proxy.source, "builtin")
+        self.assertEqual(proxy.runtime, "python-builtin")
+        self.assertEqual(proxy.module, "proxy_tools")
+        self.assertEqual(proxy.entrypoints, ("opencode-proxied", "codex-proxied"))
 
 
 if __name__ == "__main__":

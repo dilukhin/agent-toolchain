@@ -38,7 +38,7 @@ def main() -> int:
     specs, error = parse_tool_specs(env_cfg)
     if error:
         raise AssertionError(error)
-    if set(specs) != {"ssh_relay", "agent-safe"}:
+    if set(specs) != {"ssh_relay", "agent-safe", "proxy-tools"}:
         raise AssertionError(f"unexpected managed tool registry: {sorted(specs)}")
 
     bindings, error = tool_skill_bindings(env_cfg, specs)
