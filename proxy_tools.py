@@ -12,10 +12,17 @@ import threading
 import ipaddress
 from pathlib import Path
 
-from setup_external_updates import advisory, cache_fresh, load_cache, refresh
+from setup_external_updates import advisory, cache_fresh, load_cache
 from setup_inventory import ExternalCliSpec, external_cli_inventory
 
 SOCKS_HOST, SOCKS_PORT = "127.0.0.1", 1080
+
+
+def socks_address() -> tuple[str, int]:
+    return (
+        os.environ.get("AGENT_TOOLCHAIN_SOCKS_HOST", SOCKS_HOST),
+        int(os.environ.get("AGENT_TOOLCHAIN_SOCKS_PORT", str(SOCKS_PORT))),
+    )
 
 
 def _recv_exact(sock: socket.socket, size: int) -> bytes:
@@ -37,7 +44,7 @@ def socks5_preflight(host: str = SOCKS_HOST, port: int = SOCKS_PORT, timeout: fl
 
 
 def _socks_connect(host: str, port: int, timeout: float = 5.0) -> socket.socket:
-    sock = socket.create_connection((SOCKS_HOST, SOCKS_PORT), timeout=timeout)
+    sock = socket.create_connection(socks_address(), timeout=timeout)
     try:
         sock.sendall(b"\x05\x01\x00")
         if _recv_exact(sock, 2) != b"\x05\x00":
@@ -60,11 +67,16 @@ def _socks_connect(host: str, port: int, timeout: float = 5.0) -> socket.socket:
         head = _recv_exact(sock, 4)
         if head[1] != 0:
             raise ConnectionError(f"SOCKS5 CONNECT failed: {head[1]}")
-        sizes = {1: 4, 3: _recv_exact(sock, 1)[0], 4: 16}
         atyp = head[3]
-        if atyp not in sizes:
+        if atyp == 1:
+            size = 4
+        elif atyp == 3:
+            size = _recv_exact(sock, 1)[0]
+        elif atyp == 4:
+            size = 16
+        else:
             raise ConnectionError("invalid SOCKS5 address type")
-        _recv_exact(sock, sizes[atyp])
+        _recv_exact(sock, size)
         _recv_exact(sock, 2)
         sock.settimeout(None)
         return sock
@@ -185,15 +197,12 @@ def launch(command: str, argv: list[str]) -> int:
         if message:
             print(message, file=sys.stderr)
     else:
-        try:
-            record = refresh().get("tools", {}).get(command)
-            message = advisory(inventory, record)
-            if message:
-                print(message, file=sys.stderr)
-        except Exception as exc:
-            print(f"{command}: update advisory unavailable ({exc})", file=sys.stderr)
+        print(
+            f"{command}: update advisory cache missing/stale; run toolchainctl updates refresh",
+            file=sys.stderr,
+        )
     try:
-        socks5_preflight()
+        socks5_preflight(*socks_address())
     except (OSError, ConnectionError, ValueError) as exc:
         print(f"SOCKS5 preflight failed: {exc}", file=sys.stderr)
         return 78
@@ -201,7 +210,8 @@ def launch(command: str, argv: list[str]) -> int:
     bridge.start()
     env = os.environ.copy()
     proxy = f"http://{bridge.address[0]}:{bridge.address[1]}"
-    env.update({"HTTP_PROXY": proxy, "HTTPS_PROXY": proxy, "ALL_PROXY": f"socks5://{SOCKS_HOST}:{SOCKS_PORT}", "NO_PROXY": "localhost,127.0.0.1,::1"})
+    socks_host, socks_port = socks_address()
+    env.update({"HTTP_PROXY": proxy, "HTTPS_PROXY": proxy, "ALL_PROXY": f"socks5://{socks_host}:{socks_port}", "NO_PROXY": "localhost,127.0.0.1,::1"})
     env.update({"http_proxy": proxy, "https_proxy": proxy, "all_proxy": env["ALL_PROXY"], "no_proxy": env["NO_PROXY"]})
     try:
         child = subprocess.Popen([str(inventory.active.canonical_path), *argv], cwd=os.getcwd(), env=env)
@@ -215,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("command", choices=("opencode", "codex"))
     parser.add_argument("args", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
-    if "--help" in args.args or "--health" in args.args:
+    if args.args == ["--health"]:
         print(f"{args.command}-proxied: launch {args.command} through the managed SOCKS5 proxy")
         return 0
     return launch(args.command, args.args)

@@ -39,7 +39,8 @@ def load_cache(path: Path | None = None) -> dict[str, Any]:
 
 def cache_fresh(record: dict[str, Any], now: float | None = None, ttl: int = DEFAULT_TTL) -> bool:
     try:
-        return (now or time.time()) - float(record["checked_at"]) < ttl
+        current = time.time() if now is None else now
+        return current - float(record["checked_at"]) < ttl
     except (KeyError, TypeError, ValueError):
         return False
 
@@ -67,8 +68,8 @@ def _latest(item: ExternalCliInventory, timeout: float) -> tuple[str | None, str
         if cp.returncode == 0:
             for line in cp.stdout.splitlines():
                 fields = line.split("|")
-                if len(fields) >= 2 and fields[0].lower() == item.spec.command.lower():
-                    return fields[1], None
+                if len(fields) >= 3 and fields[0].lower() == item.spec.command.lower():
+                    return fields[2], None
             return item.active.version, None
         return None, (cp.stderr or "choco lookup failed").strip()[-240:]
     return None, "no safe provider-native lookup available"

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import shutil
 import stat
@@ -76,6 +77,8 @@ def _venv_command(venv: Path, command: str) -> Path:
 
 def _release_dir(spec: ToolSpec) -> Path:
     ref = spec.ref.lower() if spec.ref else "builtin"
+    if spec.runtime == "python-builtin":
+        ref = f"builtin-{_builtin_fingerprint(spec)}"
     return data_root() / "tools" / spec.name / "releases" / ref
 
 
@@ -84,6 +87,7 @@ def _marker_path(release: Path) -> Path:
 
 
 def _marker_payload(spec: ToolSpec) -> dict[str, object]:
+    release = _release_dir(spec) if spec.runtime == "python-builtin" else None
     return {
         "schema": 1,
         "owner": "agent-toolchain",
@@ -91,7 +95,35 @@ def _marker_payload(spec: ToolSpec) -> dict[str, object]:
         "repo": spec.repo,
         "source_ref": spec.ref.lower() if spec.ref else None,
         "runtime": spec.runtime,
+        "payload_sha256": release.name.removeprefix("builtin-") if release else None,
     }
+
+
+def _builtin_payload(spec: ToolSpec) -> dict[str, bytes]:
+    source_dir = Path(__file__).resolve().parent
+    source = source_dir / f"{spec.module}.py"
+    payload = {f"{spec.module}.py": source.read_bytes()}
+    if spec.name == "proxy-tools":
+        for dependency in ("setup_inventory.py", "setup_external_updates.py", "setup_lib.py"):
+            payload[dependency] = (source_dir / dependency).read_bytes()
+    for command in spec.entrypoints:
+        script = (
+            "#!/usr/bin/env python3\n"
+            f"from {spec.module} import main\n"
+            f"raise SystemExit(main([\"{command.removesuffix('-proxied')}\", *__import__('sys').argv[1:]]))\n"
+        )
+        payload[f"{command}.py"] = script.encode("utf-8")
+    return payload
+
+
+def _builtin_fingerprint(spec: ToolSpec) -> str:
+    digest = hashlib.sha256()
+    for relative, content in sorted(_builtin_payload(spec).items()):
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(content)
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _owned_release(release: Path, spec: ToolSpec) -> bool:
@@ -109,6 +141,10 @@ def _owned_release(release: Path, spec: ToolSpec) -> bool:
         and data.get("repo") == spec.repo
         and data.get("source_ref") == (spec.ref.lower() if spec.ref else None)
         and data.get("runtime") == spec.runtime
+        and (
+            spec.runtime != "python-builtin"
+            or data.get("payload_sha256") == release.name.removeprefix("builtin-")
+        )
     )
 
 
@@ -287,7 +323,7 @@ def _public_entrypoint(spec: ToolSpec, command: str) -> Path:
 def _render_windows_entrypoint(spec: ToolSpec, target: Path) -> bytes:
     if spec.runtime == "python-builtin":
         text = (f"@REM {_ENTRYPOINT_MARKER}:{spec.name}\r\n@echo off\r\n"
-                f'@"{sys.executable}" "{target}" {spec.entrypoints[0]} %*\r\n')
+                f'@"{sys.executable}" "{target}" %*\r\n')
         return text.encode("utf-8-sig")
     text = (
         f"@REM {_ENTRYPOINT_MARKER}:{spec.name}\r\n"
@@ -448,20 +484,13 @@ def _install_builtin(spec: ToolSpec, reporter: Reporter) -> Path | None:
         return None
     try:
         release.mkdir(parents=True)
-        source_dir = Path(__file__).resolve().parent
-        source = source_dir / f"{spec.module}.py"
-        if not source.is_file():
-            reporter.add(f"{spec.name} runtime", STATE_FAILED, f"builtin module is missing: {source}")
-            return None
-        atomic_write(release / f"{spec.module}.py", source.read_bytes())
-        if spec.name == "proxy-tools":
-            # Bundle the imported setup modules so the runtime is checkout-independent.
-            for dependency in ("setup_inventory.py", "setup_external_updates.py", "setup_lib.py"):
-                atomic_write(release / dependency, (source_dir / dependency).read_bytes())
+        for relative, content in _builtin_payload(spec).items():
+            target = release / relative
+            atomic_write(target, content)
+            if target.suffix == ".py" and target.name.endswith("-proxied.py") and os.name != "nt":
+                target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         for command in spec.entrypoints:
-            script = f"from {spec.module} import main\nraise SystemExit(main([\"{command.removesuffix('-proxied')}\", *__import__('sys').argv[1:]]))\n"
             target = release / f"{command}.py"
-            atomic_write(target, script.encode("utf-8"))
             if os.name != "nt":
                 target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
         atomic_write(_marker_path(release), (json.dumps(_marker_payload(spec), sort_keys=True) + "\n").encode("utf-8"))
