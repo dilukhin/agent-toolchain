@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -35,6 +36,59 @@ class BootstrapCoreTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(tree + "\n", encoding="utf-8")
         return source
+
+    def _historical_pre_payload_core(self, root: Path) -> Path:
+        historical_files = (
+            "toolchainctl.py",
+            "setup_core.py",
+            "setup_core_adapter.py",
+            "setup_lib.py",
+            "setup_manifest.py",
+            "setup_migration.py",
+            "setup_runtime.py",
+            "setup_runtime_legacy.py",
+            "setup_managed_tools.py",
+            "setup_tool_skills.py",
+            "setup_tool_skills_impl.py",
+            "setup_path.py",
+            "setup_inventory.py",
+            "setup_tools.py",
+            "config_data.json",
+        )
+        historical_trees = ("templates", "skills/remote-long-running")
+        core = root / "core"
+        core.mkdir()
+        for relative in historical_files:
+            path = core / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.suffix == ".py":
+                path.write_text("# historical bootstrap fixture\n", encoding="utf-8")
+            else:
+                path.write_text("{}\n", encoding="utf-8")
+        for tree in historical_trees:
+            path = core / tree / "fixture.txt"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(tree + "\n", encoding="utf-8")
+
+        digest = hashlib.sha256()
+        for relative in historical_files:
+            path = core / relative
+            digest.update(relative.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(path.read_bytes())
+            digest.update(b"\0")
+        for tree in historical_trees:
+            base = core / tree
+            for path in sorted(base.rglob("*")):
+                if path.is_file() and "__pycache__" not in path.parts:
+                    relative = path.relative_to(core).as_posix()
+                    digest.update(relative.encode("utf-8"))
+                    digest.update(b"\0")
+                    digest.update(path.read_bytes())
+                    digest.update(b"\0")
+        marker = {"schema": 1, "owner": "agent-toolchain", "fingerprint": digest.hexdigest()}
+        (core / bootstrap_core.CORE_MARKER).write_text(json.dumps(marker), encoding="utf-8")
+        return core
 
     def test_apply_repeat_is_idempotent_and_changed_source_retains_one_backup(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -115,6 +169,29 @@ class BootstrapCoreTests(unittest.TestCase):
 
             (core / "config_data.json").write_text("tampered\n", encoding="utf-8")
             self.assertIsNone(bootstrap_core._owned_core(core))
+
+    def test_pre_payload_historical_core_remains_verifiable_after_current_payload_grows(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            core = self._historical_pre_payload_core(Path(td))
+            self.assertNotIn("setup_external_updates.py", bootstrap_core.LEGACY_REQUIRED_FILES_V1)
+            self.assertNotIn("proxy_tools.py", bootstrap_core.LEGACY_REQUIRED_FILES_V1)
+            self.assertIn("setup_external_updates.py", bootstrap_core.REQUIRED_FILES)
+            self.assertIn("proxy_tools.py", bootstrap_core.REQUIRED_FILES)
+            owned = bootstrap_core._owned_core(core)
+            self.assertIsNotNone(owned)
+            self.assertNotIn("payload", owned)
+
+            (core / "config_data.json").write_text('{"tampered": true}\n', encoding="utf-8")
+            self.assertIsNone(bootstrap_core._owned_core(core))
+
+    def test_windows_entrypoint_is_utf8_without_bom(self) -> None:
+        data = bootstrap_core._entrypoint_bytes(Path(r"C:\agent-toolchain\core"), windows=True)
+        self.assertFalse(data.startswith(b"\xef\xbb\xbf"))
+        self.assertTrue(data.startswith(b"@REM agent-toolchain:managed-core-entrypoint:v1\r\n"))
+        self.assertEqual(
+            data.decode("utf-8").splitlines()[0],
+            f"@REM {bootstrap_core.ENTRYPOINT_MARKER}",
+        )
 
     def test_foreign_toolchainctl_is_preserved_and_blocks_bootstrap_before_publish(self) -> None:
         with tempfile.TemporaryDirectory() as td:

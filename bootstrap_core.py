@@ -16,9 +16,29 @@ SOURCE_ROOT = Path(__file__).resolve().parent
 CORE_MARKER = ".agent-toolchain-managed-core.json"
 ENTRYPOINT_MARKER = "agent-toolchain:managed-core-entrypoint:v1"
 
-# Immutable contract used by schema-1 markers that predate the self-describing payload list.
-# Keep this list stable so a machine can skip releases and still prove ownership of its old core.
+# Exact contract used by schema-1 markers that predate the self-describing payload list.
+# Keep this historical list immutable: newer managed-core files belong only in REQUIRED_FILES.
 LEGACY_REQUIRED_FILES_V1 = (
+    "toolchainctl.py",
+    "setup_core.py",
+    "setup_core_adapter.py",
+    "setup_lib.py",
+    "setup_manifest.py",
+    "setup_migration.py",
+    "setup_runtime.py",
+    "setup_runtime_legacy.py",
+    "setup_managed_tools.py",
+    "setup_tool_skills.py",
+    "setup_tool_skills_impl.py",
+    "setup_path.py",
+    "setup_inventory.py",
+    "setup_tools.py",
+    "config_data.json",
+)
+LEGACY_REQUIRED_TREES_V1 = ("templates", "skills/remote-long-running")
+
+# Current publish contract. Self-describing markers record this exact payload, so it may grow.
+REQUIRED_FILES = (
     "toolchainctl.py",
     "setup_core.py",
     "setup_core_adapter.py",
@@ -37,11 +57,7 @@ LEGACY_REQUIRED_FILES_V1 = (
     "proxy_tools.py",
     "config_data.json",
 )
-LEGACY_REQUIRED_TREES_V1 = ("templates", "skills/remote-long-running")
-
-# Current publish contract. Future versions may extend these without changing legacy validation.
-REQUIRED_FILES = LEGACY_REQUIRED_FILES_V1
-REQUIRED_TREES = LEGACY_REQUIRED_TREES_V1
+REQUIRED_TREES = ("templates", "skills/remote-long-running")
 
 
 def data_root() -> Path:
@@ -202,7 +218,9 @@ def _entrypoint_bytes(core: Path, *, windows: bool | None = None) -> bytes:
             '@set "_AGENT_TOOLCHAIN_RC=%ERRORLEVEL%"\r\n'
             "@endlocal & exit /b %_AGENT_TOOLCHAIN_RC%\r\n"
         )
-        return text.encode("utf-8-sig")
+        # cmd.exe treats an UTF-8 BOM as part of the first command (for example "я╗┐@REM").
+        # Keep the batch file BOM-free; _entrypoint_owned still accepts the historical BOM form.
+        return text.encode("utf-8")
     text = (
         "#!/usr/bin/env bash\n"
         f"# {ENTRYPOINT_MARKER}\n"
