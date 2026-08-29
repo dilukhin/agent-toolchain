@@ -10,7 +10,7 @@ import urllib.request
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "templates/routerai_model_policy.json"
@@ -44,6 +44,22 @@ GENERATED_RESOURCES = {
 
 class CatalogError(RuntimeError):
     pass
+
+
+def _emit(text: str, *, stream: TextIO | None = None) -> None:
+    """Write UTF-8 diagnostics safely even when Windows text encoding is legacy ANSI."""
+    stream = sys.stdout if stream is None else stream
+    try:
+        print(text, file=stream)
+        return
+    except UnicodeEncodeError:
+        pass
+    buffer = getattr(stream, "buffer", None)
+    if buffer is not None:
+        buffer.write((text + "\n").encode("utf-8", errors="replace"))
+        buffer.flush()
+        return
+    stream.write((text + "\n").encode("ascii", errors="backslashreplace").decode("ascii"))
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -299,18 +315,18 @@ def _verify() -> int:
     try:
         violations = verify_generated_state(*_load_repo())
     except CatalogError as exc:
-        print(f"Проверка производных данных RouterAI не выполнена: {exc}", file=sys.stderr)
+        _emit(f"Проверка производных данных RouterAI не выполнена: {exc}", stream=sys.stderr)
         return 2
     if not violations:
-        print("Производные данные RouterAI согласованы с сохранённым каталогом и ручной политикой.")
+        _emit("Производные данные RouterAI согласованы с сохранённым каталогом и ручной политикой.")
         return 0
-    print("ОШИБКА: производная область RouterAI не воспроизводится штатным генератором.", file=sys.stderr)
+    _emit("ОШИБКА: производная область RouterAI не воспроизводится штатным генератором.", stream=sys.stderr)
     for item in violations:
-        print(f"  - {item}", file=sys.stderr)
-    print(
+        _emit(f"  - {item}", stream=sys.stderr)
+    _emit(
         f"После изменения policy выполните:\n  {OFFLINE_SYNC_COMMAND}\n"
         f"Полный refresh:\n  {MANUAL_REFRESH_COMMAND}\nПодробности: {STATUS_DOC}",
-        file=sys.stderr,
+        stream=sys.stderr,
     )
     return 1
 
@@ -320,16 +336,16 @@ def _sync() -> int:
         policy, snapshot, config, template = _load_repo()
         new_config, new_template, missing = build_generated_from_snapshot(policy, snapshot, config, template)
     except CatalogError as exc:
-        print(f"Офлайновая пересборка RouterAI не выполнена: {exc}", file=sys.stderr)
+        _emit(f"Офлайновая пересборка RouterAI не выполнена: {exc}", stream=sys.stderr)
         return 2
     outputs = {CONFIG_PATH: _render(new_config), TEMPLATE_PATH: _render(new_template)}
     changed = [path for path, text in outputs.items() if _changed(path, text)]
     for path in changed:
         path.write_text(outputs[path], encoding="utf-8", newline="\n")
-        print(f"updated: {_label(path)}")
+        _emit(f"updated: {_label(path)}")
     if missing:
-        print("Модели policy отсутствуют в сохранённом RouterAI snapshot: " + ", ".join(missing), file=sys.stderr)
-    print(f"Офлайновая пересборка RouterAI: {len(changed)} file(s) changed; snapshot не изменялся.")
+        _emit("Модели policy отсутствуют в сохранённом RouterAI snapshot: " + ", ".join(missing), stream=sys.stderr)
+    _emit(f"Офлайновая пересборка RouterAI: {len(changed)} file(s) changed; snapshot не изменялся.")
     return 0
 
 
@@ -348,12 +364,12 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.verify_generated:
         if args.input:
-            print("--input нельзя использовать вместе с --verify-generated", file=sys.stderr)
+            _emit("--input нельзя использовать вместе с --verify-generated", stream=sys.stderr)
             return 2
         return _verify()
     if args.sync_generated:
         if args.input:
-            print("--input нельзя использовать вместе с --sync-generated", file=sys.stderr)
+            _emit("--input нельзя использовать вместе с --sync-generated", stream=sys.stderr)
             return 2
         return _sync()
     try:
@@ -364,25 +380,25 @@ def main(argv: list[str] | None = None) -> int:
             payload, policy, old_snapshot, config, template, observed_at=observed_at
         )
     except CatalogError as exc:
-        print(f"RouterAI catalog update failed: {exc}", file=sys.stderr)
+        _emit(f"RouterAI catalog update failed: {exc}", stream=sys.stderr)
         return 2
     outputs = {SNAPSHOT_PATH: _render(snapshot), CONFIG_PATH: _render(new_config), TEMPLATE_PATH: _render(new_template)}
     changed = [path for path, text in outputs.items() if _changed(path, text)]
     policy_models = policy.get("models")
-    print(
+    _emit(
         f"RouterAI catalog: {len(snapshot['models'])} live model(s); "
         f"{len(policy_models) if isinstance(policy_models, dict) else 0} curated model(s); "
         f"{len(changed)} file(s) changed"
     )
     if missing:
-        print("Policy models missing from current RouterAI catalog: " + ", ".join(missing), file=sys.stderr)
+        _emit("Policy models missing from current RouterAI catalog: " + ", ".join(missing), stream=sys.stderr)
     if args.check:
         for path in changed:
-            print(f"outdated: {_label(path)}")
+            _emit(f"outdated: {_label(path)}")
         return 1 if changed else 0
     for path in changed:
         path.write_text(outputs[path], encoding="utf-8", newline="\n")
-        print(f"updated: {_label(path)}")
+        _emit(f"updated: {_label(path)}")
     return 0
 
 
