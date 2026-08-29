@@ -113,7 +113,7 @@ python3 scripts/update_routerai_catalog.py --write --input path/to/models.json
 - при изменении policy может включить изменения generated config/template только если они в точности воспроизводятся `--sync-generated`;
 - произвольная правка цены, имени, описания или generated notice отклоняется.
 
-`automation/routerai-catalog` является отдельной служебной веткой полного внешнего refresh и имеет соответствующее исключение.
+`automation/routerai-catalog` является отдельной служебной веткой полного внешнего refresh и имеет соответствующее узкое исключение.
 
 ## Канал состояния
 
@@ -124,7 +124,13 @@ branch: automation/routerai-status
 file:   routerai-refresh-status.json
 ```
 
-Ветка полностью принадлежит автоматизации. Сам status JSON содержит `_managed_notice` со ссылкой на `docs/routerai_refresh_status_design_ru.md` и командой полного ручного запуска.
+Ветка полностью принадлежит автоматизации. Сам status JSON содержит:
+
+- `schema: 1`;
+- стабильный `owner: agent-toolchain:routerai-status:v1`;
+- `_managed_notice` с назначением ветки, ссылкой на `docs/routerai_refresh_status_design_ru.md` и командой полного ручного запуска.
+
+Имя ветки и имя файла сами по себе не считаются доказательством ownership. Если `automation/routerai-status` уже существует, предыдущий status принимается только когда одновременно подтверждены ожидаемая schema, стабильный owner и штатный `_managed_notice`. Чужое, повреждённое или вручную изменённое состояние не усыновляется и не перезаписывается: workflow останавливается fail-closed.
 
 Статус различает:
 
