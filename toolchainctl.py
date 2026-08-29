@@ -36,6 +36,8 @@ from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
 from setup_path import reconcile_public_bin_path
 from setup_tool_skills import reconcile_pinned_tool_skills
 from setup_tools import parse_tool_specs
+from setup_external_updates import cache_path, load_cache, refresh
+from setup_inventory import common_external_cli_inventory
 
 PRODUCT = "agent-toolchain"
 LEGACY_PRODUCT = "opencode_setup"
@@ -60,7 +62,9 @@ _CORE_REQUIRED_FILES = (
     "setup_tool_skills_impl.py",
     "setup_path.py",
     "setup_inventory.py",
+    "setup_external_updates.py",
     "setup_tools.py",
+    "proxy_tools.py",
     "config_data.json",
 )
 _CORE_REQUIRED_TREES = ("templates", "skills/remote-long-running")
@@ -195,9 +199,33 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("--skip-dependency-install", action="store_true", help=argparse.SUPPRESS)
         cmd.add_argument("--ssh-relay-url", help=argparse.SUPPRESS)
         cmd.add_argument("--agent-safe-url", help=argparse.SUPPRESS)
+    updates = sub.add_parser("updates", help="read-only external CLI update advisories")
+    update_sub = updates.add_subparsers(dest="updates_command", required=True)
+    update_sub.add_parser("refresh", help="query providers and atomically refresh advisory cache")
+    update_sub.add_parser("show", help="show cached advisories without network access")
     update = sub.add_parser("update", help="update the installed agent-toolchain core from GitHub main")
     update.add_argument("--apply", action="store_true", help="run the freshly installed toolchainctl apply after update")
     return parser
+
+
+def _updates_phase(args: argparse.Namespace) -> int:
+    if args.updates_command == "refresh":
+        try:
+            data = refresh()
+        except Exception as exc:
+            print(f"update advisory refresh failed: {exc}", file=sys.stderr)
+            return 0
+    else:
+        data = load_cache()
+    print(f"cache: {cache_path()}")
+    inventories = common_external_cli_inventory()
+    for name in ("opencode", "codex"):
+        record = data.get("tools", {}).get(name, {})
+        inventory = inventories[name]
+        print(f"{name}: provider={record.get('provider', inventory.active.provider if inventory.active else 'unknown')} "
+              f"installed={record.get('installed_version', inventory.active.version if inventory.active else 'unknown')} "
+              f"latest={record.get('latest_version', 'unknown')} status={record.get('status', 'missing')}")
+    return 0
 
 
 def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
@@ -656,6 +684,8 @@ def _run_self_update(*, apply_after: bool) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.command == "updates":
+        return _updates_phase(args)
     if args.command == "update":
         return _run_self_update(apply_after=bool(args.apply))
 

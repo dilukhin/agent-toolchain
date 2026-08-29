@@ -17,6 +17,34 @@ class ExecutableInstance:
     active: bool
 
 
+@dataclass(frozen=True)
+class ExternalCliSpec:
+    command: str
+    display_name: str | None = None
+    package_names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ExternalCliInstance:
+    path: Path
+    canonical_path: Path
+    version: str | None
+    provider: str
+    provider_evidence: str
+    package: str | None
+    scope: str
+    active: bool
+
+
+@dataclass(frozen=True)
+class ExternalCliInventory:
+    spec: ExternalCliSpec
+    instances: tuple[ExternalCliInstance, ...]
+    active: ExternalCliInstance | None
+    conflict: bool
+    update_advice: str | None
+
+
 def _windows_names(command: str) -> list[str]:
     if Path(command).suffix:
         return [command]
@@ -204,6 +232,21 @@ def report_common_tool_inventory(reporter: Reporter) -> None:
         detail = "; ".join(_short_instance(item) for item in items)
         detail += ". " + duplicate_recommendation(display, items)
         reporter.add(f"ПРЕДУПРЕЖДЕНИЕ: дублирование {display}", STATE_INFO, detail)
+    for inventory in common_external_cli_inventory().values():
+        if not inventory.instances:
+            continue
+        instances = "; ".join(
+            f"{'активный' if item.active else 'затенённый'}: {item.path} "
+            f"({item.version or 'версия не определена'}; {item.provider}; {item.scope})"
+            for item in inventory.instances
+        )
+        conflict = " provider conflict; automatic update advice suppressed" if inventory.conflict else ""
+        advice = f" update: {inventory.update_advice}" if inventory.update_advice else ""
+        reporter.add(
+            f"External CLI {inventory.spec.display_name or inventory.spec.command}",
+            STATE_INFO,
+            instances + conflict + advice,
+        )
 
 
 def render_instances(items: list[ExecutableInstance]) -> str:
@@ -212,6 +255,46 @@ def render_instances(items: list[ExecutableInstance]) -> str:
 
 def active_instance(items: list[ExecutableInstance]) -> ExecutableInstance | None:
     return next((item for item in items if item.active), items[0] if items else None)
+
+
+def _external_provider(path: Path, command: str) -> tuple[str, str, str, str | None]:
+    """Classify path evidence conservatively; this never changes package-manager state."""
+    normalized = str(path).replace("\\", "/").lower()
+    if "chocolatey" in normalized or "/choco/" in normalized:
+        scope = "system" if "programdata" in normalized else "user"
+        return "chocolatey", f"path:{path}", scope, command
+    if "/scoop/" in normalized:
+        return "scoop", f"path:{path}", "user", command
+    if "/npm/" in normalized or "node_modules" in normalized:
+        package = "opencode-ai" if command == "opencode" else "@openai/codex"
+        return "npm", f"path:{path}", "user", package
+    if command == "opencode" and ("/.opencode/bin/" in normalized or "/.local/bin/" in normalized):
+        return "standalone", f"path:{path}", "user", None
+    return "unknown", f"path:{path}", "unknown", None
+
+
+def external_cli_inventory(spec: ExternalCliSpec) -> ExternalCliInventory:
+    raw = executable_inventory(spec.command)
+    items: list[ExternalCliInstance] = []
+    for item in raw:
+        provider, evidence, scope, package = _external_provider(item.path, spec.command)
+        items.append(ExternalCliInstance(item.path, item.path.resolve(strict=False), item.version,
+                                         provider, evidence, package, scope, item.active))
+    active = next((item for item in items if item.active), items[0] if items else None)
+    providers = {item.provider for item in items}
+    conflict = len(items) > 1 and len(providers) > 1
+    advice = None
+    if active and not conflict:
+        commands = {"chocolatey": f"choco upgrade {spec.command} -y",
+                    "npm": f"npm install -g {active.package or spec.command}@latest",
+                    "scoop": f"scoop update {spec.command}"}
+        if active.provider in commands:
+            advice = commands[active.provider]
+    return ExternalCliInventory(spec, tuple(items), active, conflict, advice)
+
+
+def common_external_cli_inventory() -> dict[str, ExternalCliInventory]:
+    return {name: external_cli_inventory(ExternalCliSpec(name, name.title())) for name in ("opencode", "codex")}
 
 
 def isolated_manager_detail(manager: str, version: str) -> str:

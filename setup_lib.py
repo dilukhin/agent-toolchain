@@ -165,7 +165,7 @@ def _decode_subprocess_output(data: bytes | None) -> str:
             return data.decode("utf-8", errors="replace")
 
 
-def run(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def run(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None, timeout: float | None = None) -> subprocess.CompletedProcess[str]:
     raw = subprocess.run(
         cmd,
         cwd=str(cwd) if cwd else None,
@@ -173,6 +173,7 @@ def run(cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = No
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
+        timeout=timeout,
     )
     return subprocess.CompletedProcess(
         raw.args,
