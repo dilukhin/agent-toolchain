@@ -99,13 +99,19 @@ def _marker_payload(spec: ToolSpec) -> dict[str, object]:
     }
 
 
+def _canonical_text_payload(path: Path) -> bytes:
+    # Text-mode reading normalizes CRLF/CR to LF. utf-8-sig also strips a historical BOM.
+    # Builtin release identity therefore depends on source content, not checkout line endings.
+    return path.read_text(encoding="utf-8-sig").encode("utf-8")
+
+
 def _builtin_payload(spec: ToolSpec) -> dict[str, bytes]:
     source_dir = Path(__file__).resolve().parent
     source = source_dir / f"{spec.module}.py"
-    payload = {f"{spec.module}.py": source.read_bytes()}
+    payload = {f"{spec.module}.py": _canonical_text_payload(source)}
     if spec.name == "proxy-tools":
         for dependency in ("setup_inventory.py", "setup_external_updates.py", "setup_lib.py"):
-            payload[dependency] = (source_dir / dependency).read_bytes()
+            payload[dependency] = _canonical_text_payload(source_dir / dependency)
     for command in spec.entrypoints:
         script = (
             "#!/usr/bin/env python3\n"
@@ -354,17 +360,17 @@ def _public_entrypoint(spec: ToolSpec, command: str) -> Path:
     return public_bin_dir() / f"{command}{suffix}"
 
 
-def _render_windows_entrypoint(spec: ToolSpec, target: Path) -> bytes:
+def _render_windows_entrypoint(spec: ToolSpec, target: Path, *, legacy_bom: bool = False) -> bytes:
     if spec.runtime == "python-builtin":
         text = (f"@REM {_ENTRYPOINT_MARKER}:{spec.name}\r\n@echo off\r\n"
                 f'@"{sys.executable}" "{target}" %*\r\n')
-        return text.encode("utf-8-sig")
-    text = (
-        f"@REM {_ENTRYPOINT_MARKER}:{spec.name}\r\n"
-        "@echo off\r\n"
-        f'@"{target}" %*\r\n'
-    )
-    return text.encode("utf-8-sig")
+    else:
+        text = (
+            f"@REM {_ENTRYPOINT_MARKER}:{spec.name}\r\n"
+            "@echo off\r\n"
+            f'@"{target}" %*\r\n'
+        )
+    return text.encode("utf-8-sig" if legacy_bom else "utf-8")
 
 
 def _previous_entrypoint(previous: Any, command: str) -> tuple[Path, Path] | None:
@@ -390,8 +396,11 @@ def _current_entrypoint_is_owned(spec: ToolSpec, command: str, public: Path, pre
     old_target = previous_paths[1]
     if os.name == "nt":
         try:
-            expected = _render_windows_entrypoint(spec, old_target)
-            return public.read_bytes() == expected
+            current = public.read_bytes()
+            return current in {
+                _render_windows_entrypoint(spec, old_target),
+                _render_windows_entrypoint(spec, old_target, legacy_bom=True),
+            }
         except OSError:
             return False
     if not public.is_symlink():
