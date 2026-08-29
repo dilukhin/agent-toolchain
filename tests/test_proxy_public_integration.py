@@ -128,8 +128,8 @@ class PublicProxyIntegrationTests(unittest.TestCase):
                 previous = {
                     "entrypoints": {
                         "opencode-proxied": {
-                            "public_path": str(public.resolve(strict=False)),
-                            "target": str(target.resolve(strict=False)),
+                            "public_path": str(public),
+                            "target": str(target),
                         }
                     }
                 }

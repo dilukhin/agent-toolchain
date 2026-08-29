@@ -386,7 +386,9 @@ def _previous_entrypoint(previous: Any, command: str) -> tuple[Path, Path] | Non
     target = item.get("target")
     if not isinstance(public, str) or not isinstance(target, str):
         return None
-    return Path(public).resolve(strict=False), Path(target).resolve(strict=False)
+    # public path is compared semantically, but target spelling is part of the exact
+    # Windows .cmd bytes originally recorded by _manifest_record and must be preserved.
+    return Path(public).resolve(strict=False), Path(target)
 
 
 def _current_entrypoint_is_owned(spec: ToolSpec, command: str, public: Path, previous: Any) -> bool:
@@ -406,7 +408,7 @@ def _current_entrypoint_is_owned(spec: ToolSpec, command: str, public: Path, pre
     if not public.is_symlink():
         return False
     try:
-        return public.resolve(strict=False) == old_target
+        return public.resolve(strict=False) == old_target.resolve(strict=False)
     except OSError:
         return False
 
