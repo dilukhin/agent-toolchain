@@ -83,6 +83,62 @@ class PublicProxyIntegrationTests(unittest.TestCase):
                 if old_bin is None: os.environ.pop("AGENT_TOOLCHAIN_BIN_DIR", None)
                 else: os.environ["AGENT_TOOLCHAIN_BIN_DIR"] = old_bin
 
+    def test_builtin_payload_identity_ignores_checkout_line_endings(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="agent-toolchain-builtin-newlines-") as td:
+            root = Path(td)
+            files = ("proxy_tools.py", "setup_inventory.py", "setup_external_updates.py", "setup_lib.py")
+            for name in files:
+                (root / name).write_bytes((f"# {name}\nprint('ok')\n").encode("utf-8"))
+            spec = ToolSpec(
+                name="proxy-tools", source="builtin", runtime="python-builtin",
+                update_policy="bundled-with-setup", entrypoints=("opencode-proxied", "codex-proxied"),
+                health_contract=(), platforms=("windows", "linux"), module="proxy_tools",
+            )
+            fake_module_path = root / "setup_managed_tools.py"
+            with mock.patch.object(setup_managed_tools, "__file__", str(fake_module_path)):
+                fingerprint_lf = setup_managed_tools._builtin_fingerprint(spec)
+                payload_lf = setup_managed_tools._builtin_payload(spec)
+                for name in files:
+                    raw = (root / name).read_bytes().replace(b"\n", b"\r\n")
+                    (root / name).write_bytes(raw)
+                fingerprint_crlf = setup_managed_tools._builtin_fingerprint(spec)
+                payload_crlf = setup_managed_tools._builtin_payload(spec)
+            self.assertEqual(fingerprint_lf, fingerprint_crlf)
+            self.assertEqual(payload_lf, payload_crlf)
+            for name in files:
+                self.assertNotIn(b"\r\n", payload_crlf[name])
+
+    def test_windows_entrypoint_is_bom_free_and_legacy_bom_remains_owned(self) -> None:
+        spec = ToolSpec(
+            name="proxy-tools", source="builtin", runtime="python-builtin",
+            update_policy="bundled-with-setup", entrypoints=("opencode-proxied",),
+            health_contract=(), platforms=("windows", "linux"), module="proxy_tools",
+        )
+        with tempfile.TemporaryDirectory(prefix="agent-toolchain-entrypoint-bom-") as td:
+            root = Path(td)
+            public = root / "opencode-proxied.cmd"
+            target = root / "opencode-proxied.py"
+            target.write_text("# target\n", encoding="utf-8")
+            desired = setup_managed_tools._render_windows_entrypoint(spec, target)
+            legacy = setup_managed_tools._render_windows_entrypoint(spec, target, legacy_bom=True)
+            self.assertFalse(desired.startswith(b"\xef\xbb\xbf"))
+            self.assertTrue(desired.startswith(b"@REM agent-toolchain:managed-entrypoint:v1:proxy-tools\r\n"))
+            self.assertTrue(legacy.startswith(b"\xef\xbb\xbf"))
+            if os.name == "nt":
+                previous = {
+                    "entrypoints": {
+                        "opencode-proxied": {
+                            "public_path": str(public),
+                            "target": str(target),
+                        }
+                    }
+                }
+                public.write_bytes(legacy)
+                self.assertTrue(setup_managed_tools._current_entrypoint_is_owned(spec, "opencode-proxied", public, previous))
+                self.assertFalse(setup_managed_tools._entrypoint_matches_desired(spec, public, target))
+                public.write_bytes(desired)
+                self.assertTrue(setup_managed_tools._entrypoint_matches_desired(spec, public, target))
+
     def test_public_entrypoints_are_real_processes_with_isolated_payload(self) -> None:
         with tempfile.TemporaryDirectory(prefix="agent-toolchain-proxy-e2e-") as td:
             root = Path(td)
@@ -135,6 +191,8 @@ class PublicProxyIntegrationTests(unittest.TestCase):
                 for command in ("opencode-proxied", "codex-proxied"):
                     public = bindir / (command + (".cmd" if os.name == "nt" else ""))
                     public_paths.append(public)
+                    if os.name == "nt":
+                        self.assertFalse(public.read_bytes().startswith(b"\xef\xbb\xbf"))
                     completed = subprocess.run([str(public), "--help", "--test"], cwd=root, env=os.environ, check=False)
                     self.assertEqual(completed.returncode, 37)
                     payload = json.loads(result.read_text(encoding="utf-8"))
