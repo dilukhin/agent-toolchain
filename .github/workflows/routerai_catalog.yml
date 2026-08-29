@@ -1,6 +1,11 @@
 name: Refresh RouterAI catalog
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - templates/routerai_catalog.generated.json
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
@@ -20,6 +25,15 @@ jobs:
     env:
       BRANCH: automation/routerai-catalog
       GH_TOKEN: ${{ github.token }}
+    outputs:
+      attempt_status: ${{ steps.summary.outputs.attempt_status }}
+      phase: ${{ steps.summary.outputs.phase }}
+      error_code: ${{ steps.summary.outputs.error_code }}
+      error_summary: ${{ steps.summary.outputs.error_summary }}
+      source_check_at: ${{ steps.summary.outputs.source_check_at }}
+      catalog_changed: ${{ steps.summary.outputs.catalog_changed }}
+      validation_status: ${{ steps.summary.outputs.validation_status }}
+      candidate_sha: ${{ steps.summary.outputs.candidate_sha }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -27,6 +41,7 @@ jobs:
           fetch-depth: 0
 
       - name: Prepare owned automation branch
+        id: prepare
         shell: bash
         run: |
           set -euo pipefail
@@ -54,11 +69,33 @@ jobs:
           fi
 
       - name: Refresh RouterAI data
-        run: python3 ./scripts/update_routerai_catalog.py --write
+        id: refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp templates/routerai_catalog.generated.json "$RUNNER_TEMP/routerai-before.json"
+          python3 ./scripts/update_routerai_catalog.py --write
+          checked_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          changed="$(
+            python3 - "$RUNNER_TEMP/routerai-before.json" templates/routerai_catalog.generated.json <<'PY'
+          import json
+          import sys
+          before = json.load(open(sys.argv[1], encoding="utf-8"))
+          after = json.load(open(sys.argv[2], encoding="utf-8"))
+          print("true" if before.get("models") != after.get("models") else "false")
+          PY
+          )"
+          echo "checked_at=$checked_at" >> "$GITHUB_OUTPUT"
+          echo "catalog_changed=$changed" >> "$GITHUB_OUTPUT"
 
       - name: Validate generated data and regressions
+        id: regressions
         run: |
-          python3 -m py_compile ./toolchainctl.py ./scripts/update_routerai_catalog.py
+          python3 -m py_compile \
+            ./scripts/update_routerai_catalog.py \
+            ./scripts/check_routerai_owned_diff.py \
+            ./scripts/update_routerai_refresh_status.py
+          python3 ./scripts/update_routerai_catalog.py --verify-generated
           python3 ./tests/run_migration_ci.py
 
       - name: Commit generated changes
@@ -77,12 +114,14 @@ jobs:
             git commit -m "Refresh RouterAI model catalog"
           fi
 
+          local_sha="$(git rev-parse HEAD)"
+          echo "local_sha=$local_sha" >> "$GITHUB_OUTPUT"
+
           if git diff --quiet origin/main...HEAD; then
             echo "push_required=0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          local_sha="$(git rev-parse HEAD)"
           if [[ "$BRANCH_EXISTED" == "1" && "$local_sha" == "$REMOTE_BRANCH_SHA" ]]; then
             echo "push_required=0" >> "$GITHUB_OUTPUT"
             exit 0
@@ -103,11 +142,245 @@ jobs:
               --base main \
               --head "$BRANCH" \
               --title "Refresh RouterAI model catalog" \
-              --body $'Automated refresh from the public RouterAI `GET /api/v1/models` catalog.\n\nThe workflow updates objective model data and generated price labels only. Curated model roles remain in `templates/routerai_model_policy.json` and are not selected automatically.\n\nThe refresh workflow runs Python regressions before pushing. Full Windows/Linux validation is dispatched explicitly for the automation branch.')"
+              --body "Статус и описание будут заполнены финализатором автоматического обновления.")"
             number="${url##*/}"
           fi
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
-      - name: Dispatch full Windows/Linux validation
+      - name: Dispatch and wait for full Windows/Linux validation
         if: steps.commit.outputs.push_required == '1'
-        run: gh workflow run validate.yml --ref "$BRANCH"
+        id: validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_sha="${{ steps.commit.outputs.local_sha }}"
+          gh workflow run validate.yml --ref "$BRANCH"
+
+          run_id=""
+          for _ in $(seq 1 30); do
+            run_id="$(
+              gh run list \
+                --workflow validate.yml \
+                --branch "$BRANCH" \
+                --event workflow_dispatch \
+                --limit 20 \
+                --json databaseId,headSha \
+                --jq "[.[] | select(.headSha == \"$candidate_sha\")][0].databaseId // empty"
+            )"
+            if [[ -n "$run_id" ]]; then
+              break
+            fi
+            sleep 2
+          done
+          if [[ -z "$run_id" ]]; then
+            echo "Could not locate dispatched validate.yml run for $candidate_sha" >&2
+            exit 3
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          gh run watch "$run_id" --exit-status
+
+      - name: Summarize refresh attempt
+        if: always()
+        id: summary
+        shell: bash
+        env:
+          PREPARE_OUTCOME: ${{ steps.prepare.outcome }}
+          REFRESH_OUTCOME: ${{ steps.refresh.outcome }}
+          REGRESSIONS_OUTCOME: ${{ steps.regressions.outcome }}
+          COMMIT_OUTCOME: ${{ steps.commit.outcome }}
+          PR_OUTCOME: ${{ steps.pr.outcome }}
+          VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
+          PUSH_REQUIRED: ${{ steps.commit.outputs.push_required }}
+          SOURCE_CHECK_AT: ${{ steps.refresh.outputs.checked_at }}
+          CATALOG_CHANGED: ${{ steps.refresh.outputs.catalog_changed }}
+          CANDIDATE_SHA: ${{ steps.commit.outputs.local_sha }}
+        run: |
+          set -euo pipefail
+          status="success"
+          phase="complete"
+          code=""
+          summary=""
+
+          if [[ "$PREPARE_OUTCOME" != "success" ]]; then
+            status="failed"
+            phase="sync-main"
+            code="catalog-branch-sync"
+            summary="Не удалось безопасно синхронизировать automation/routerai-catalog с актуальным main."
+          elif [[ "$REFRESH_OUTCOME" != "success" ]]; then
+            status="failed"
+            phase="fetch-routerai"
+            code="routerai-refresh"
+            summary="Не удалось получить или обработать актуальный каталог RouterAI."
+          elif [[ "$REGRESSIONS_OUTCOME" != "success" ]]; then
+            status="failed"
+            phase="regressions"
+            code="regressions"
+            summary="После генерации не прошли обязательные регрессионные проверки."
+          elif [[ "$COMMIT_OUTCOME" != "success" ]]; then
+            status="failed"
+            phase="publish-candidate"
+            code="candidate-publish"
+            summary="Не удалось безопасно сформировать или опубликовать ветку-кандидат RouterAI."
+          elif [[ "$PUSH_REQUIRED" == "1" && "$PR_OUTCOME" != "success" ]]; then
+            status="failed"
+            phase="pull-request"
+            code="pull-request"
+            summary="Не удалось создать или переиспользовать pull request обновления RouterAI."
+          elif [[ "$PUSH_REQUIRED" == "1" && "$VALIDATION_OUTCOME" != "success" ]]; then
+            status="failed"
+            phase="full-validation"
+            code="full-validation"
+            summary="Кандидат RouterAI не прошёл полную Windows/Linux проверку."
+          fi
+
+          validation="unchanged"
+          if [[ "$VALIDATION_OUTCOME" == "success" ]]; then
+            validation="success"
+          elif [[ "$VALIDATION_OUTCOME" == "failure" ]]; then
+            validation="failed"
+          fi
+
+          {
+            echo "attempt_status=$status"
+            echo "phase=$phase"
+            echo "error_code=$code"
+            echo "error_summary=$summary"
+            echo "source_check_at=${SOURCE_CHECK_AT:-}"
+            echo "catalog_changed=${CATALOG_CHANGED:-unknown}"
+            echo "validation_status=$validation"
+            echo "candidate_sha=${CANDIDATE_SHA:-}"
+          } >> "$GITHUB_OUTPUT"
+
+  publish-status:
+    if: always()
+    needs: refresh
+    runs-on: ubuntu-latest
+    env:
+      STATUS_BRANCH: automation/routerai-status
+      CATALOG_BRANCH: automation/routerai-catalog
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Build managed status
+        id: status
+        shell: bash
+        env:
+          ATTEMPT_STATUS: ${{ needs.refresh.outputs.attempt_status }}
+          PHASE: ${{ needs.refresh.outputs.phase }}
+          ERROR_CODE: ${{ needs.refresh.outputs.error_code }}
+          ERROR_SUMMARY: ${{ needs.refresh.outputs.error_summary }}
+          SOURCE_CHECK_AT: ${{ needs.refresh.outputs.source_check_at }}
+          CATALOG_CHANGED: ${{ needs.refresh.outputs.catalog_changed }}
+          VALIDATION_STATUS: ${{ needs.refresh.outputs.validation_status }}
+          RUN_CANDIDATE_SHA: ${{ needs.refresh.outputs.candidate_sha }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          previous="$RUNNER_TEMP/routerai-previous-status.json"
+          candidate_snapshot="$RUNNER_TEMP/routerai-candidate-snapshot.json"
+          status_out="$RUNNER_TEMP/routerai-refresh-status.json"
+          pr_body="$RUNNER_TEMP/routerai-pr-body.md"
+          : > "$previous"
+
+          status_branch_exists=0
+          if git ls-remote --exit-code --heads origin "refs/heads/$STATUS_BRANCH" >/dev/null 2>&1; then
+            status_branch_exists=1
+            git fetch origin "refs/heads/$STATUS_BRANCH:refs/remotes/origin/$STATUS_BRANCH"
+            files="$(git ls-tree -r --name-only "origin/$STATUS_BRANCH")"
+            if [[ "$files" != "routerai-refresh-status.json" ]]; then
+              echo "Status branch contains unexpected files; refusing to adopt or overwrite it:" >&2
+              printf '%s\n' "$files" >&2
+              exit 2
+            fi
+            git show "origin/$STATUS_BRANCH:routerai-refresh-status.json" > "$previous"
+          fi
+
+          candidate_sha=""
+          candidate_pr=""
+          if git ls-remote --exit-code --heads origin "refs/heads/$CATALOG_BRANCH" >/dev/null 2>&1; then
+            git fetch origin "refs/heads/$CATALOG_BRANCH:refs/remotes/origin/$CATALOG_BRANCH"
+            candidate_sha="$(git rev-parse "origin/$CATALOG_BRANCH")"
+            candidate_pr="$(gh pr list --state open --base main --head "$CATALOG_BRANCH" --json number --jq '.[0].number // empty')"
+            if [[ -n "$candidate_pr" ]]; then
+              git show "origin/$CATALOG_BRANCH:templates/routerai_catalog.generated.json" > "$candidate_snapshot"
+            else
+              candidate_sha=""
+            fi
+          fi
+
+          validation="${VALIDATION_STATUS:-unchanged}"
+          if [[ -z "$RUN_CANDIDATE_SHA" || -z "$candidate_sha" || "$RUN_CANDIDATE_SHA" != "$candidate_sha" ]]; then
+            validation="unchanged"
+          fi
+
+          args=(
+            --published-snapshot templates/routerai_catalog.generated.json
+            --published-main-sha "$(git rev-parse HEAD)"
+            --attempt-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            --trigger "${{ github.event_name }}"
+            --attempt-status "${ATTEMPT_STATUS:-failed}"
+            --phase "${PHASE:-unknown}"
+            --catalog-changed "${CATALOG_CHANGED:-unknown}"
+            --candidate-validation "$validation"
+            --output "$status_out"
+            --pr-body-output "$pr_body"
+          )
+          if [[ -s "$previous" ]]; then
+            args+=(--previous "$previous")
+          fi
+          if [[ -n "$ERROR_CODE" ]]; then
+            args+=(--error-code "$ERROR_CODE")
+          fi
+          if [[ -n "$ERROR_SUMMARY" ]]; then
+            args+=(--error-summary "$ERROR_SUMMARY")
+          fi
+          if [[ -n "$SOURCE_CHECK_AT" ]]; then
+            args+=(--source-check-at "$SOURCE_CHECK_AT")
+          fi
+          if [[ -n "$candidate_sha" && -n "$candidate_pr" ]]; then
+            args+=(
+              --candidate-snapshot "$candidate_snapshot"
+              --candidate-sha "$candidate_sha"
+              --candidate-pr "$candidate_pr"
+            )
+          fi
+
+          python3 scripts/update_routerai_refresh_status.py "${args[@]}"
+
+          echo "status_branch_exists=$status_branch_exists" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$candidate_pr" >> "$GITHUB_OUTPUT"
+          echo "status_out=$status_out" >> "$GITHUB_OUTPUT"
+          echo "pr_body=$pr_body" >> "$GITHUB_OUTPUT"
+
+      - name: Update RouterAI PR summary
+        if: steps.status.outputs.pr_number != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh pr edit "${{ steps.status.outputs.pr_number }}" --body-file "${{ steps.status.outputs.pr_body }}"
+
+      - name: Publish managed status branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_out="${{ steps.status.outputs.status_out }}"
+
+          if [[ "${{ steps.status.outputs.status_branch_exists }}" == "1" ]]; then
+            git switch -C "$STATUS_BRANCH" "origin/$STATUS_BRANCH"
+          else
+            git switch --orphan "$STATUS_BRANCH"
+          fi
+
+          cp "$status_out" routerai-refresh-status.json
+          git add routerai-refresh-status.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Record RouterAI refresh status"
+          git push origin "HEAD:refs/heads/$STATUS_BRANCH"

@@ -82,10 +82,15 @@ class ProxyLaunchTests(unittest.TestCase):
         inventory = mock.Mock(active=instance)
         with mock.patch("proxy_tools.external_cli_inventory", return_value=inventory), \
              mock.patch("proxy_tools.load_cache", return_value={"tools": {}}), \
+             mock.patch("proxy_tools._show_routerai_status"), \
              mock.patch("proxy_tools.socks5_preflight", side_effect=OSError("missing")), \
              mock.patch("proxy_tools.subprocess.Popen") as popen:
             self.assertNotEqual(proxy_tools.launch("opencode", ["--help"]), 0)
         self.assertFalse(any(call.args and call.args[0][0] == str(instance.canonical_path) for call in popen.call_args_list))
+
+    def test_routerai_status_failure_never_blocks_launch_path(self) -> None:
+        with mock.patch("proxy_tools.get_routerai_status", side_effect=RuntimeError("boom")):
+            proxy_tools._show_routerai_status()
 
     def test_health_is_exact_and_help_is_forwarded(self) -> None:
         with mock.patch("proxy_tools.launch", return_value=37) as launch:

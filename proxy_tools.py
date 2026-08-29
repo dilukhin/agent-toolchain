@@ -1,7 +1,8 @@
-"""Managed, stdlib-only launchers and per-process HTTP-to-SOCKS5 bridge."""
+"Managed, stdlib-only launchers and per-process HTTP-to-SOCKS5 bridge."
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import os
 import select
 import socket
@@ -9,10 +10,16 @@ import socketserver
 import subprocess
 import sys
 import threading
-import ipaddress
 from pathlib import Path
 
-from setup_external_updates import advisory, cache_fresh, load_cache
+from setup_external_updates import (
+    advisory,
+    cache_fresh,
+    get_routerai_status,
+    installed_routerai_catalog_observed_at,
+    load_cache,
+    routerai_status_advisory,
+)
 from setup_inventory import ExternalCliSpec, external_cli_inventory
 
 SOCKS_HOST, SOCKS_PORT = "127.0.0.1", 1080
@@ -186,6 +193,25 @@ class HttpSocksBridge:
         self.thread.join(timeout=2)
 
 
+def _show_routerai_status() -> None:
+    repo_root = Path(__file__).resolve().parent
+    try:
+        status, meta = get_routerai_status()
+        installed = installed_routerai_catalog_observed_at(repo_root)
+        for line in routerai_status_advisory(
+            status,
+            installed_observed_at=installed,
+            meta=meta,
+        ):
+            print(line, file=sys.stderr)
+    except Exception:
+        # Price-status observability must never turn into a launch dependency.
+        print(
+            "RouterAI: состояние актуальности цен проверить не удалось; запуск продолжается.",
+            file=sys.stderr,
+        )
+
+
 def launch(command: str, argv: list[str]) -> int:
     inventory = external_cli_inventory(ExternalCliSpec(command, command.title()))
     if not inventory.active:
@@ -201,6 +227,9 @@ def launch(command: str, argv: list[str]) -> int:
             f"{command}: update advisory cache missing/stale; run toolchainctl updates refresh",
             file=sys.stderr,
         )
+
+    _show_routerai_status()
+
     try:
         socks5_preflight(*socks_address())
     except (OSError, ConnectionError, ValueError) as exc:
