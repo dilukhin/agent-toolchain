@@ -27,6 +27,7 @@ report_common_tool_inventory = _legacy.report_common_tool_inventory
 _known_opencode_managers = _legacy._known_opencode_managers
 installed_version = _legacy.installed_version
 _module_origin = _legacy._module_origin
+_legacy_resolve_npm_target = _legacy._resolve_npm_target
 
 _NPM_METADATA_TIMEOUT_SECONDS = 30.0
 _NPM_METADATA_ENV = {
@@ -98,6 +99,40 @@ def _bounded_legacy_run(cmd, cwd=None, env=None, timeout=None):
     return cp
 
 
+def _standalone_opencode_version() -> str | None:
+    items = executable_inventory("opencode")
+    if len(items) != 1:
+        return None
+    active = active_instance(items)
+    if active is None or active.manager == "npm":
+        return None
+    return _legacy._version_number(active.version)
+
+
+def _resolve_npm_target(npm: str, package: str, configured: object) -> str | None:
+    policy = str(configured or "latest").strip()
+    if package != "@opencode-ai/plugin" or policy.lower() != "latest":
+        return _legacy_resolve_npm_target(npm, package, configured)
+
+    items = executable_inventory("opencode")
+    if len(items) > 1:
+        # Plugin compatibility target is ambiguous when CLI ownership/resolution is ambiguous.
+        return None
+
+    active = active_instance(items)
+    if active is None or active.manager == "npm":
+        # npm-managed OpenCode is reconciled to npm latest before plugin reconciliation.
+        return _legacy_resolve_npm_target(npm, package, configured)
+
+    opencode_version = _legacy._version_number(active.version)
+    if opencode_version is None:
+        return None
+
+    exact_package = f"{package}@{opencode_version}"
+    published = _legacy._npm_latest_version(npm, exact_package)
+    return opencode_version if published == opencode_version else None
+
+
 def _annotate_npm_metadata_failure(reporter, start_index: int) -> None:
     if not _last_npm_metadata_error:
         return
@@ -113,6 +148,23 @@ def _annotate_npm_metadata_failure(reporter, start_index: int) -> None:
         result.detail = f"{result.detail}; npm metadata lookup: {_last_npm_metadata_error}"
 
 
+def _annotate_plugin_version_match(reporter, start_index: int) -> None:
+    opencode_version = _standalone_opencode_version()
+    if opencode_version is None:
+        return
+    for result in reporter.results[start_index:]:
+        if result.component != "OpenCode plugin":
+            continue
+        result.detail = result.detail.replace(
+            " (npm latest)",
+            f" (совпадает с OpenCode {opencode_version})",
+        )
+        if result.state in {STATE_CONFIGURED, STATE_MISSING, STATE_OUTDATED}:
+            marker = f"целевая версия следует активному OpenCode {opencode_version}"
+            if marker not in result.detail:
+                result.detail = f"{result.detail}; {marker}"
+
+
 def _sync_legacy_policy() -> None:
     _legacy.run = _bounded_legacy_run
     _legacy.shutil = shutil
@@ -124,6 +176,7 @@ def _sync_legacy_policy() -> None:
     _legacy.report_common_tool_inventory = report_common_tool_inventory
     _legacy._known_opencode_managers = _known_opencode_managers
     _legacy._module_origin = _module_origin
+    _legacy._resolve_npm_target = _resolve_npm_target
 
 
 def reconcile_npm(config_dir, config, reporter, check, skip):
@@ -133,6 +186,7 @@ def reconcile_npm(config_dir, config, reporter, check, skip):
     _sync_legacy_policy()
     result = _legacy.reconcile_npm(config_dir, config, reporter, check, skip)
     _annotate_npm_metadata_failure(reporter, start_index)
+    _annotate_plugin_version_match(reporter, start_index)
     return result
 
 
