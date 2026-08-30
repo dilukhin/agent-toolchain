@@ -7,7 +7,9 @@ import re
 import subprocess
 import sys
 
+import setup_external_updates as _external_updates
 import setup_runtime_legacy as _legacy
+from setup_inventory import ExternalCliSpec, external_cli_inventory
 
 Reporter = _legacy.Reporter
 STATE_CONFIGURED = _legacy.STATE_CONFIGURED
@@ -31,6 +33,7 @@ _known_opencode_managers = _legacy._known_opencode_managers
 installed_version = _legacy.installed_version
 _module_origin = _legacy._module_origin
 _legacy_resolve_npm_target = _legacy._resolve_npm_target
+_external_latest = _external_updates._latest
 
 _NPM_METADATA_TIMEOUT_SECONDS = 30.0
 _NPM_METADATA_ENV = {
@@ -39,6 +42,7 @@ _NPM_METADATA_ENV = {
     "npm_config_fetch_retry_mintimeout": "1000",
     "npm_config_fetch_retry_maxtimeout": "5000",
 }
+_EXTERNAL_UPDATE_TIMEOUT_SECONDS = 5.0
 _last_npm_metadata_error: str | None = None
 
 _TLDR_RESULTS: dict[str, object] = {}
@@ -68,6 +72,35 @@ def _trim_action(text: str, limit: int = 220) -> str:
     return normalized[: limit - 1].rstrip() + "…"
 
 
+def _clarify_routerai_placeholder_detail(result) -> None:
+    if result.component != "RouterAI credential":
+        return
+    old_marker = "служебная заглушка предыдущей версии не является API key; запишите реальный ключ RouterAI:"
+    if old_marker not in result.detail:
+        return
+    path = result.detail.split(old_marker, 1)[1].strip().rstrip(".")
+    if not path:
+        return
+    result.detail = (
+        "MANUAL ACTION REQUIRED: RouterAI не настроен: замените `your-routerai-api-key-here` в "
+        f"{path} на реальный API-ключ RouterAI одной строкой, без `Bearer` и кавычек; "
+        "новый ключ создаётся в RouterAI: Настройки → API-ключи"
+    )
+
+
+def _opencode_update_action(result) -> str | None:
+    if result.component != "OpenCode CLI" or result.state != STATE_OUTDATED:
+        return None
+    match = re.search(
+        r"установлено ([^;]+); доступно ([^;]+);.*рекомендуемая команда обновления: `([^`]+)`",
+        result.detail,
+    )
+    if match is None:
+        return None
+    installed, latest, command = (part.strip() for part in match.groups())
+    return f"обновить OpenCode {installed} → {latest}: `{command}`"
+
+
 def _tldr_actions(results) -> list[str]:
     latest: dict[str, object] = {}
     for result in results:
@@ -77,8 +110,12 @@ def _tldr_actions(results) -> list[str]:
     actions: list[str] = []
     for result in latest.values():
         manual = _manual_action(result.detail)
-        action: str | None = None
-        if manual is not None:
+        action: str | None = _opencode_update_action(result)
+        if action is not None:
+            pass
+        elif result.component == "RouterAI credential" and manual and "RouterAI не настроен:" in manual:
+            action = manual.split("; новый ключ создаётся", 1)[0].strip()
+        elif manual is not None:
             action = manual
         elif result.state in {STATE_MISSING, STATE_OUTDATED} and (
             "обычный apply" in result.detail or "toolchainctl apply" in result.detail
@@ -125,6 +162,7 @@ def _reporter_render_with_tldr(self, *args, **kwargs):
     global _TLDR_REGISTERED
     if _toolchainctl_tldr_enabled():
         for result in self.results:
+            _clarify_routerai_placeholder_detail(result)
             _TLDR_RESULTS.pop(result.component, None)
             _TLDR_RESULTS[result.component] = result
         if not _TLDR_REGISTERED:
@@ -268,6 +306,60 @@ def _annotate_npm_metadata_failure(reporter, start_index: int) -> None:
         result.detail = f"{result.detail}; npm metadata lookup: {_last_npm_metadata_error}"
 
 
+def _external_opencode_inventory():
+    return external_cli_inventory(ExternalCliSpec("opencode", "OpenCode"))
+
+
+def _annotate_external_opencode_freshness(reporter, start_index: int) -> None:
+    try:
+        inventory = _external_opencode_inventory()
+    except Exception:
+        return
+    if inventory is None or inventory.active is None or inventory.conflict:
+        return
+    if inventory.active.provider == "npm" or not inventory.update_advice:
+        # npm-owned OpenCode already has its own latest-version reconciliation path.
+        return
+
+    installed = _legacy._version_number(inventory.active.version)
+    if installed is None:
+        return
+
+    try:
+        latest, error = _external_latest(inventory, _EXTERNAL_UPDATE_TIMEOUT_SECONDS)
+    except Exception:
+        latest, error = None, "lookup failed"
+
+    target = next(
+        (item for item in reporter.results[start_index:] if item.component == "OpenCode CLI"),
+        None,
+    )
+    if target is None or target.state not in {STATE_OK, STATE_INFO}:
+        return
+
+    if error or not latest:
+        if target.state == STATE_OK:
+            target.state = STATE_INFO
+            target.detail += (
+                f"; установленная копия исправна, но актуальность версии через {inventory.active.provider} "
+                "не удалось подтвердить read-only проверкой"
+            )
+        return
+
+    latest_version = _legacy._version_number(str(latest)) or str(latest).strip()
+    if latest_version == installed:
+        if target.state == STATE_OK:
+            target.detail += f"; доступных обновлений через {inventory.active.provider} не найдено"
+        return
+
+    target.state = STATE_OUTDATED
+    target.detail = (
+        f"активный экземпляр: {inventory.active.path}; установлено {installed}; доступно {latest_version}; "
+        f"владелец обновления: {inventory.active.provider}; обычный reconciliation внешний CLI не изменяет; "
+        f"рекомендуемая команда обновления: `{inventory.update_advice}`"
+    )
+
+
 def _annotate_plugin_version_match(reporter, start_index: int) -> None:
     opencode_version = _standalone_opencode_version()
     if opencode_version is None:
@@ -307,6 +399,7 @@ def reconcile_npm(config_dir, config, reporter, check, skip):
     _sync_legacy_policy()
     result = _legacy.reconcile_npm(config_dir, config, reporter, check, skip)
     _annotate_npm_metadata_failure(reporter, start_index)
+    _annotate_external_opencode_freshness(reporter, start_index)
     _annotate_plugin_version_match(reporter, start_index)
     return result
 
@@ -318,6 +411,7 @@ def _reconcile_opencode_cli(config, reporter, check, npm):
     _sync_legacy_policy()
     result = _legacy._reconcile_opencode_cli(config, reporter, check, npm)
     _annotate_npm_metadata_failure(reporter, start_index)
+    _annotate_external_opencode_freshness(reporter, start_index)
     return result
 
 
