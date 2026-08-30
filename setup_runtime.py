@@ -1,8 +1,11 @@
 """Compatibility facade for unchanged OpenCode/npm policy and legacy direct callers."""
 from __future__ import annotations
 
+import atexit
 import os
+import re
 import subprocess
+import sys
 
 import setup_runtime_legacy as _legacy
 
@@ -37,6 +40,100 @@ _NPM_METADATA_ENV = {
     "npm_config_fetch_retry_maxtimeout": "5000",
 }
 _last_npm_metadata_error: str | None = None
+
+_TLDR_RESULTS: dict[str, object] = {}
+_TLDR_REGISTERED = False
+_ORIGINAL_REPORTER_RENDER = Reporter.render
+
+
+def _toolchainctl_tldr_enabled() -> bool:
+    if len(sys.argv) < 2 or sys.argv[1] not in {"check", "apply"}:
+        return False
+    name = os.path.basename(sys.argv[0]).lower()
+    return name in {"toolchainctl", "toolchainctl.py"}
+
+
+def _manual_action(detail: str) -> str | None:
+    marker = "MANUAL ACTION REQUIRED:"
+    if marker not in detail:
+        return None
+    action = detail.split(marker, 1)[1].strip().rstrip(".")
+    return action or None
+
+
+def _trim_action(text: str, limit: int = 220) -> str:
+    normalized = " ".join(text.split())
+    if len(normalized) <= limit:
+        return normalized
+    return normalized[: limit - 1].rstrip() + "…"
+
+
+def _tldr_actions(results) -> list[str]:
+    latest: dict[str, object] = {}
+    for result in results:
+        latest.pop(result.component, None)
+        latest[result.component] = result
+
+    actions: list[str] = []
+    for result in latest.values():
+        manual = _manual_action(result.detail)
+        action: str | None = None
+        if manual is not None:
+            action = manual
+        elif result.state in {STATE_MISSING, STATE_OUTDATED} and (
+            "обычный apply" in result.detail or "toolchainctl apply" in result.detail
+        ):
+            action = "выполнить `toolchainctl apply`"
+        elif result.state == STATE_FAILED and "npm metadata lookup:" in result.detail:
+            action = "повторить `toolchainctl apply` после восстановления доступа к npm registry"
+        elif result.state in {STATE_FAILED, STATE_CONFLICT}:
+            action = f"исправить «{result.component}»: {result.detail}"
+        elif result.state in {STATE_MISSING, STATE_OUTDATED}:
+            action = f"проверить «{result.component}»: {result.detail}"
+
+        if action is None:
+            continue
+        action = _trim_action(action)
+        if action not in actions:
+            actions.append(action)
+    return actions
+
+
+def _format_tldr(results) -> str:
+    actions = _tldr_actions(results)
+    if not actions:
+        return "TL/DR: дополнительных действий не требуется."
+    lines = ["TL/DR: рекомендуется:"]
+    lines.extend(f"  - {action}" for action in actions[:6])
+    if len(actions) > 6:
+        lines.append(f"  - ещё {len(actions) - 6} рекомендац. — см. таблицы выше")
+    return "\n".join(lines)
+
+
+def _emit_tldr() -> None:
+    if not _TLDR_RESULTS:
+        return
+    try:
+        print()
+        print(_format_tldr(_TLDR_RESULTS.values()))
+    except Exception:
+        # TL/DR is advisory only and must never turn a successful reconciliation into a failure.
+        return
+
+
+def _reporter_render_with_tldr(self, *args, **kwargs):
+    global _TLDR_REGISTERED
+    if _toolchainctl_tldr_enabled():
+        for result in self.results:
+            _TLDR_RESULTS.pop(result.component, None)
+            _TLDR_RESULTS[result.component] = result
+        if not _TLDR_REGISTERED:
+            atexit.register(_emit_tldr)
+            _TLDR_REGISTERED = True
+    return _ORIGINAL_REPORTER_RENDER(self, *args, **kwargs)
+
+
+Reporter.render = _reporter_render_with_tldr
 
 
 def _call_runtime_run(cmd, *, cwd=None, env=None, timeout=None):
@@ -133,6 +230,29 @@ def _resolve_npm_target(npm: str, package: str, configured: object) -> str | Non
     return opencode_version if published == opencode_version else None
 
 
+def _version_triplet(value: str) -> tuple[int, int, int] | None:
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:[-+].*)?", value)
+    if match is None:
+        return None
+    return tuple(int(part) for part in match.groups())
+
+
+def _fix_plugin_change_wording(detail: str) -> str:
+    match = re.search(r"обновлён с (\S+) до (\S+) через npm", detail)
+    if match is None:
+        return detail
+    before, after = match.groups()
+    before_key = _version_triplet(before)
+    after_key = _version_triplet(after)
+    if before_key is not None and after_key is not None and after_key < before_key:
+        return detail.replace(
+            match.group(0),
+            f"понижен с {before} до {after} через npm",
+            1,
+        )
+    return detail
+
+
 def _annotate_npm_metadata_failure(reporter, start_index: int) -> None:
     if not _last_npm_metadata_error:
         return
@@ -155,6 +275,7 @@ def _annotate_plugin_version_match(reporter, start_index: int) -> None:
     for result in reporter.results[start_index:]:
         if result.component != "OpenCode plugin":
             continue
+        result.detail = _fix_plugin_change_wording(result.detail)
         result.detail = result.detail.replace(
             " (npm latest)",
             f" (совпадает с OpenCode {opencode_version})",
