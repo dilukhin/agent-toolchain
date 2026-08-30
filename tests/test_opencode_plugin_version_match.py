@@ -227,6 +227,33 @@ class StandaloneOpenCodePluginVersionTests(unittest.TestCase):
         self.assertIn("актуальность версии", cli.detail)
         self.assertNotIn("choco lookup timed out", cli.detail)
 
+    def test_external_choco_never_recommends_provider_downgrade(self) -> None:
+        runtime._external_opencode_inventory = self._choco_external_inventory
+        runtime._external_latest = lambda inventory, timeout: ("1.18.17", None)
+        reporter = runtime.Reporter()
+        reporter.add("OpenCode CLI", runtime.STATE_OK, "active Chocolatey OpenCode 1.18.18")
+
+        runtime._annotate_external_opencode_freshness(reporter, 0)
+
+        cli = reporter.results[-1]
+        self.assertEqual(cli.state, runtime.STATE_INFO)
+        self.assertIn("не подтверждена как более новая", cli.detail)
+        self.assertNotIn("рекомендуемая команда обновления", cli.detail)
+        self.assertNotIn("choco upgrade", runtime._format_tldr(reporter.results))
+
+    def test_external_freshness_does_not_expand_to_scoop(self) -> None:
+        inventory = self._choco_external_inventory()
+        inventory.active.provider = "scoop"
+        inventory.update_advice = "scoop update opencode"
+        runtime._external_opencode_inventory = lambda: inventory
+        runtime._external_latest = lambda inventory, timeout: self.fail("unexpected Scoop freshness lookup")
+        reporter = runtime.Reporter()
+        reporter.add("OpenCode CLI", runtime.STATE_OK, "active Scoop OpenCode 1.18.18")
+
+        runtime._annotate_external_opencode_freshness(reporter, 0)
+
+        self.assertEqual(reporter.results[-1].state, runtime.STATE_OK)
+
     def test_tldr_keeps_only_actionable_recommendations(self) -> None:
         reporter = runtime.Reporter()
         reporter.add(

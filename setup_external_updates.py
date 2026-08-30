@@ -79,12 +79,14 @@ def _latest(item: ExternalCliInventory, timeout: float) -> tuple[str | None, str
             cp = run(["choco", "outdated", "--limit-output", "--exact", item.spec.command], timeout=timeout)
         except (TimeoutError, subprocess.TimeoutExpired):
             return None, "choco lookup timed out"
-        if cp.returncode == 0:
+        if cp.returncode in {0, 2}:
             for line in cp.stdout.splitlines():
                 fields = line.split("|")
                 if len(fields) >= 3 and fields[0].lower() == item.spec.command.lower():
                     return fields[2], None
-            return item.active.version, None
+            if cp.returncode == 0:
+                return item.active.version, None
+            return None, "choco reported outdated packages without the requested package"
         return None, (cp.stderr or "choco lookup failed").strip()[-240:]
     return None, "no safe provider-native lookup available"
 

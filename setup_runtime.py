@@ -317,8 +317,8 @@ def _annotate_external_opencode_freshness(reporter, start_index: int) -> None:
         return
     if inventory is None or inventory.active is None or inventory.conflict:
         return
-    if inventory.active.provider == "npm" or not inventory.update_advice:
-        # npm-owned OpenCode already has its own latest-version reconciliation path.
+    if inventory.active.provider != "chocolatey" or not inventory.update_advice:
+        # npm has its own latest reconciliation; other providers are outside this changeset.
         return
 
     installed = _legacy._version_number(inventory.active.version)
@@ -341,7 +341,7 @@ def _annotate_external_opencode_freshness(reporter, start_index: int) -> None:
         if target.state == STATE_OK:
             target.state = STATE_INFO
             target.detail += (
-                f"; установленная копия исправна, но актуальность версии через {inventory.active.provider} "
+                "; установленная копия исправна, но актуальность версии через Chocolatey "
                 "не удалось подтвердить read-only проверкой"
             )
         return
@@ -349,13 +349,23 @@ def _annotate_external_opencode_freshness(reporter, start_index: int) -> None:
     latest_version = _legacy._version_number(str(latest)) or str(latest).strip()
     if latest_version == installed:
         if target.state == STATE_OK:
-            target.detail += f"; доступных обновлений через {inventory.active.provider} не найдено"
+            target.detail += "; доступных обновлений через Chocolatey не найдено"
+        return
+
+    installed_key = _version_triplet(installed)
+    latest_key = _version_triplet(latest_version)
+    if installed_key is None or latest_key is None or latest_key <= installed_key:
+        target.state = STATE_INFO
+        target.detail += (
+            f"; Chocolatey сообщил версию {latest_version}, но она не подтверждена как более новая, "
+            "поэтому команда обновления не рекомендована"
+        )
         return
 
     target.state = STATE_OUTDATED
     target.detail = (
         f"активный экземпляр: {inventory.active.path}; установлено {installed}; доступно {latest_version}; "
-        f"владелец обновления: {inventory.active.provider}; обычный reconciliation внешний CLI не изменяет; "
+        "владелец обновления: chocolatey; обычный reconciliation внешний CLI не изменяет; "
         f"рекомендуемая команда обновления: `{inventory.update_advice}`"
     )
 

@@ -61,6 +61,26 @@ class UpdateCacheTests(unittest.TestCase):
         ):
             self.assertEqual(_latest(choco_item, 3), ("1.18.23", None))
 
+    def test_choco_enhanced_exit_code_two_still_reports_update(self) -> None:
+        choco_item = mock.Mock(active=mock.Mock(provider="chocolatey", version="1.18.18"), conflict=False)
+        choco_item.spec.command = "opencode"
+        with mock.patch("setup_external_updates.shutil.which", return_value="choco"), mock.patch(
+            "setup_external_updates.run",
+            return_value=mock.Mock(returncode=2, stdout="opencode|1.18.18|1.18.25|false\n", stderr=""),
+        ):
+            self.assertEqual(_latest(choco_item, 3), ("1.18.25", None))
+
+    def test_choco_enhanced_exit_code_two_without_requested_package_fails_closed(self) -> None:
+        choco_item = mock.Mock(active=mock.Mock(provider="chocolatey", version="1.18.18"), conflict=False)
+        choco_item.spec.command = "opencode"
+        with mock.patch("setup_external_updates.shutil.which", return_value="choco"), mock.patch(
+            "setup_external_updates.run",
+            return_value=mock.Mock(returncode=2, stdout="other|1.0|2.0|false\n", stderr=""),
+        ):
+            latest, error = _latest(choco_item, 3)
+        self.assertIsNone(latest)
+        self.assertIn("without the requested package", error)
+
 
 class ProxyLaunchTests(unittest.TestCase):
     def test_preflight_requires_no_auth_handshake(self) -> None:
