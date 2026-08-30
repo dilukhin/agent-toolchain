@@ -111,6 +111,43 @@ class StandaloneOpenCodePluginVersionTests(unittest.TestCase):
         self.assertTrue(any("@opencode-ai/plugin@1.18.18" in cmd for cmd in commands), commands)
         self.assertFalse(any("-g" in cmd and "opencode-ai" in " ".join(cmd) for cmd in commands), commands)
 
+    def test_duplicate_cli_inventory_blocks_plugin_mutation(self) -> None:
+        commands: list[list[str]] = []
+        runtime.executable_inventory = lambda command: [
+            ExecutableInstance(
+                Path("C:/ProgramData/chocolatey/bin/opencode.exe"),
+                "1.18.18",
+                "choco",
+                True,
+            ),
+            ExecutableInstance(
+                Path("C:/Users/Dima/AppData/Roaming/npm/opencode.cmd"),
+                "1.18.25",
+                "npm",
+                False,
+            ),
+        ] if command == "opencode" else []
+        runtime._known_opencode_managers = lambda npm: {"choco": "1.18.18", "npm": "1.18.25"}
+        runtime.run = lambda cmd, cwd=None, env=None, timeout=None: (
+            commands.append(cmd)
+            or subprocess.CompletedProcess(cmd, 0, "", "")
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            config_dir = Path(td)
+            package_json = self._package_json(config_dir)
+            package_json.parent.mkdir(parents=True)
+            package_json.write_text(json.dumps({"version": "1.18.25"}), encoding="utf-8")
+
+            reporter = runtime.Reporter()
+            runtime.reconcile_npm(config_dir, self._config(), reporter, check=False, skip=False)
+
+        duplicate = [item for item in reporter.results if item.component == "OpenCode: дублирующиеся установки"][-1]
+        plugin = [item for item in reporter.results if item.component == "OpenCode plugin"][-1]
+        self.assertEqual(duplicate.state, runtime.STATE_CONFLICT)
+        self.assertEqual(plugin.state, runtime.STATE_CONFLICT)
+        self.assertFalse(any("install" in cmd for cmd in commands), commands)
+
 
 if __name__ == "__main__":
     unittest.main()
