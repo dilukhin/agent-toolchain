@@ -106,7 +106,8 @@ class StandaloneOpenCodePluginVersionTests(unittest.TestCase):
 
         plugin = [item for item in reporter.results if item.component == "OpenCode plugin"][-1]
         self.assertEqual(plugin.state, runtime.STATE_CONFIGURED)
-        self.assertIn("обновлён с 1.18.25 до 1.18.18", plugin.detail)
+        self.assertIn("понижен с 1.18.25 до 1.18.18", plugin.detail)
+        self.assertNotIn("обновлён с 1.18.25 до 1.18.18", plugin.detail)
         self.assertIn("активному OpenCode 1.18.18", plugin.detail)
         self.assertTrue(any("@opencode-ai/plugin@1.18.18" in cmd for cmd in commands), commands)
         self.assertFalse(any("-g" in cmd and "opencode-ai" in " ".join(cmd) for cmd in commands), commands)
@@ -147,6 +148,45 @@ class StandaloneOpenCodePluginVersionTests(unittest.TestCase):
         self.assertEqual(duplicate.state, runtime.STATE_CONFLICT)
         self.assertEqual(plugin.state, runtime.STATE_CONFLICT)
         self.assertFalse(any("install" in cmd for cmd in commands), commands)
+
+    def test_tldr_keeps_only_actionable_recommendations(self) -> None:
+        reporter = runtime.Reporter()
+        reporter.add(
+            "External CLI Opencode",
+            runtime.STATE_INFO,
+            "активный: C:/ProgramData/chocolatey/bin/opencode.exe; update: choco upgrade opencode -y",
+        )
+        reporter.add(
+            "OpenCode plugin",
+            runtime.STATE_OUTDATED,
+            "цель 1.18.18, установлено 1.18.25; обычный apply установит/обновит plugin автоматически",
+        )
+        reporter.add(
+            "RouterAI credential",
+            runtime.STATE_MISSING,
+            "MANUAL ACTION REQUIRED: запишите реальный ключ RouterAI: C:/Users/Dima/.config/opencode/credentials/routerai-api-key.txt",
+        )
+
+        summary = runtime._format_tldr(reporter.results)
+        self.assertIn("TL/DR: рекомендуется:", summary)
+        self.assertIn("выполнить `toolchainctl apply`", summary)
+        self.assertIn("запишите реальный ключ RouterAI", summary)
+        self.assertNotIn("choco upgrade opencode", summary)
+
+    def test_tldr_turns_npm_metadata_failure_into_retry_advice(self) -> None:
+        reporter = runtime.Reporter()
+        reporter.add(
+            "OpenCode plugin",
+            runtime.STATE_FAILED,
+            "не удалось определить целевую версию; npm metadata lookup: TLS/SSL failure",
+        )
+        summary = runtime._format_tldr(reporter.results)
+        self.assertIn("повторить `toolchainctl apply` после восстановления доступа к npm registry", summary)
+
+    def test_tldr_reports_no_action_when_state_is_current(self) -> None:
+        reporter = runtime.Reporter()
+        reporter.add("OpenCode plugin", runtime.STATE_OK, "1.18.18 (совпадает с OpenCode 1.18.18)")
+        self.assertEqual(runtime._format_tldr(reporter.results), "TL/DR: дополнительных действий не требуется.")
 
 
 if __name__ == "__main__":
