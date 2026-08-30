@@ -54,15 +54,16 @@ class NpmMetadataBoundsTests(unittest.TestCase):
         package_json.parent.mkdir(parents=True)
         package_json.write_text(json.dumps({"version": version}), encoding="utf-8")
 
-    def test_failed_registry_lookup_is_bounded_and_does_not_install(self) -> None:
+    def test_failed_registry_lookup_is_bounded_sanitized_and_does_not_install(self) -> None:
         commands: list[list[str]] = []
         metadata_env: dict[str, str] = {}
+        sensitive = "ECONNRESET https://token@example.invalid/private-registry"
 
         def fake_run(cmd, cwd=None, env=None):
             commands.append(cmd)
             if cmd[1:3] == ["view", "@opencode-ai/plugin"]:
                 metadata_env.update(env or {})
-                return subprocess.CompletedProcess(cmd, 1, "", "network unavailable")
+                return subprocess.CompletedProcess(cmd, 1, "", sensitive)
             raise AssertionError(f"unexpected command: {cmd}")
 
         runtime.run = fake_run
@@ -74,7 +75,8 @@ class NpmMetadataBoundsTests(unittest.TestCase):
 
         plugin = [item for item in reporter.results if item.component == "OpenCode plugin"][-1]
         self.assertEqual(plugin.state, runtime.STATE_FAILED)
-        self.assertIn("network unavailable", plugin.detail)
+        self.assertIn("network connection failed", plugin.detail)
+        self.assertNotIn("token@example.invalid", plugin.detail)
         self.assertFalse(any("install" in cmd for cmd in commands), commands)
         self.assertEqual(metadata_env["npm_config_fetch_timeout"], "10000")
         self.assertEqual(metadata_env["npm_config_fetch_retries"], "1")
