@@ -85,10 +85,9 @@ def _ensure_process_path(desired: Path) -> None:
         os.environ["PATH"] = (current.rstrip(";") + ";" if current else "") + str(desired)
 
 
-def _stale_session_detail(desired: Path, *, owned: bool) -> str:
-    persisted = "owned user PATH entry" if owned else "pre-existing user PATH entry"
+def _stale_session_detail(desired: Path) -> str:
     return (
-        f"{persisted} is configured in the registry: {desired}; current process PATH does not include it. "
+        f"owned user PATH entry is configured in the registry: {desired}; current process PATH does not include it. "
         "MANUAL ACTION REQUIRED: restart the parent terminal application (for example Far Manager/ConEmu) "
         "or sign out/in before using bare managed commands. The running toolchainctl process can activate "
         "the entry only for its own child processes."
@@ -125,13 +124,13 @@ def reconcile_public_bin_path(
 
     if present:
         process_present = _process_path_has(desired)
-        if not process_present:
+        if not process_present and owned:
             # Never hide a stale inherited shell during check. Apply may activate its own
             # process so later reconciliation can resolve managed commands, but that cannot
             # modify the already-running parent terminal environment.
             if not check:
                 _ensure_process_path(desired)
-            reporter.add("agent-toolchain PATH", STATE_OUTDATED, _stale_session_detail(desired, owned=owned))
+            reporter.add("agent-toolchain PATH", STATE_OUTDATED, _stale_session_detail(desired))
             return False
         if owned:
             reporter.add("agent-toolchain PATH", STATE_OK, f"owned user PATH entry: {desired}")
