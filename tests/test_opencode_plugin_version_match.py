@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -189,6 +190,7 @@ reporter.render(color=False)
         completed = subprocess.run(
             [sys.executable, "-c", script],
             cwd=ROOT,
+            env={**os.environ, "PYTHONUTF8": "1"},
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
