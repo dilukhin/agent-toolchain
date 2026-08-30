@@ -100,7 +100,10 @@ def _bounded_legacy_run(cmd, cwd=None, env=None, timeout=None):
 
 
 def _standalone_opencode_version() -> str | None:
-    active = active_instance(executable_inventory("opencode"))
+    items = executable_inventory("opencode")
+    if len(items) != 1:
+        return None
+    active = active_instance(items)
     if active is None or active.manager == "npm":
         return None
     return _legacy._version_number(active.version)
@@ -111,10 +114,19 @@ def _resolve_npm_target(npm: str, package: str, configured: object) -> str | Non
     if package != "@opencode-ai/plugin" or policy.lower() != "latest":
         return _legacy_resolve_npm_target(npm, package, configured)
 
-    opencode_version = _standalone_opencode_version()
-    if opencode_version is None:
+    items = executable_inventory("opencode")
+    if len(items) > 1:
+        # Plugin compatibility target is ambiguous when CLI ownership/resolution is ambiguous.
+        return None
+
+    active = active_instance(items)
+    if active is None or active.manager == "npm":
         # npm-managed OpenCode is reconciled to npm latest before plugin reconciliation.
         return _legacy_resolve_npm_target(npm, package, configured)
+
+    opencode_version = _legacy._version_number(active.version)
+    if opencode_version is None:
+        return None
 
     exact_package = f"{package}@{opencode_version}"
     published = _legacy._npm_latest_version(npm, exact_package)
