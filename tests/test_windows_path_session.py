@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-import setup_manifest
-import setup_path
-from setup_lib import Reporter, STATE_OUTDATED
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+import setup_manifest  # noqa: E402
+import setup_path  # noqa: E402
+from setup_lib import Reporter, STATE_OUTDATED  # noqa: E402
 
 
 class WindowsPathSessionTests(unittest.TestCase):
@@ -40,20 +44,24 @@ class WindowsPathSessionTests(unittest.TestCase):
             self.assertIn("current process PATH does not include it", reporter.results[-1].details)
             self.assertIn("Far Manager/ConEmu", reporter.results[-1].details)
 
+    @unittest.skipUnless(os.name == "nt", "Windows process-local PATH activation contract")
     def test_apply_uses_process_local_activation_but_still_reports_parent_session_as_stale(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             desired = Path(td) / "bin"
             manifest = self._owned_manifest(desired)
             inherited = r"C:\Windows\System32;C:\Tools"
-            with mock.patch.object(setup_path, "platform_name", return_value="windows"), \
-                    mock.patch.object(setup_path, "public_bin_dir", return_value=desired), \
+            with mock.patch.object(setup_path, "public_bin_dir", return_value=desired), \
                     mock.patch.object(setup_path, "_read_user_path", return_value=(str(desired), 2)), \
                     mock.patch.object(setup_path, "_write_user_path") as write, \
-                    mock.patch.object(setup_path.os, "name", "nt"), \
                     mock.patch.dict(os.environ, {"PATH": inherited}, clear=False):
                 reporter = Reporter()
                 changed = setup_path.reconcile_public_bin_path(manifest, reporter, check=False)
-                self.assertTrue(any(setup_path._normalized(item) == setup_path._normalized(str(desired)) for item in setup_path._split(os.environ["PATH"])))
+                self.assertTrue(
+                    any(
+                        setup_path._normalized(item) == setup_path._normalized(str(desired))
+                        for item in setup_path._split(os.environ["PATH"])
+                    )
+                )
             self.assertFalse(changed)
             write.assert_not_called()
             self.assertEqual(reporter.results[-1].state, STATE_OUTDATED)
