@@ -41,8 +41,8 @@ class WindowsPathSessionTests(unittest.TestCase):
             self.assertFalse(changed)
             write.assert_not_called()
             self.assertEqual(reporter.results[-1].state, STATE_OUTDATED)
-            self.assertIn("current process PATH does not include it", reporter.results[-1].details)
-            self.assertIn("Far Manager/ConEmu", reporter.results[-1].details)
+            self.assertIn("current process PATH does not include it", reporter.results[-1].detail)
+            self.assertIn("Far Manager/ConEmu", reporter.results[-1].detail)
 
     @unittest.skipUnless(os.name == "nt", "Windows process-local PATH activation contract")
     def test_apply_uses_process_local_activation_but_still_reports_parent_session_as_stale(self) -> None:
@@ -65,7 +65,7 @@ class WindowsPathSessionTests(unittest.TestCase):
             self.assertFalse(changed)
             write.assert_not_called()
             self.assertEqual(reporter.results[-1].state, STATE_OUTDATED)
-            self.assertIn("only for its own child processes", reporter.results[-1].details)
+            self.assertIn("only for its own child processes", reporter.results[-1].detail)
 
 
 if __name__ == "__main__":
