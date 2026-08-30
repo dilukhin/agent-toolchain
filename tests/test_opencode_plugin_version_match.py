@@ -173,6 +173,31 @@ class StandaloneOpenCodePluginVersionTests(unittest.TestCase):
         self.assertIn("запишите реальный ключ RouterAI", summary)
         self.assertNotIn("choco upgrade opencode", summary)
 
+    def test_toolchainctl_check_emits_tldr_at_process_exit(self) -> None:
+        script = r'''
+import sys
+sys.argv[:] = ["toolchainctl.py", "check"]
+import setup_runtime as runtime
+reporter = runtime.Reporter()
+reporter.add(
+    "RouterAI credential",
+    runtime.STATE_MISSING,
+    "MANUAL ACTION REQUIRED: запишите реальный ключ RouterAI: C:/credential.txt",
+)
+reporter.render(color=False)
+'''
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        output = completed.stdout.decode("utf-8", errors="replace")
+        self.assertEqual(completed.returncode, 0, completed.stderr.decode("utf-8", errors="replace"))
+        self.assertTrue(output.rstrip().endswith("  - запишите реальный ключ RouterAI: C:/credential.txt"), output)
+        self.assertEqual(output.count("TL/DR: рекомендуется:"), 1, output)
+
     def test_tldr_turns_npm_metadata_failure_into_retry_advice(self) -> None:
         reporter = runtime.Reporter()
         reporter.add(
