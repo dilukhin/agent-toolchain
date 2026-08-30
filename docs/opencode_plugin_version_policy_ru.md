@@ -52,7 +52,9 @@ OpenCode CLI:          1.18.18
 ```bat
 where opencode
 npm list -g --depth=0 opencode-ai
-choco list --local-only --exact opencode
+choco list --limit-output --exact opencode
 ```
+
+В Chocolatey CLI 2.x `choco list` уже показывает только локально установленные пакеты; удалённый флаг `--local-only` использовать не нужно.
 
 Наличие `@opencode-ai/plugin` под `%USERPROFILE%\.config\opencode\node_modules` в этот список не входит, поскольку пакет не публикует второй managed OpenCode CLI.
