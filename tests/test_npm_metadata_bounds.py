@@ -61,7 +61,7 @@ class NpmMetadataBoundsTests(unittest.TestCase):
 
         def fake_run(cmd, cwd=None, env=None):
             commands.append(cmd)
-            if cmd[1:3] == ["view", "@opencode-ai/plugin"]:
+            if cmd[1:3] == ["view", "@opencode-ai/plugin@1.18.18"]:
                 metadata_env.update(env or {})
                 return subprocess.CompletedProcess(cmd, 1, "", sensitive)
             raise AssertionError(f"unexpected command: {cmd}")
@@ -88,7 +88,7 @@ class NpmMetadataBoundsTests(unittest.TestCase):
 
         def fake_run(cmd, cwd=None, env=None, timeout=None):
             commands.append(cmd)
-            if cmd[1:3] == ["view", "@opencode-ai/plugin"]:
+            if cmd[1:3] == ["view", "@opencode-ai/plugin@1.18.18"]:
                 self.assertEqual(timeout, runtime._NPM_METADATA_TIMEOUT_SECONDS)
                 raise subprocess.TimeoutExpired(cmd, timeout)
             raise AssertionError(f"unexpected command: {cmd}")
