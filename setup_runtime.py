@@ -54,6 +54,21 @@ def _call_runtime_run(cmd, *, cwd=None, env=None, timeout=None):
     return run(cmd, **kwargs)
 
 
+def _safe_npm_metadata_error(cp) -> str:
+    text = f"{cp.stdout}\n{cp.stderr}".lower()
+    if any(token in text for token in ("etimedout", "timeout", "timed out")):
+        return "network timeout"
+    if any(token in text for token in ("eai_again", "enotfound", "getaddrinfo", "dns")):
+        return "DNS/network lookup failed"
+    if any(token in text for token in ("ssl", "tls", "certificate", "cert_")):
+        return "TLS/SSL failure"
+    if any(token in text for token in ("econnreset", "econnrefused", "socket hang up")):
+        return "network connection failed"
+    if any(token in text for token in ("e401", "e403", "unauthorized", "forbidden")):
+        return "registry authentication/authorization failed"
+    return f"npm view failed with exit code {cp.returncode}"
+
+
 def _bounded_legacy_run(cmd, cwd=None, env=None, timeout=None):
     global _last_npm_metadata_error
     is_npm_metadata = len(cmd) >= 2 and str(cmd[1]).lower() == "view"
@@ -75,8 +90,7 @@ def _bounded_legacy_run(cmd, cwd=None, env=None, timeout=None):
         return subprocess.CompletedProcess(cmd, 124, "", _last_npm_metadata_error)
 
     if cp.returncode != 0:
-        detail = cp.stderr.strip()[-300:] or f"npm exited with code {cp.returncode}"
-        _last_npm_metadata_error = detail
+        _last_npm_metadata_error = _safe_npm_metadata_error(cp)
     elif not cp.stdout.strip():
         _last_npm_metadata_error = "npm returned an empty metadata response"
     else:
