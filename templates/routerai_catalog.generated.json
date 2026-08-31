@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-08-30T09:13:36Z",
+  "observed_at": "2026-08-31T09:44:28Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -1600,9 +1600,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00000550106050494",
-        "completion": "0.00001100212100988",
-        "input_cache_read": "0.000001100212100988"
+        "prompt": "0.00000367227003",
+        "completion": "0.00001958544016",
+        "input_cache_read": "0.000001591317013"
       }
     },
     "deepseek/deepseek-v4-flash-vision-exp": {
@@ -1620,9 +1620,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00002692998022",
-        "completion": "0.00008078994066",
-        "input_cache_read": "0.000000856863007"
+        "prompt": "0.00005385996044",
+        "completion": "0.00016157988132",
+        "input_cache_read": "0.000001713726014"
       }
     },
     "deepseek/deepseek-v4-pro": {
@@ -1639,9 +1639,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000710884709262",
-        "completion": "0.0001421769418524",
-        "input_cache_read": "0.0000058889857572"
+        "prompt": "0.00013554014838",
+        "completion": "0.00027108029676",
+        "input_cache_read": "0.000027108029676"
       }
     },
     "deepseek/deepseek-v4-pro-0813": {
@@ -1658,9 +1658,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00010282356084",
-        "completion": "0.00030847068252",
-        "input_cache_read": "0.000003427452028"
+        "prompt": "0.0002025312562",
+        "completion": "0.0004050625124",
+        "input_cache_read": "0.0000155793274"
       }
     },
     "fish-audio/s1": {
@@ -2499,9 +2499,9 @@
         "tokenizer": "Gemma"
       },
       "pricing": {
-        "prompt": "0.000011128091",
+        "prompt": "0.0000100152819",
         "completion": "0.0000378355094",
-        "input_cache_read": "0.000011128091"
+        "input_cache_read": "0.0000055640455"
       }
     },
     "google/lyria-3-clip-preview": {
@@ -2521,6 +2521,7 @@
       },
       "pricing": {
         "prompt": "0.0",
+        "request": "4.4512364",
         "completion": "0.0"
       }
     },
@@ -2541,6 +2542,7 @@
       },
       "pricing": {
         "prompt": "0.0",
+        "request": "8.9024728",
         "completion": "0.0"
       }
     },
@@ -3577,9 +3579,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000367227003",
-        "completion": "0.0001101681009",
-        "input_cache_read": "0.00000367227003"
+        "prompt": "0.000033384273",
+        "completion": "0.000100152819",
+        "input_cache_read": "0.0000033384273"
       }
     },
     "mistralai/codestral-embed-2505": {
@@ -3615,9 +3617,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000489636004",
-        "completion": "0.000244818002",
-        "input_cache_read": "0.00000489636004"
+        "prompt": "0.000044512364",
+        "completion": "0.00022256182",
+        "input_cache_read": "0.0000044512364"
       }
     },
     "mistralai/ministral-14b-2512": {
@@ -3635,9 +3637,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000244818002",
-        "completion": "0.0000244818002",
-        "input_cache_read": "0.00000244818002"
+        "prompt": "0.000022256182",
+        "completion": "0.000022256182",
+        "input_cache_read": "0.0000022256182"
       }
     },
     "mistralai/ministral-3b-2512": {
@@ -3655,9 +3657,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000122409001",
-        "completion": "0.0000122409001",
-        "input_cache_read": "0.00000122409001"
+        "prompt": "0.000011128091",
+        "completion": "0.000011128091",
+        "input_cache_read": "0.0000011128091"
       }
     },
     "mistralai/ministral-8b-2512": {
@@ -3675,9 +3677,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.00001836135015",
-        "completion": "0.00001836135015",
-        "input_cache_read": "0.000001836135015"
+        "prompt": "0.0000166921365",
+        "completion": "0.0000166921365",
+        "input_cache_read": "0.00000166921365"
       }
     },
     "mistralai/mistral-embed-2312": {
@@ -3713,9 +3715,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000244818002",
-        "completion": "0.000734454006",
-        "input_cache_read": "0.0000244818002"
+        "prompt": "0.00022256182",
+        "completion": "0.00066768546",
+        "input_cache_read": "0.000022256182"
       }
     },
     "mistralai/mistral-large-2407": {
@@ -3733,9 +3735,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000244818002",
-        "completion": "0.000734454006",
-        "input_cache_read": "0.0000244818002"
+        "prompt": "0.00022256182",
+        "completion": "0.00066768546",
+        "input_cache_read": "0.000022256182"
       }
     },
     "mistralai/mistral-large-2512": {
@@ -3754,9 +3756,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000612045005",
-        "completion": "0.0001836135015",
-        "input_cache_read": "0.00000612045005"
+        "prompt": "0.000055640455",
+        "completion": "0.000166921365",
+        "input_cache_read": "0.0000055640455"
       }
     },
     "mistralai/mistral-medium-3": {
@@ -3775,9 +3777,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000489636004",
-        "completion": "0.000244818002",
-        "input_cache_read": "0.00000489636004"
+        "prompt": "0.000044512364",
+        "completion": "0.00022256182",
+        "input_cache_read": "0.0000044512364"
       }
     },
     "mistralai/mistral-medium-3-5": {
@@ -3796,8 +3798,8 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0001836135015",
-        "completion": "0.0009180675075"
+        "prompt": "0.000166921365",
+        "completion": "0.000834606825"
       }
     },
     "mistralai/mistral-medium-3.1": {
@@ -3816,9 +3818,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000489636004",
-        "completion": "0.000244818002",
-        "input_cache_read": "0.00000489636004"
+        "prompt": "0.000044512364",
+        "completion": "0.00022256182",
+        "input_cache_read": "0.0000044512364"
       }
     },
     "mistralai/mistral-nemo": {
@@ -3854,9 +3856,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000244818002",
-        "completion": "0.0000734454006",
-        "input_cache_read": "0.00000244818002"
+        "prompt": "0.000022256182",
+        "completion": "0.000066768546",
+        "input_cache_read": "0.0000022256182"
       }
     },
     "mistralai/mistral-small-24b-instruct-2501": {
@@ -3892,9 +3894,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.00001836135015",
-        "completion": "0.0000734454006",
-        "input_cache_read": "0.000001836135015"
+        "prompt": "0.0000166921365",
+        "completion": "0.000066768546",
+        "input_cache_read": "0.00000166921365"
       }
     },
     "mistralai/mistral-small-3.1-24b-instruct": {
@@ -3950,9 +3952,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000244818002",
-        "completion": "0.000734454006",
-        "input_cache_read": "0.0000244818002"
+        "prompt": "0.00022256182",
+        "completion": "0.00066768546",
+        "input_cache_read": "0.000022256182"
       }
     },
     "mistralai/voxtral-mini-3b-2507": {
@@ -3986,8 +3988,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.367227003",
-        "seconds": "0.00612045005",
+        "prompt": "0.33384273",
+        "seconds": "0.0055640455",
         "completion": "0.0"
       }
     },
@@ -4004,7 +4006,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.001958544016",
+        "prompt": "0.00178049456",
         "completion": "0.0"
       }
     },
@@ -4024,11 +4026,11 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "audio": "0.0122409001",
-        "prompt": "0.0000122409001",
-        "seconds": "0.00020401500166666666",
-        "completion": "0.0000367227003",
-        "input_cache_read": "0.00000122409001"
+        "audio": "0.011128091",
+        "prompt": "0.000011128091",
+        "seconds": "0.00018546818333333334",
+        "completion": "0.000033384273",
+        "input_cache_read": "0.0000011128091"
       }
     },
     "mistralai/voxtral-small-24b-2507-stt": {
@@ -4157,9 +4159,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000588842935265",
-        "completion": "0.00024793386748",
-        "input_cache_read": "0.0000099173546992"
+        "prompt": "0.000059780104852",
+        "completion": "0.000251695162238",
+        "input_cache_read": "0.000010070922355"
       }
     },
     "moonshotai/kimi-k2.7-code": {
@@ -8150,9 +8152,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00001467439103988",
-        "completion": "0.00005869756415952",
-        "input_cache_read": "0.00000366859775997"
+        "prompt": "0.00001468908012",
+        "completion": "0.00005875632048",
+        "input_cache_read": "0.00000367227003"
       }
     },
     "tencent/hy3-preview": {
@@ -9101,9 +9103,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000101109834826",
-        "completion": "0.000317773766596",
-        "input_cache_read": "0.0000187775407534"
+        "prompt": "0.0001012656281",
+        "completion": "0.0003182634026",
+        "input_cache_read": "0.00001880647379"
       }
     },
     "z-ai/glm-5.2": {
@@ -9120,9 +9122,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000036455626116",
-        "completion": "0.000114574824936",
-        "input_cache_read": "0.0000067703305644"
+        "prompt": "0.000054249443625",
+        "completion": "0.0001735982196",
+        "input_cache_read": "0.00001012656281"
       }
     },
     "z-ai/glm-5.3": {
@@ -9160,9 +9162,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000612045005",
-        "completion": "0.0000204055804667",
-        "input_cache_read": "0.00000122409001"
+        "prompt": "0.00000872164132125",
+        "completion": "0.0000290721377375",
+        "input_cache_read": "0.00000174432826425"
       }
     },
     "z-ai/glm-5v-turbo": {
@@ -9229,7 +9231,8 @@
       "DeepSeek V4 Pro [reasoning, 122/245 ₽]",
       "DeepSeek V4 Pro [reasoning, 106/212 ₽]",
       "DeepSeek V4 Pro [reasoning, 103/205 ₽]",
-      "DeepSeek V4 Pro [reasoning, 71/142 ₽]"
+      "DeepSeek V4 Pro [reasoning, 71/142 ₽]",
+      "DeepSeek V4 Pro [reasoning, 136/271 ₽]"
     ],
     "minimax/minimax-m2.7": [
       "MiniMax M2.7",
