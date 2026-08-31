@@ -57,9 +57,31 @@ class UpdateCacheTests(unittest.TestCase):
         choco_item.spec.command = "opencode"
         with mock.patch("setup_external_updates.shutil.which", return_value="choco"), mock.patch(
             "setup_external_updates.run",
-            return_value=mock.Mock(returncode=0, stdout="opencode|1.18.18|1.18.23|false\n", stderr=""),
+            return_value=mock.Mock(returncode=0, stdout="opencode|1.18.23\n", stderr=""),
         ):
             self.assertEqual(_latest(choco_item, 3), ("1.18.23", None))
+
+    def test_choco_search_exit_code_two_means_no_results(self) -> None:
+        choco_item = mock.Mock(active=mock.Mock(provider="chocolatey", version="1.18.18"), conflict=False)
+        choco_item.spec.command = "opencode"
+        with mock.patch("setup_external_updates.shutil.which", return_value="choco"), mock.patch(
+            "setup_external_updates.run",
+            return_value=mock.Mock(returncode=2, stdout="", stderr=""),
+        ):
+            latest, error = _latest(choco_item, 3)
+        self.assertIsNone(latest)
+        self.assertIn("no results", error)
+
+    def test_choco_search_success_without_requested_package_fails_closed(self) -> None:
+        choco_item = mock.Mock(active=mock.Mock(provider="chocolatey", version="1.18.18"), conflict=False)
+        choco_item.spec.command = "opencode"
+        with mock.patch("setup_external_updates.shutil.which", return_value="choco"), mock.patch(
+            "setup_external_updates.run",
+            return_value=mock.Mock(returncode=0, stdout="other|2.0\n", stderr=""),
+        ):
+            latest, error = _latest(choco_item, 3)
+        self.assertIsNone(latest)
+        self.assertIn("no matching package row", error)
 
 
 class ProxyLaunchTests(unittest.TestCase):

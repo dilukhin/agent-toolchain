@@ -74,17 +74,22 @@ def _latest(item: ExternalCliInventory, timeout: float) -> tuple[str | None, str
             except (ValueError, TypeError):
                 return None, "npm returned malformed version"
         return None, (cp.stderr or "npm lookup failed").strip()[-240:]
-    if provider == "chocolatey" and shutil.which("choco"):
+    if provider == "chocolatey":
+        choco = shutil.which("choco")
+        if not choco:
+            return None, "choco executable not found"
         try:
-            cp = run(["choco", "outdated", "--limit-output", "--exact", item.spec.command], timeout=timeout)
+            cp = run([choco, "search", item.spec.command, "--exact", "--limit-output"], timeout=timeout)
         except (TimeoutError, subprocess.TimeoutExpired):
             return None, "choco lookup timed out"
         if cp.returncode == 0:
             for line in cp.stdout.splitlines():
                 fields = line.split("|")
-                if len(fields) >= 3 and fields[0].lower() == item.spec.command.lower():
-                    return fields[2], None
-            return item.active.version, None
+                if len(fields) >= 2 and fields[0].lower() == item.spec.command.lower():
+                    return fields[1], None
+            return None, "choco exact search returned no matching package row"
+        if cp.returncode == 2:
+            return None, "choco exact search returned no results"
         return None, (cp.stderr or "choco lookup failed").strip()[-240:]
     return None, "no safe provider-native lookup available"
 

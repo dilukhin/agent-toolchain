@@ -72,12 +72,26 @@ def _record(manifest: dict[str, Any], desired: Path) -> None:
     }
 
 
+def _process_path_has(desired: Path) -> bool:
+    current = os.environ.get("PATH", "")
+    return any(_normalized(item) == _normalized(str(desired)) for item in _split(current))
+
+
 def _ensure_process_path(desired: Path) -> None:
     if os.name != "nt":
         return
     current = os.environ.get("PATH", "")
-    if not any(_normalized(item) == _normalized(str(desired)) for item in _split(current)):
+    if not _process_path_has(desired):
         os.environ["PATH"] = (current.rstrip(";") + ";" if current else "") + str(desired)
+
+
+def _stale_session_detail(desired: Path) -> str:
+    return (
+        f"owned user PATH entry is configured in the registry: {desired}; current process PATH does not include it. "
+        "MANUAL ACTION REQUIRED: restart the parent terminal application (for example Far Manager/ConEmu) "
+        "or sign out/in before using bare managed commands. The running toolchainctl process can activate "
+        "the entry only for its own child processes."
+    )
 
 
 def reconcile_public_bin_path(
@@ -109,7 +123,15 @@ def reconcile_public_bin_path(
     owned = _owned_record(manifest, desired)
 
     if present:
-        _ensure_process_path(desired)
+        process_present = _process_path_has(desired)
+        if not process_present and owned:
+            # Never hide a stale inherited shell during check. Apply may activate its own
+            # process so later reconciliation can resolve managed commands, but that cannot
+            # modify the already-running parent terminal environment.
+            if not check:
+                _ensure_process_path(desired)
+            reporter.add("agent-toolchain PATH", STATE_OUTDATED, _stale_session_detail(desired))
+            return False
         if owned:
             reporter.add("agent-toolchain PATH", STATE_OK, f"owned user PATH entry: {desired}")
         else:
@@ -136,5 +158,9 @@ def reconcile_public_bin_path(
         return False
     _ensure_process_path(desired)
     _record(manifest, desired)
-    reporter.add("agent-toolchain PATH", STATE_CONFIGURED, f"appended owned user PATH entry: {desired}")
+    reporter.add(
+        "agent-toolchain PATH",
+        STATE_CONFIGURED,
+        f"appended owned user PATH entry: {desired}; restart the parent terminal application if it keeps an older inherited PATH",
+    )
     return True
