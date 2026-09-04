@@ -75,7 +75,10 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         ):
             actual = setup_tools._resolve_github_branch("https://github.com/dilukhin/ssh_relay.git", "main")
         self.assertEqual(actual, expected)
-        run.assert_called_once_with(
+        run.assert_called_once()
+        args, kwargs = run.call_args
+        self.assertEqual(
+            args[0],
             [
                 "/usr/bin/git",
                 "ls-remote",
@@ -83,11 +86,12 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
                 "https://github.com/dilukhin/ssh_relay.git",
                 "refs/heads/main",
             ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            check=False,
-            timeout=15,
         )
+        self.assertIs(kwargs["stdout"], subprocess.PIPE)
+        self.assertIs(kwargs["stderr"], subprocess.DEVNULL)
+        self.assertFalse(kwargs["check"])
+        self.assertEqual(kwargs["timeout"], 15)
+        self.assertEqual(kwargs["env"]["GIT_TERMINAL_PROMPT"], "0")
 
     def test_follow_branch_requires_git_for_resolution(self) -> None:
         with mock.patch.object(setup_tools.shutil, "which", return_value=None):
