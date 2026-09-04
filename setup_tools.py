@@ -152,9 +152,10 @@ def _resolve_follow_branch(spec: ToolSpec) -> tuple[ToolSpec | None, str | None]
         sha = _resolve_github_branch(spec.repo, spec.tracking_branch)
     except ValueError as exc:
         return None, f"ToolSpec {spec.name!r}: cannot resolve production branch {spec.tracking_branch!r}: {exc}"
-    # Resolve the mutable production branch exactly once for this reconciliation run.
-    # The resulting immutable SHA is reused by runtime and bound skill reconciliation.
-    return replace(spec, ref=sha), None
+    # Product policy selects the moving production branch. The existing deployer then
+    # consumes an exact immutable snapshot; this is execution identity, not a second
+    # approval gate. Runtime and bound skills receive this same resolved SHA.
+    return replace(spec, update_policy="pinned-tested", ref=sha), None
 
 
 def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
