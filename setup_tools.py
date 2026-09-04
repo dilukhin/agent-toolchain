@@ -1,6 +1,7 @@
 """Declarative ToolSpec model, validation, and production-branch resolution."""
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -106,6 +107,7 @@ def _resolve_github_branch(repo: str, branch: str) -> str:
     if not git:
         raise ValueError("git is required to resolve a git-sourced production branch")
     remote_ref = f"refs/heads/{branch}"
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
     try:
         completed = subprocess.run(
             [git, "ls-remote", "--refs", repo, remote_ref],
@@ -113,6 +115,7 @@ def _resolve_github_branch(repo: str, branch: str) -> str:
             stderr=subprocess.DEVNULL,
             check=False,
             timeout=15,
+            env=env,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise ValueError(f"git ls-remote failed: {exc}") from exc
