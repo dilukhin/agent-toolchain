@@ -51,7 +51,7 @@ class RussianActionGuidanceTests(unittest.TestCase):
         self.assertNotIn("managed file", result.detail)
         self.assertIn("сравнить локально изменённый `global AGENTS.md`", summary)
         self.assertIn("AGENTS.md", summary)
-        self.assertIn("обычный `toolchainctl apply` файл не перезапишет", summary)
+        self.assertNotIn("…", summary)
         self.assertNotIn("apply --force", summary)
         self.assertNotIn("исправить «global AGENTS.md»", summary)
 

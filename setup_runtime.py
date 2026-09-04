@@ -206,10 +206,7 @@ def _managed_file_conflict_action(result) -> str | None:
             command = f'fc "{template}" "{destination}"'
         else:
             command = f'diff -u "{template}" "{destination}"'
-        return (
-            f"сравнить локально изменённый `global AGENTS.md` с управляемым шаблоном: `{command}`; "
-            "обычный `toolchainctl apply` файл не перезапишет"
-        )
+        return f"сравнить локально изменённый `global AGENTS.md` с управляемым шаблоном: `{command}`"
     return (
         f"проверить локальные изменения в «{result.component}»; обычный `toolchainctl apply` их сохранит, "
         "автоматическая перезапись отключена"
