@@ -140,6 +140,46 @@ class GlobalAgentsSplitTests(unittest.TestCase):
             self.assertEqual(agents.read_bytes(), crlf)
             self.assertEqual(_result(applied, "global AGENTS.md").state, lib.STATE_OK)
 
+    def test_unmodified_legacy_whole_file_migrates_with_backup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            agents, managed, state = self._paths(Path(tmp))
+            agents.parent.mkdir(parents=True)
+            agents.write_bytes(PRE_SPLIT_AGENTS)
+            manifest = {
+                "managed_files": {
+                    "global AGENTS.md": {
+                        "path": str(agents),
+                        "sha256": lib.sha256_bytes(PRE_SPLIT_AGENTS),
+                        "source": "opencode_setup:templates/AGENTS.md",
+                    }
+                }
+            }
+
+            before = agents.read_bytes()
+            checked = self._check(agents=agents, state=state, manifest=manifest)
+            self.assertEqual(agents.read_bytes(), before)
+            self.assertFalse(managed.exists())
+            self.assertEqual(_result(checked, "global AGENTS.md").state, lib.STATE_OUTDATED)
+
+            applied = self._apply(agents=agents, state=state, manifest=manifest)
+            migrated = agents.read_bytes()
+            self.assertIn(b"<!-- agent-toolchain:managed:start:v1 -->", migrated)
+            self.assertNotIn(b"<!-- opencode_setup:managed:start -->", migrated)
+            self.assertEqual(managed.read_bytes(), MANAGED_INSTRUCTIONS)
+            entry = manifest["managed_files"]["global AGENTS.md"]
+            self.assertEqual(entry["mode"], "bootstrap-block-v1")
+            self.assertIn("block_sha256", entry)
+            self.assertNotIn("sha256", entry)
+            self.assertEqual(_result(applied, "global AGENTS.md").state, lib.STATE_CONFIGURED)
+            backups = list(state.rglob("AGENTS.md"))
+            self.assertTrue(backups)
+            self.assertIn(PRE_SPLIT_AGENTS, [path.read_bytes() for path in backups])
+
+            final = agents.read_bytes()
+            checked_again = self._check(agents=agents, state=state, manifest=manifest)
+            self.assertEqual(agents.read_bytes(), final)
+            self.assertEqual(_result(checked_again, "global AGENTS.md").state, lib.STATE_OK)
+
     def test_ilukhin_modified_whole_file_migrates_and_preserves_host_safety_rule(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             agents, managed, state = self._paths(Path(tmp))
