@@ -56,7 +56,7 @@ Legacy markers `opencode_setup:managed:*` распознаются только 
 
 1. делает backup `AGENTS.md`;
 2. заменяет только legacy block на новый bootstrap block;
-3. сохраняет surrounding user text byte-for-byte;
+3. сохраняет surrounding user text; технически допустима нормализация завершающего перевода строки при пересборке документа;
 4. создаёт/проверяет `agent-toolchain/managed-instructions.md`;
 5. переводит manifest в `bootstrap-block-v1`.
 
