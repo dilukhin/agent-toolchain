@@ -72,6 +72,15 @@ def _trim_action(text: str, limit: int = 220) -> str:
     return normalized[: limit - 1].rstrip() + "…"
 
 
+def _default_global_agents_path() -> str:
+    config_dir = os.environ.get("OPENCODE_CONFIG_DIR")
+    if config_dir:
+        base = os.path.expanduser(config_dir)
+    else:
+        base = os.path.join(os.path.expanduser("~"), ".config", "opencode")
+    return os.path.join(base, "AGENTS.md")
+
+
 def _clarify_routerai_placeholder_detail(result) -> None:
     if result.component != "RouterAI credential":
         return
@@ -88,6 +97,92 @@ def _clarify_routerai_placeholder_detail(result) -> None:
     )
 
 
+def _localize_actionable_detail(result) -> None:
+    detail = result.detail
+
+    if result.component == "RouterAI model labels":
+        match = re.fullmatch(
+            r"(\d+) managed label\(s\) differ; ordinary apply will update only recognized managed names",
+            detail,
+        )
+        if match is not None:
+            result.detail = (
+                f"управляемые подписи моделей устарели: {match.group(1)}; `toolchainctl apply` обновит только "
+                "распознанные управляемые подписи, пользовательские названия сохранит"
+            )
+            return
+        match = re.fullmatch(r"custom labels preserved for (\d+) curated model\(s\)", detail)
+        if match is not None:
+            result.detail = (
+                "управляемые подписи изменений не требуют; пользовательские названия сохранены; "
+                f"моделей с пользовательскими названиями: {match.group(1)}"
+            )
+            return
+        if detail == (
+            "managed OpenCode JSONC needs model-label changes but contains comments/trailing commas; "
+            "formatting preserved"
+        ):
+            result.detail = (
+                "нужно обновить управляемые подписи моделей, но OpenCode JSONC содержит комментарии или "
+                "завершающие запятые; форматирование сохранено, автоматическая запись остановлена"
+            )
+            return
+        if detail == "config_data.json models is not an object":
+            result.detail = "секция models в config_data.json имеет неверный формат; автоматическая запись остановлена"
+            return
+        if detail.startswith("cannot load ownership manifest: "):
+            result.detail = "не удалось прочитать ownership manifest: " + detail.split(": ", 1)[1]
+            return
+        if detail.startswith("cannot load managed model policy: "):
+            result.detail = "не удалось прочитать управляемую политику моделей: " + detail.split(": ", 1)[1]
+            return
+        if detail.startswith("cannot persist managed labels: "):
+            result.detail = "не удалось сохранить управляемые подписи моделей: " + detail.split(": ", 1)[1]
+            return
+        match = re.fullmatch(
+            r"updated (\d+) managed label\(s\); custom names preserved; backup: (.+?)(?:; custom labels preserved for (\d+) curated model\(s\))?",
+            detail,
+        )
+        if match is not None:
+            count, backup, custom_count = match.groups()
+            result.detail = (
+                f"обновлено управляемых подписей моделей: {count}; пользовательские названия сохранены; "
+                f"backup: {backup}"
+            )
+            if custom_count is not None:
+                result.detail += f"; моделей с пользовательскими названиями: {custom_count}"
+            return
+
+    if detail == "managed file was modified locally; preserved":
+        if result.component == "global AGENTS.md":
+            result.detail = (
+                "управляемый файл изменён локально и сохранён без перезаписи: "
+                f"{_default_global_agents_path()}; обычный `toolchainctl apply` этот конфликт не устранит"
+            )
+        else:
+            result.detail = "управляемый файл изменён локально; файл сохранён без перезаписи"
+        return
+    if detail == "managed file modified; --force would backup and replace":
+        result.detail = (
+            "управляемый файл изменён локально; `toolchainctl apply --force` создаст backup и заменит его "
+            "управляемой версией"
+        )
+        return
+    if detail == "manifest points to a different destination":
+        result.detail = "ownership manifest указывает на другой целевой путь; автоматическая перезапись запрещена"
+        return
+    if detail == "existing file is not owned by opencode_setup":
+        result.detail = (
+            "существующий файл не подтверждён как управляемый agent-toolchain; файл сохранён без изменений"
+        )
+        return
+    if detail.startswith("destination is not a regular file: "):
+        result.detail = "целевой путь существует, но это не обычный файл: " + detail.split(": ", 1)[1]
+        return
+    if detail.startswith("managed source changed; "):
+        result.detail = "управляемый источник изменился; " + detail.split("; ", 1)[1]
+
+
 def _opencode_update_action(result) -> str | None:
     if result.component != "OpenCode CLI" or result.state != STATE_OUTDATED:
         return None
@@ -99,6 +194,19 @@ def _opencode_update_action(result) -> str | None:
         return None
     installed, latest, command = (part.strip() for part in match.groups())
     return f"обновить OpenCode {installed} → {latest}: `{command}`"
+
+
+def _managed_file_conflict_action(result) -> str | None:
+    if result.state != STATE_CONFLICT or "управляемый файл изменён локально" not in result.detail:
+        return None
+    if result.component == "global AGENTS.md":
+        subject = f"«global AGENTS.md» ({_default_global_agents_path()})"
+    else:
+        subject = f"«{result.component}»"
+    return (
+        f"разобраться с {subject}: если локальные правки не нужны — выполнить `toolchainctl apply --force` "
+        "(с backup); если нужны — сначала сохранить их вручную"
+    )
 
 
 def _tldr_actions(results) -> list[str]:
@@ -117,6 +225,8 @@ def _tldr_actions(results) -> list[str]:
             action = manual.split("; новый ключ создаётся", 1)[0].strip()
         elif manual is not None:
             action = manual
+        elif _managed_file_conflict_action(result) is not None:
+            action = _managed_file_conflict_action(result)
         elif result.state in {STATE_MISSING, STATE_OUTDATED} and (
             "обычный apply" in result.detail or "toolchainctl apply" in result.detail
         ):
@@ -163,6 +273,7 @@ def _reporter_render_with_tldr(self, *args, **kwargs):
     if _toolchainctl_tldr_enabled():
         for result in self.results:
             _clarify_routerai_placeholder_detail(result)
+            _localize_actionable_detail(result)
             _TLDR_RESULTS.pop(result.component, None)
             _TLDR_RESULTS[result.component] = result
         if not _TLDR_REGISTERED:
