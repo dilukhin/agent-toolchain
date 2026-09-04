@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -53,20 +54,46 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         self.assertIn("must not define a fixed ref", error or "")
 
     def test_follow_branch_rejects_non_github_source(self) -> None:
-        with mock.patch.object(setup_tools, "_resolve_github_branch", wraps=setup_tools._resolve_github_branch):
-            spec, error = setup_tools.parse_tool_spec(
-                "tool",
-                self._raw(repo="https://git.example.invalid/example/tool.git"),
-            )
+        spec, error = setup_tools.parse_tool_spec(
+            "tool",
+            self._raw(repo="https://git.example.invalid/example/tool.git"),
+        )
         self.assertIsNone(spec)
         self.assertIn("requires an https://github.com", error or "")
 
-    def test_github_branch_response_yields_exact_sha(self) -> None:
+    def test_git_ls_remote_yields_exact_sha_without_checkout(self) -> None:
         expected = "39dea792ee2923a8853ba5fa416fde7be24a7db6"
-        with mock.patch.object(setup_tools, "_read_json_url", return_value={"commit": {"sha": expected}}) as read:
+        completed = subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=f"{expected}\trefs/heads/main\n".encode("ascii"),
+            stderr=b"",
+        )
+        with (
+            mock.patch.object(setup_tools.shutil, "which", return_value="/usr/bin/git"),
+            mock.patch.object(setup_tools.subprocess, "run", return_value=completed) as run,
+        ):
             actual = setup_tools._resolve_github_branch("https://github.com/dilukhin/ssh_relay.git", "main")
         self.assertEqual(actual, expected)
-        read.assert_called_once_with("https://api.github.com/repos/dilukhin/ssh_relay/branches/main")
+        run.assert_called_once_with(
+            [
+                "/usr/bin/git",
+                "ls-remote",
+                "--refs",
+                "https://github.com/dilukhin/ssh_relay.git",
+                "refs/heads/main",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=15,
+        )
+
+    def test_follow_branch_requires_git_for_resolution(self) -> None:
+        with mock.patch.object(setup_tools.shutil, "which", return_value=None):
+            spec, error = setup_tools.parse_tool_spec("tool", self._raw())
+        self.assertIsNone(spec)
+        self.assertIn("git is required", error or "")
 
     def test_repository_policy_follows_first_party_production_branches(self) -> None:
         config = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
