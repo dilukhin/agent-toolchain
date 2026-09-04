@@ -308,7 +308,7 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
             if check:
                 reporter.add(component, STATE_OUTDATED,
                              "содержимое актуально, но ownership metadata устарела; обычный apply обновит metadata")
-                return False
+            return False
             managed[component] = {"path": str(destination), "sha256": desired_hash, "source": source_label}
             reporter.add(component, STATE_CONFIGURED, "содержимое уже было актуально; ownership metadata обновлена")
             return True
@@ -651,6 +651,18 @@ def _managed_agents_block(managed_path: Path) -> bytes:
     return block.encode("utf-8")
 
 
+def _canonical_managed_block(data: bytes) -> bytes:
+    return data.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+
+
+def _managed_block_hash(data: bytes) -> str:
+    return sha256_bytes(_canonical_managed_block(data))
+
+
+def _managed_blocks_equal(left: bytes, right: bytes) -> bool:
+    return _canonical_managed_block(left) == _canonical_managed_block(right)
+
+
 def _fresh_agents_document(desired_block: bytes) -> bytes:
     return b"# Global OpenCode instructions\n\n" + desired_block
 
@@ -660,7 +672,7 @@ def _bootstrap_manifest_entry(destination: Path, desired_block: bytes) -> dict[s
         "path": str(destination),
         "source": _AGENTS_BOOTSTRAP_SOURCE,
         "mode": _AGENTS_BOOTSTRAP_MODE,
-        "block_sha256": sha256_bytes(desired_block),
+        "block_sha256": _managed_block_hash(desired_block),
     }
 
 
@@ -693,7 +705,7 @@ def _known_legacy_blocks() -> set[str]:
         block = _legacy_block_from_whole(payload)
         if block is not None and block not in seen:
             seen.add(block)
-            hashes.add(sha256_bytes(block))
+            hashes.add(_managed_block_hash(block))
     return hashes
 
 
@@ -765,7 +777,7 @@ def _plan_agents_file(*, destination: Path, desired_block: bytes, previous: dict
             )
         if new_block is not None:
             _start, _end_pos, current_block = new_block
-            if current_block != desired_block:
+            if not _managed_blocks_equal(current_block, desired_block):
                 return _AgentsPlan(STATE_CONFLICT, "непринадлежащий manifest bootstrap-блок отличается от целевого; файл сохранён")
             return _AgentsPlan(
                 STATE_OUTDATED,
@@ -774,7 +786,7 @@ def _plan_agents_file(*, destination: Path, desired_block: bytes, previous: dict
             )
         if old_block is not None:
             start, end_pos, current_block = old_block
-            if sha256_bytes(current_block) not in _known_legacy_blocks():
+            if _managed_block_hash(current_block) not in _known_legacy_blocks():
                 return _AgentsPlan(STATE_CONFLICT, "legacy managed block без ownership metadata не совпадает с известным payload; файл сохранён")
             return _AgentsPlan(
                 STATE_OUTDATED,
@@ -803,18 +815,18 @@ def _plan_agents_file(*, destination: Path, desired_block: bytes, previous: dict
         previous_block_hash = previous.get("block_sha256")
         if not isinstance(previous_block_hash, str):
             return _AgentsPlan(STATE_CONFLICT, "manifest bootstrap-блока не содержит block_sha256; автоматическая mutation запрещена")
-        current_block_hash = sha256_bytes(current_block)
+        current_block_hash = _managed_block_hash(current_block)
         if current_block_hash != previous_block_hash:
             if not force:
                 return _AgentsPlan(STATE_CONFLICT, "managed bootstrap-блок изменён локально; пользовательский текст вне блока сохранён")
             return _AgentsPlan(
-                STATE_CONFLICT if force and False else STATE_OUTDATED,
+                STATE_OUTDATED,
                 "managed bootstrap-блок изменён локально; явный --force заменит только блок после backup, surrounding user text сохранится",
                 updated_data=_replace_block(text, start, end_pos, desired_block),
                 needs_backup=True,
                 manifest_entry=desired_entry,
             )
-        if current_block == desired_block:
+        if _managed_blocks_equal(current_block, desired_block):
             if previous != desired_entry:
                 return _AgentsPlan(
                     STATE_OUTDATED,
@@ -837,7 +849,7 @@ def _plan_agents_file(*, destination: Path, desired_block: bytes, previous: dict
         previous_block_hash = previous.get("block_sha256")
         if not isinstance(previous_block_hash, str):
             return _AgentsPlan(STATE_CONFLICT, "legacy block ownership не содержит block_sha256; автоматическая migration запрещена")
-        if sha256_bytes(current_block) != previous_block_hash and not force:
+        if _managed_block_hash(current_block) != previous_block_hash and not force:
             return _AgentsPlan(STATE_CONFLICT, "legacy managed block изменён локально; surrounding user text сохранён")
         return _AgentsPlan(
             STATE_OUTDATED,
