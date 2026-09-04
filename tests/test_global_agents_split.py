@@ -122,6 +122,24 @@ class GlobalAgentsSplitTests(unittest.TestCase):
             self.assertEqual(agents.read_bytes(), edited)
             self.assertEqual(_result(applied_again, "global AGENTS.md").state, lib.STATE_OK)
 
+    def test_bootstrap_line_endings_are_not_semantic_edits(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            agents, _managed, state = self._paths(Path(tmp))
+            agents.parent.mkdir(parents=True)
+            agents.write_bytes(b"# User rules\n")
+            manifest = {"managed_files": {}}
+            self._apply(agents=agents, state=state, manifest=manifest)
+
+            crlf = agents.read_bytes().replace(b"\n", b"\r\n")
+            agents.write_bytes(crlf)
+            checked = self._check(agents=agents, state=state, manifest=manifest)
+            self.assertEqual(agents.read_bytes(), crlf)
+            self.assertEqual(_result(checked, "global AGENTS.md").state, lib.STATE_OK)
+
+            applied = self._apply(agents=agents, state=state, manifest=manifest)
+            self.assertEqual(agents.read_bytes(), crlf)
+            self.assertEqual(_result(applied, "global AGENTS.md").state, lib.STATE_OK)
+
     def test_ilukhin_modified_whole_file_migrates_and_preserves_host_safety_rule(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             agents, managed, state = self._paths(Path(tmp))
