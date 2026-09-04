@@ -13,8 +13,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from setup_lib import (  # noqa: E402
-    AGENTS_BLOCK_END,
-    AGENTS_BLOCK_START,
     STATE_CONFLICT,
     STATE_OK,
     inspect_repo,
@@ -132,14 +130,21 @@ class CoreMigrationTests(unittest.TestCase):
 
             agents = (config_dir / "AGENTS.md").read_text(encoding="utf-8")
             self.assertIn("Keep this line.", agents)
-            self.assertIn(AGENTS_BLOCK_START, agents)
-            self.assertIn(AGENTS_BLOCK_END, agents)
+            self.assertIn("<!-- agent-toolchain:managed:start:v1 -->", agents)
+            self.assertIn("<!-- agent-toolchain:managed:end:v1 -->", agents)
+            managed_instructions = config_dir / "agent-toolchain" / "managed-instructions.md"
+            self.assertTrue(managed_instructions.is_file())
+            self.assertIn(str(managed_instructions), agents)
 
             manifest = json.loads((home / "state" / "manifest.json").read_text(encoding="utf-8"))
             cred = manifest["credentials"]["routerai"]
             self.assertEqual(cred["mode"], "external-file")
             self.assertEqual(cred["path"], str(external_key.resolve()))
             self.assertNotIn("sha256", cred)
+            agents_owner = manifest["managed_files"]["global AGENTS.md"]
+            self.assertEqual(agents_owner["mode"], "bootstrap-block-v1")
+            self.assertIn("block_sha256", agents_owner)
+            self.assertNotIn("sha256", agents_owner)
 
     def test_inline_credential_is_preserved_and_no_placeholder_is_created(self) -> None:
         with tempfile.TemporaryDirectory() as td:
