@@ -1,13 +1,12 @@
 """Declarative ToolSpec model, validation, and production-branch resolution."""
 from __future__ import annotations
 
-import json
 import re
-import urllib.error
-import urllib.parse
-import urllib.request
+import shutil
+import subprocess
 from dataclasses import dataclass, replace
 from typing import Any
+from urllib.parse import urlsplit
 
 TOOL_SPEC_SCHEMA = 1
 VALID_SOURCES = {"git", "builtin"}
@@ -16,7 +15,6 @@ VALID_RUNTIMES = {"python-venv", "python-builtin", "python", "go-binary", "binar
 VALID_PLATFORMS = {"windows", "linux"}
 _SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 _BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
-_GITHUB_API_MAX_BYTES = 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -85,7 +83,7 @@ def _valid_branch_name(value: str) -> bool:
 
 
 def _github_repo_parts(repo: str) -> tuple[str, str] | None:
-    parsed = urllib.parse.urlsplit(repo)
+    parsed = urlsplit(repo)
     if parsed.scheme != "https" or parsed.netloc.lower() != "github.com":
         return None
     parts = [part for part in parsed.path.split("/") if part]
@@ -99,50 +97,39 @@ def _github_repo_parts(repo: str) -> tuple[str, str] | None:
     return owner, name
 
 
-def _read_json_url(url: str) -> Any:
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "agent-toolchain-managed-tools/1",
-        },
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=15) as response:
-            length = response.headers.get("Content-Length")
-            if length is not None:
-                try:
-                    declared_length = int(length)
-                except ValueError:
-                    declared_length = None
-                if declared_length is not None and declared_length > _GITHUB_API_MAX_BYTES:
-                    raise ValueError(f"GitHub response is too large: {declared_length} bytes")
-            data = response.read(_GITHUB_API_MAX_BYTES + 1)
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise ValueError(f"GitHub branch lookup failed: {exc}") from exc
-    if len(data) > _GITHUB_API_MAX_BYTES:
-        raise ValueError(f"GitHub response exceeds {_GITHUB_API_MAX_BYTES} bytes")
-    try:
-        return json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise ValueError(f"GitHub branch response is not valid JSON: {exc}") from exc
-
-
 def _resolve_github_branch(repo: str, branch: str) -> str:
-    parts = _github_repo_parts(repo)
-    if parts is None:
+    if _github_repo_parts(repo) is None:
         raise ValueError("follow-branch currently requires an https://github.com/OWNER/REPO(.git) source")
     if not _valid_branch_name(branch):
         raise ValueError(f"invalid production branch name: {branch!r}")
-    owner, name = parts
-    branch_path = urllib.parse.quote(branch, safe="")
-    payload = _read_json_url(f"https://api.github.com/repos/{owner}/{name}/branches/{branch_path}")
+    git = shutil.which("git")
+    if not git:
+        raise ValueError("git is required to resolve a git-sourced production branch")
+    remote_ref = f"refs/heads/{branch}"
     try:
-        sha = payload["commit"]["sha"]
-    except (TypeError, KeyError) as exc:
-        raise ValueError("GitHub branch response has no commit.sha") from exc
-    if not isinstance(sha, str) or _SHA_RE.fullmatch(sha) is None:
-        raise ValueError(f"GitHub returned an invalid branch commit SHA: {sha!r}")
+        completed = subprocess.run(
+            [git, "ls-remote", "--refs", repo, remote_ref],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(f"git ls-remote failed: {exc}") from exc
+    if completed.returncode != 0:
+        raise ValueError(f"git ls-remote failed with exit code {completed.returncode}")
+    try:
+        output = completed.stdout.decode("ascii").strip().splitlines()
+    except UnicodeDecodeError as exc:
+        raise ValueError("git ls-remote returned non-ASCII output") from exc
+    if len(output) != 1:
+        raise ValueError(f"production branch resolved to {len(output)} refs instead of exactly one")
+    fields = output[0].split()
+    if len(fields) != 2 or fields[1] != remote_ref:
+        raise ValueError("git ls-remote returned an unexpected ref")
+    sha = fields[0]
+    if _SHA_RE.fullmatch(sha) is None:
+        raise ValueError(f"git ls-remote returned an invalid commit SHA: {sha!r}")
     return sha.lower()
 
 
