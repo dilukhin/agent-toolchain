@@ -112,11 +112,11 @@ def _read_json_url(url: str) -> Any:
             length = response.headers.get("Content-Length")
             if length is not None:
                 try:
-                    if int(length) > _GITHUB_API_MAX_BYTES:
-                        raise ValueError(f"GitHub response is too large: {length} bytes")
-                except ValueError as exc:
-                    if "too large" in str(exc):
-                        raise
+                    declared_length = int(length)
+                except ValueError:
+                    declared_length = None
+                if declared_length is not None and declared_length > _GITHUB_API_MAX_BYTES:
+                    raise ValueError(f"GitHub response is too large: {declared_length} bytes")
             data = response.read(_GITHUB_API_MAX_BYTES + 1)
     except (urllib.error.URLError, TimeoutError, OSError) as exc:
         raise ValueError(f"GitHub branch lookup failed: {exc}") from exc
@@ -152,9 +152,9 @@ def _resolve_follow_branch(spec: ToolSpec) -> tuple[ToolSpec | None, str | None]
         sha = _resolve_github_branch(spec.repo, spec.tracking_branch)
     except ValueError as exc:
         return None, f"ToolSpec {spec.name!r}: cannot resolve production branch {spec.tracking_branch!r}: {exc}"
-    # Downstream deployment is deliberately exact-ref-only. Branch selection is resolved
-    # once per parse/reconciliation run; runtime and bound skills receive the same SHA.
-    return replace(spec, update_policy="pinned-tested", ref=sha), None
+    # Resolve the mutable production branch exactly once for this reconciliation run.
+    # The resulting immutable SHA is reused by runtime and bound skill reconciliation.
+    return replace(spec, ref=sha), None
 
 
 def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
