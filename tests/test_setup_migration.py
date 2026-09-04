@@ -134,7 +134,9 @@ class CoreMigrationTests(unittest.TestCase):
             self.assertIn("<!-- agent-toolchain:managed:end:v1 -->", agents)
             managed_instructions = config_dir / "agent-toolchain" / "managed-instructions.md"
             self.assertTrue(managed_instructions.is_file())
-            self.assertIn(str(managed_instructions), agents)
+            reference_prefix = "- Before using managed tools or changing machine state, read and follow `"
+            referenced_path = agents.split(reference_prefix, 1)[1].split("`", 1)[0]
+            self.assertTrue(os.path.samefile(referenced_path, managed_instructions))
 
             manifest = json.loads((home / "state" / "manifest.json").read_text(encoding="utf-8"))
             cred = manifest["credentials"]["routerai"]
