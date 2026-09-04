@@ -308,7 +308,7 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
             if check:
                 reporter.add(component, STATE_OUTDATED,
                              "содержимое актуально, но ownership metadata устарела; обычный apply обновит metadata")
-            return False
+                return False
             managed[component] = {"path": str(destination), "sha256": desired_hash, "source": source_label}
             reporter.add(component, STATE_CONFIGURED, "содержимое уже было актуально; ownership metadata обновлена")
             return True
