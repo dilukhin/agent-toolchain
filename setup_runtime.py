@@ -200,12 +200,19 @@ def _managed_file_conflict_action(result) -> str | None:
     if result.state != STATE_CONFLICT or "управляемый файл изменён локально" not in result.detail:
         return None
     if result.component == "global AGENTS.md":
-        subject = f"«global AGENTS.md» ({_default_global_agents_path()})"
-    else:
-        subject = f"«{result.component}»"
+        destination = _default_global_agents_path()
+        template = os.path.join(os.path.dirname(__file__), "templates", "AGENTS.md")
+        if os.name == "nt":
+            command = f'fc "{template}" "{destination}"'
+        else:
+            command = f'diff -u "{template}" "{destination}"'
+        return (
+            f"сравнить локально изменённый `global AGENTS.md` с управляемым шаблоном: `{command}`; "
+            "обычный `toolchainctl apply` файл не перезапишет"
+        )
     return (
-        f"разобраться с {subject}: если локальные правки не нужны — выполнить `toolchainctl apply --force` "
-        "(с backup); если нужны — сначала сохранить их вручную"
+        f"проверить локальные изменения в «{result.component}»; обычный `toolchainctl apply` их сохранит, "
+        "автоматическая перезапись отключена"
     )
 
 

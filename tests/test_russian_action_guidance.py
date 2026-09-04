@@ -46,12 +46,13 @@ class RussianActionGuidanceTests(unittest.TestCase):
             summary = runtime._format_tldr(reporter.results)
 
         self.assertIn("управляемый файл изменён локально", result.detail)
-        self.assertIn("/tmp/opencode/AGENTS.md", result.detail)
+        self.assertIn(os.path.join("/tmp/opencode", "AGENTS.md"), result.detail)
         self.assertIn("обычный `toolchainctl apply` этот конфликт не устранит", result.detail)
         self.assertNotIn("managed file", result.detail)
-        self.assertIn("если локальные правки не нужны", summary)
-        self.assertIn("`toolchainctl apply --force`", summary)
-        self.assertIn("если нужны — сначала сохранить их вручную", summary)
+        self.assertIn("сравнить локально изменённый `global AGENTS.md`", summary)
+        self.assertIn("AGENTS.md", summary)
+        self.assertIn("обычный `toolchainctl apply` файл не перезапишет", summary)
+        self.assertNotIn("apply --force", summary)
         self.assertNotIn("исправить «global AGENTS.md»", summary)
 
     def test_generic_managed_file_conflict_is_russian_and_actionable(self) -> None:
@@ -63,8 +64,9 @@ class RussianActionGuidanceTests(unittest.TestCase):
         summary = runtime._format_tldr(reporter.results)
 
         self.assertEqual(result.detail, "управляемый файл изменён локально; файл сохранён без перезаписи")
-        self.assertIn("разобраться с «managed sample»", summary)
-        self.assertIn("`toolchainctl apply --force`", summary)
+        self.assertIn("проверить локальные изменения в «managed sample»", summary)
+        self.assertIn("автоматическая перезапись отключена", summary)
+        self.assertNotIn("apply --force", summary)
 
 
 if __name__ == "__main__":
