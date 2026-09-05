@@ -10,9 +10,9 @@
   "models": {
     "openai/gpt-4o": {
       "description": "Дорогая универсальная модель, запасной вариант для сложных задач",
-      "name": "OpenAI GPT-4o [дорогая универсальная, 282/1130 ₽]",
-      "price_input_rub_per_1m": 282,
-      "price_output_rub_per_1m": 1130,
+      "name": "OpenAI GPT-4o [дорогая универсальная, 281/1126 ₽]",
+      "price_input_rub_per_1m": 281,
+      "price_output_rub_per_1m": 1126,
       "cache_read_rub_per_1m": 141
     },
     "openai/gpt-4o-mini": {
@@ -24,29 +24,29 @@
     },
     "deepseek/deepseek-chat": {
       "description": "Недорогая модель для анализа кода и повседневных задач",
-      "name": "DeepSeek Chat [дешёвая code/chat, 36/101 ₽]",
+      "name": "DeepSeek Chat [дешёвая code/chat, 36/100 ₽]",
       "price_input_rub_per_1m": 36,
-      "price_output_rub_per_1m": 101
+      "price_output_rub_per_1m": 100
     },
     "anthropic/claude-opus-4.7": {
       "description": "Топовая модель для сложного агентного программирования",
-      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 565/2824 ₽]",
-      "price_input_rub_per_1m": 565,
-      "price_output_rub_per_1m": 2824,
+      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 563/2814 ₽]",
+      "price_input_rub_per_1m": 563,
+      "price_output_rub_per_1m": 2814,
       "cache_read_rub_per_1m": 56
     },
     "qwen/qwen3.6-plus": {
       "description": "Основная рабочая модель для OpenCode",
-      "name": "Qwen 3.6 Plus [основная, 37/220 ₽]",
+      "name": "Qwen 3.6 Plus [основная, 37/219 ₽]",
       "price_input_rub_per_1m": 37,
-      "price_output_rub_per_1m": 220,
+      "price_output_rub_per_1m": 219,
       "cache_read_rub_per_1m": 4
     },
     "deepseek/deepseek-v4-pro": {
       "description": "Сильная reasoning/code модель",
-      "name": "DeepSeek V4 Pro [reasoning, 190/190 ₽]",
-      "price_input_rub_per_1m": 190,
-      "price_output_rub_per_1m": 190,
+      "name": "DeepSeek V4 Pro [reasoning, 189/189 ₽]",
+      "price_input_rub_per_1m": 189,
+      "price_output_rub_per_1m": 189,
       "cache_read_rub_per_1m": 95
     },
     "minimax/minimax-m2.7": {
@@ -57,30 +57,30 @@
     },
     "z-ai/glm-5": {
       "description": "Для архитектора/ревьюера: планирование, декомпозиция",
-      "name": "GLM-5 [архитектор, 68/217 ₽]",
+      "name": "GLM-5 [архитектор, 68/216 ₽]",
       "price_input_rub_per_1m": 68,
-      "price_output_rub_per_1m": 217,
+      "price_output_rub_per_1m": 216,
       "cache_read_rub_per_1m": 14
     },
     "moonshotai/kimi-k2.5": {
       "description": "Запасная агентная для tool-use и анализа кода",
-      "name": "Kimi K2.5 [агентная, 51/254 ₽]",
+      "name": "Kimi K2.5 [агентная, 51/253 ₽]",
       "price_input_rub_per_1m": 51,
-      "price_output_rub_per_1m": 254,
+      "price_output_rub_per_1m": 253,
       "cache_read_rub_per_1m": 8
     },
     "z-ai/glm-5-turbo": {
       "description": "Дорогой fallback для длинных цепочек",
-      "name": "GLM-5 Turbo [fallback, 136/452 ₽]",
-      "price_input_rub_per_1m": 136,
-      "price_output_rub_per_1m": 452,
+      "name": "GLM-5 Turbo [fallback, 135/450 ₽]",
+      "price_input_rub_per_1m": 135,
+      "price_output_rub_per_1m": 450,
       "cache_read_rub_per_1m": 27
     },
     "openai/gpt-5.2-codex": {
       "description": "Оптимизированная для программной инженерии",
-      "name": "GPT-5.2-Codex [код/агент, 198/1581 ₽]",
-      "price_input_rub_per_1m": 198,
-      "price_output_rub_per_1m": 1581,
+      "name": "GPT-5.2-Codex [код/агент, 197/1576 ₽]",
+      "price_input_rub_per_1m": 197,
+      "price_output_rub_per_1m": 1576,
       "cache_read_rub_per_1m": 20
     },
     "qwen/qwen3-coder-next": {
@@ -92,9 +92,9 @@
     },
     "qwen/qwen3.5-122b-a10b": {
       "description": "Мультимодальная модель с reasoning, контекст 262K токенов",
-      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 29/235 ₽]",
+      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 29/234 ₽]",
       "price_input_rub_per_1m": 29,
-      "price_output_rub_per_1m": 235
+      "price_output_rub_per_1m": 234
     }
   },
   "config_defaults": {
