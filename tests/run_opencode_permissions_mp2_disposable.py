@@ -64,20 +64,18 @@ def load_current_contract(permissions_root: Path) -> dict[str, Any]:
 
     native_id = profile["policy_artifacts"]["linux"]
     native_dir = permissions_root / "dist" / "opencode" / segment(native_id)
-    candidates = []
-    for manifest_path in sorted((permissions_root / "dist" / "pilot").glob("sha256-*/manifest.json")):
-        manifest = load_json(manifest_path)
-        target = manifest.get("target") or {}
-        if (
-            manifest.get("status") == "mp0_ready"
-            and target.get("exact_version") == version
-            and target.get("platform") == "linux"
-            and target.get("compatibility_profile_id") == profile["profile_id"]
-            and manifest.get("native_policy_artifact_id") == native_id
-        ):
-            candidates.append((manifest_path.parent, manifest))
-    assert len(candidates) == 1, f"current P0 pilot artifact candidates: {candidates}"
-    pilot_dir, pilot_manifest = candidates[0]
+
+    builder_path = permissions_root / "tools" / "build_p0_pilot_artifact.py"
+    spec = importlib.util.spec_from_file_location("mp2_p0_artifact_builder", builder_path)
+    assert spec is not None and spec.loader is not None
+    builder = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(builder)
+    plan = builder.build_plan(permissions_root)
+    assert plan["manifest"]["target"]["exact_version"] == version
+    assert plan["manifest"]["native_policy_artifact_id"] == native_id
+    pilot_dir = permissions_root / plan["artifact_path"]
+    pilot_manifest = load_json(pilot_dir / "manifest.json")
+    assert pilot_manifest == plan["manifest"]
 
     checked = pilot.validate_artifacts(
         pilot_bundle_dir=pilot_dir,
