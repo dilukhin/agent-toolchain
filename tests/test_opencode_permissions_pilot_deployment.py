@@ -319,7 +319,7 @@ class PilotDeploymentTests(unittest.TestCase):
 
             pilot._atomic_write = interrupted
             try:
-                with self.assertRaisesRegex(RuntimeError, "synthetic interruption"):
+                with self.assertRaises(pilot.PilotDeploymentError) as ctx:
                     pilot.apply_pilot(
                         pilot_bundle_dir=bundle,
                         native_artifact_dir=native,
@@ -328,6 +328,9 @@ class PilotDeploymentTests(unittest.TestCase):
                         data_dir=data,
                         state_dir=state,
                     )
+                self.assertEqual(ctx.exception.code, "PILOT_APPLY_FAILED")
+                self.assertIsInstance(ctx.exception.__cause__, RuntimeError)
+                self.assertEqual(str(ctx.exception.__cause__), "synthetic interruption")
             finally:
                 pilot._atomic_write = original_atomic
 
