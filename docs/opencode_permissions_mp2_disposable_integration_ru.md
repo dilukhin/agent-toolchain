@@ -1,6 +1,6 @@
 # OpenCode Permissions MP-2 — disposable exact OpenCode integration
 
-Статус: **PASS ON BRANCH / PENDING MERGE / DISPOSABLE ONLY / NO USER DEPLOYMENT**.
+Статус: **CLOSED / PASS / DISPOSABLE ONLY / NO USER DEPLOYMENT**.
 
 MP-2 проверяет production-shaped P0 целиком на официальном Linux binary текущего `current_target`, выбранного через `dilukhin/opencode_permissions/tests/compatibility/registry.json`.
 
@@ -53,16 +53,17 @@ sha256:b38090e07008fb174607aa2a924cfef1dd26d03bdb339a379b1a770397a8ad84
 
 Старый pilot `sha256:fe0587a7...` сохранён immutable как historical evidence и не выбирается current source plan.
 
-## Branch acceptance evidence
+## Runtime evidence
 
-На `agent-toolchain` head `85893c92a543bdfaba4d6c29628894c2d7f10702` workflow `Validate MP-2 disposable exact OpenCode` run #2 выполнил production integration с checkout `opencode_permissions/main=77408e4fc1746cb37e64ab39815f3ff5b6c80784` и официальным OpenCode 1.18.29.
-
-Verified release:
+Финальный production proof использует:
 
 ```text
-asset: opencode-linux-x64.tar.gz
-sha256: ea800b7ff56226b70952126c9fc1e2517ca4c4b5682fd9d3f9e87449697a1194
+OpenCode: 1.18.29
 compatibility profile: opencode-1.18.29-gate-b
+asset: opencode-linux-x64.tar.gz
+asset sha256: ea800b7ff56226b70952126c9fc1e2517ca4c4b5682fd9d3f9e87449697a1194
+pilot: sha256:ce1ae9aedcb65e2e62c4ee38f21d0d535b58338816bd273ad090bc76cc64a9d2
+native: sha256:b38090e07008fb174607aa2a924cfef1dd26d03bdb339a379b1a770397a8ad84
 ```
 
 Результаты runtime proof:
@@ -76,7 +77,7 @@ classifier_failure  PASS  running   / pending=true
 no_auditor          PASS  false/false
 ```
 
-Таким образом на branch evidence одновременно подтверждены terminal native ALLOW, terminal hard DENY, реальный production classifier ALLOW, нормальный residual ASK, fail-closed classifier failure и отсутствие auditor.
+Таким образом одновременно подтверждены terminal native ALLOW, terminal hard DENY, реальный production classifier ALLOW, нормальный residual ASK, fail-closed classifier failure и отсутствие auditor.
 
 ## Stop conditions
 
@@ -90,14 +91,23 @@ MP-2 не считается PASS при любом из следующих ре
 - residual ASK/classifier failure превращаются в execution;
 - обнаруживается auditor/workspace trust/state-changing classifier.
 
-## Closure gate
+## Gate closure
 
-Branch runtime proof сам по себе ещё не закрывает MP-2. Для **CLOSED / PASS** требуются также:
+MP-2 закрыт после выполнения всех acceptance conditions:
 
-1. весь CI финального PR head PASS;
-2. merge в `agent-toolchain/main` с exact-head guard;
-3. targeted post-merge read-back;
-4. post-merge `Validate MP-2 disposable exact OpenCode` PASS;
-5. post-merge общий `Validate agent-toolchain` PASS.
+1. финальный PR head `329463339686ced0c846448e0fcdc57d666d1caa`;
+2. PR-specific `Validate MP-2 disposable exact OpenCode` #4 — PASS;
+3. PR-specific `Validate MP-1 OpenCode Permissions pilot` #25 — PASS;
+4. PR-specific `Validate RouterAI generated ownership` #63 — PASS;
+5. PR-specific `Validate agent-toolchain` #511 — Linux PASS, Windows PASS;
+6. PR #49 squash-merged в `main` с exact-head guard как `5f8c3b58e2b3a02877bd207872fdd4fc198859bb`;
+7. targeted post-merge read-back подтвердил:
+   - `main=5f8c3b58e2b3a02877bd207872fdd4fc198859bb`;
+   - harness blob `4ccdedeef2204de033e09c4be09fc46d72499db8`;
+   - MP-2 workflow blob `4096e6cce28a7cef986050ede58c3aac317b4c87`;
+8. post-merge `Validate MP-2 disposable exact OpenCode` #5 — PASS; run checkout-нул `agent-toolchain=5f8c3b58e2b3a02877bd207872fdd4fc198859bb` и `opencode_permissions=77408e4fc1746cb37e64ab39815f3ff5b6c80784`, затем повторно подтвердил все шесть runtime scenarios;
+9. post-merge `Validate agent-toolchain` #512 — Linux PASS, Windows PASS.
 
-До выполнения этих условий и explicit MP-2 closure пользовательский pilot остаётся запрещён. MP-3 — отдельный первый user opt-in этап.
+Результат: **MP-2 CLOSED / PASS**.
+
+MP-2 не разрешает автоматическое изменение реальной пользовательской среды. MP-3 остаётся отдельным первым user opt-in этапом. Auditor, workspace trust и state-changing classifier остаются вне scope текущего этапа.
