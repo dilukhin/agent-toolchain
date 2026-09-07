@@ -11,12 +11,12 @@ for entry in (ROOT, TESTS):
     sys.path.insert(0, str(entry))
 
 import setup_opencode_permissions_pilot as pilot  # noqa: E402
-from test_opencode_permissions_pilot_deployment import PilotDeploymentTests  # noqa: E402
+import test_opencode_permissions_pilot_deployment as deployment_tests  # noqa: E402
 
 
 class PilotRecoveryGuardTests(unittest.TestCase):
     def test_invalid_previous_permission_is_rejected_before_any_mutation(self):
-        helper = PilotDeploymentTests(methodName="runTest")
+        helper = deployment_tests.PilotDeploymentTests(methodName="runTest")
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             bundle, native, _ = helper.make_artifacts(root)
