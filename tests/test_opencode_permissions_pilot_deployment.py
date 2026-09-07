@@ -313,7 +313,7 @@ class PilotDeploymentTests(unittest.TestCase):
             original_atomic = pilot._atomic_write
 
             def interrupted(path, data_bytes):
-                if Path(path) == config_path:
+                if Path(path).resolve() == config_path.resolve():
                     raise RuntimeError("synthetic interruption")
                 return original_atomic(Path(path), data_bytes)
 
