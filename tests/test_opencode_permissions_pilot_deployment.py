@@ -300,6 +300,78 @@ class PilotDeploymentTests(unittest.TestCase):
             self.assertEqual(ctx.exception.code, "CONFIG_ROLLBACK_CONFLICT")
             self.assertEqual(plugin_path.read_bytes(), plugin_before)
 
+    def test_prepared_state_resumes_after_interrupted_config_write(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundle, native, _ = self.make_artifacts(root)
+            config, data, state = self.paths(root)
+            config.mkdir()
+            original = {"model": "synthetic/model"}
+            config_path = config / "opencode.jsonc"
+            config_path.write_bytes(pilot._pretty_json(original))
+
+            original_atomic = pilot._atomic_write
+
+            def interrupted(path, data_bytes):
+                if Path(path) == config_path:
+                    raise RuntimeError("synthetic interruption")
+                return original_atomic(Path(path), data_bytes)
+
+            pilot._atomic_write = interrupted
+            try:
+                with self.assertRaisesRegex(RuntimeError, "synthetic interruption"):
+                    pilot.apply_pilot(
+                        pilot_bundle_dir=bundle,
+                        native_artifact_dir=native,
+                        installed_version="1.18.29",
+                        config_dir=config,
+                        data_dir=data,
+                        state_dir=state,
+                    )
+            finally:
+                pilot._atomic_write = original_atomic
+
+            prepared = json.loads((state / "opencode-permissions-pilot.json").read_text())
+            self.assertEqual(prepared["phase"], "prepared")
+            self.assertEqual(json.loads(config_path.read_text()), original)
+            self.assertFalse((config / "plugins" / pilot.PLUGIN_NAME).exists())
+
+            resumed = pilot.apply_pilot(
+                pilot_bundle_dir=bundle,
+                native_artifact_dir=native,
+                installed_version="1.18.29",
+                config_dir=config,
+                data_dir=data,
+                state_dir=state,
+            )
+            self.assertEqual(resumed["effective_readback"], "PASS")
+            self.assertTrue(resumed["changed"])
+
+    def test_jsonc_merge_conflict_is_read_only(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundle, native, _ = self.make_artifacts(root)
+            config, data, state = self.paths(root)
+            config.mkdir()
+            config_path = config / "opencode.jsonc"
+            original = b'{\n  // preserve this comment\n  "model": "synthetic/model"\n}\n'
+            config_path.write_bytes(original)
+
+            with self.assertRaises(pilot.PilotDeploymentError) as ctx:
+                pilot.apply_pilot(
+                    pilot_bundle_dir=bundle,
+                    native_artifact_dir=native,
+                    installed_version="1.18.29",
+                    config_dir=config,
+                    data_dir=data,
+                    state_dir=state,
+                )
+            self.assertEqual(ctx.exception.code, "CONFIG_NOT_SAFE_FOR_PILOT_MERGE")
+            self.assertEqual(config_path.read_bytes(), original)
+            self.assertFalse(data.exists())
+            self.assertFalse(state.exists())
+            self.assertFalse((config / "plugins" / pilot.PLUGIN_NAME).exists())
+
     def test_artifact_tamper_is_detected(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
