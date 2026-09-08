@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 import tempfile
@@ -26,6 +27,27 @@ SCENARIOS = {
     "classifier_failure": "/usr/bin/grep MP2_NEEDLE fixture.txt",
 }
 GITIGNORE = "node_modules\npackage.json\npackage-lock.json\nbun.lock\n.gitignore\n"
+METRIC_COUNTERS = {
+    "native_ask",
+    "classifier_allow",
+    "classifier_deny",
+    "residual_ask",
+    "classifier_error/fail_closed",
+    "binding_reject",
+}
+METRIC_TOPLEVEL = {
+    "schema",
+    "scope",
+    "opencode_version",
+    "compatibility_profile",
+    "native_policy_artifact_id",
+    "pilot_artifact_id",
+    "classifier_profile",
+    "counters",
+    "reasons",
+    "families",
+    "updated_at",
+}
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -92,6 +114,17 @@ def load_current_contract(permissions_root: Path) -> dict[str, Any]:
     assert classifier_profile["constraints"]["workspace_trust"] is False
     assert classifier_profile["constraints"]["state_changing"] is False
     assert classifier_profile["allow_families"] == ["grep.single_nonsecret_workspace_file"]
+    metrics = classifier_profile["metrics"]
+    assert metrics["schema"] == "opencode-permissions-p0-metrics/v1"
+    assert metrics["scope"] == "ask_path"
+    assert metrics["required_for_classifier_allow"] is True
+    assert metrics["raw_inputs"] is False
+    assert metrics["storage"] == "per_process_aggregate_snapshot"
+    assert metrics["state_resolution"] == "os_homedir_local_state"
+    assert metrics["max_reason_buckets"] == 64
+    assert set(metrics["counters"]) == METRIC_COUNTERS
+    assert "native_allow" not in metrics["counters"]
+    assert "native_deny" not in metrics["counters"]
 
     return {
         "permissions_root": permissions_root,
@@ -241,14 +274,70 @@ def configure_and_deploy(root: Path, provider_port: int, contract: dict[str, Any
         }
     )
     env.pop("OPENCODE_SERVER_PASSWORD", None)
-    return project, config_dir, Path(deployed["runtime_dir"]), deny_marker, env
+    return project, home, config_dir, Path(deployed["runtime_dir"]), deny_marker, env
+
+
+def metric_files(home: Path, contract: dict[str, Any]) -> list[Path]:
+    directory = (
+        home
+        / ".local"
+        / "state"
+        / "opencode_permissions"
+        / "p0-metrics"
+        / contract["pilot_manifest"]["artifact_path_segment"]
+    )
+    if not directory.exists():
+        return []
+    assert directory.is_dir() and not directory.is_symlink()
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+    return sorted(directory.glob("process-*.json"))
+
+
+def aggregate_metrics(
+    home: Path,
+    contract: dict[str, Any],
+    *,
+    command: str,
+    project: Path,
+    session_id: str,
+) -> dict[str, int]:
+    files = metric_files(home, contract)
+    assert files, "expected P0 metrics snapshot"
+    aggregate = {name: 0 for name in METRIC_COUNTERS}
+    for path in files:
+        assert path.is_file() and not path.is_symlink()
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+        raw = path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        assert isinstance(data, dict)
+        assert set(data) == METRIC_TOPLEVEL
+        assert data["schema"] == "opencode-permissions-p0-metrics/v1"
+        assert data["scope"] == "ask_path"
+        assert data["opencode_version"] == contract["version"]
+        assert data["compatibility_profile"] == contract["profile"]["profile_id"]
+        assert data["native_policy_artifact_id"] == contract["native_id"]
+        assert data["pilot_artifact_id"] == contract["pilot_manifest"]["artifact_id"]
+        assert data["classifier_profile"] == contract["classifier_profile"]["classifier_profile_id"]
+        assert set(data["counters"]) == METRIC_COUNTERS
+        assert isinstance(data["reasons"], dict) and len(data["reasons"]) <= 64
+        assert isinstance(data["families"], dict) and len(data["families"]) <= 64
+        assert command not in raw
+        assert str(project) not in raw
+        assert session_id not in raw
+        assert "fixture.txt" not in raw
+        assert "MP2_NEEDLE" not in raw
+        for name in METRIC_COUNTERS:
+            value = data["counters"][name]
+            assert isinstance(value, int) and value >= 0
+            aggregate[name] += value
+    return aggregate
 
 
 def run_scenario(opencode: Path, contract: dict[str, Any], dc4, name: str) -> dict[str, Any]:
     command = SCENARIOS[name]
     with tempfile.TemporaryDirectory(prefix=f"mp2-{name}-") as td, dc4.mock_provider(command) as provider_port:
         root = Path(td)
-        project, config_dir, runtime_dir, deny_marker, env = configure_and_deploy(
+        project, home, config_dir, runtime_dir, deny_marker, env = configure_and_deploy(
             root, provider_port, contract
         )
         port = dc4.free_port()
@@ -261,6 +350,7 @@ def run_scenario(opencode: Path, contract: dict[str, Any], dc4, name: str) -> di
             text=True,
         )
         base = f"http://127.0.0.1:{port}"
+        metrics: dict[str, int] | None = None
         try:
             dc4.wait_server(base, str(project), server)
             if name == "classifier_failure":
@@ -295,14 +385,45 @@ def run_scenario(opencode: Path, contract: dict[str, Any], dc4, name: str) -> di
             if name == "native_allow":
                 assert "completed" in states and not pending
                 assert any(str(project) in output for output in outputs)
+                assert not metric_files(home, contract), "native ALLOW must not be inferred into ASK-path metrics"
             elif name == "native_deny":
                 assert "error" in states and not pending
                 assert not deny_marker.exists(), "native DENY command executed"
+                assert not metric_files(home, contract), "native DENY must not be inferred into ASK-path metrics"
             elif name == "classifier_allow":
                 assert "completed" in states and not pending
                 assert any("MP2_NEEDLE expected line" in output for output in outputs)
-            elif name in {"residual_ask", "classifier_failure"}:
+                metrics = aggregate_metrics(
+                    home, contract, command=command, project=project, session_id=sid
+                )
+                assert metrics["native_ask"] == 1
+                assert metrics["classifier_allow"] == 1
+                assert metrics["classifier_deny"] == 0
+                assert metrics["residual_ask"] == 0
+                assert metrics["classifier_error/fail_closed"] == 0
+                assert metrics["binding_reject"] == 0
+            elif name == "residual_ask":
                 assert pending and "completed" not in states
+                metrics = aggregate_metrics(
+                    home, contract, command=command, project=project, session_id=sid
+                )
+                assert metrics["native_ask"] == 1
+                assert metrics["classifier_allow"] == 0
+                assert metrics["classifier_deny"] == 0
+                assert metrics["residual_ask"] == 1
+                assert metrics["classifier_error/fail_closed"] == 0
+                assert metrics["binding_reject"] == 0
+            elif name == "classifier_failure":
+                assert pending and "completed" not in states
+                metrics = aggregate_metrics(
+                    home, contract, command=command, project=project, session_id=sid
+                )
+                assert metrics["native_ask"] == 1
+                assert metrics["classifier_allow"] == 0
+                assert metrics["classifier_deny"] == 0
+                assert metrics["residual_ask"] == 1
+                assert metrics["classifier_error/fail_closed"] == 1
+                assert metrics["binding_reject"] == 0
             else:
                 raise AssertionError(name)
 
@@ -311,6 +432,7 @@ def run_scenario(opencode: Path, contract: dict[str, Any], dc4, name: str) -> di
                 "status": "PASS",
                 "tool_states": states,
                 "pending_permission": bool(pending),
+                "metrics": metrics,
             }
         finally:
             server.terminate()
