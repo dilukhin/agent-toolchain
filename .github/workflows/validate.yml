@@ -45,7 +45,12 @@ jobs:
             .\setup_path.py `
             .\setup_inventory.py `
             .\setup_tools.py `
+            .\setup_yc_transitional_guard.py `
+            .\yc_transitional_entry.py `
             .\tests\run_managed_tools_integration.py
+      - name: Validate transitional YC guard unit tests
+        shell: powershell
+        run: py -3 -m unittest tests.test_yc_transitional_guard_deployment tests.test_yc_transitional_entry -v
       - name: Validate PowerShell bootstrap and retired interface syntax
         shell: powershell
         run: |
@@ -152,7 +157,11 @@ jobs:
             ./setup_path.py \
             ./setup_inventory.py \
             ./setup_tools.py \
+            ./setup_yc_transitional_guard.py \
+            ./yc_transitional_entry.py \
             ./tests/run_managed_tools_integration.py
+      - name: Validate transitional YC guard unit tests
+        run: python3 -m unittest tests.test_yc_transitional_guard_deployment tests.test_yc_transitional_entry -v
       - name: Validate shell bootstrap and retired interface syntax
         run: |
           bash -n ./bootstrap_linux.sh

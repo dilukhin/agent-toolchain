@@ -38,6 +38,7 @@ from setup_tool_skills import reconcile_pinned_tool_skills
 from setup_tools import parse_tool_specs
 from setup_external_updates import cache_path, load_cache, refresh
 from setup_inventory import common_external_cli_inventory
+import setup_yc_transitional_guard
 
 PRODUCT = "agent-toolchain"
 LEGACY_PRODUCT = "opencode_setup"
@@ -64,6 +65,8 @@ _CORE_REQUIRED_FILES = (
     "setup_inventory.py",
     "setup_external_updates.py",
     "setup_tools.py",
+    "setup_yc_transitional_guard.py",
+    "yc_transitional_entry.py",
     "proxy_tools.py",
     "config_data.json",
 )
@@ -205,6 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
     update_sub.add_parser("show", help="show cached advisories without network access")
     update = sub.add_parser("update", help="update the installed agent-toolchain core from GitHub main")
     update.add_argument("--apply", action="store_true", help="run the freshly installed toolchainctl apply after update")
+    setup_yc_transitional_guard.add_cli_parser(sub)
     return parser
 
 
@@ -688,6 +692,8 @@ def main(argv: list[str] | None = None) -> int:
         return _updates_phase(args)
     if args.command == "update":
         return _run_self_update(apply_after=bool(args.apply))
+    if args.command == "yc-guard":
+        return setup_yc_transitional_guard.run_cli(args)
 
     check = args.command == "check"
     try:
