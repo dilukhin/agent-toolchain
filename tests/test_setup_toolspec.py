@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -11,8 +12,7 @@ if str(ROOT) not in sys.path:
 
 from setup_tools import TOOL_SPEC_SCHEMA, parse_tool_spec, parse_tool_specs  # noqa: E402
 
-SSH_RELAY_REF = "1a794f84bb3664fe580716195ee939bbe2295675"
-AGENT_SAFE_REF = "95545d20533b2dfa1de7d75a30fa1bbfb1d428e3"
+_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 class ToolSpecTests(unittest.TestCase):
@@ -100,26 +100,39 @@ class ToolSpecTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(parsed, {})
 
-    def test_repository_config_declares_exact_pinned_production_tools(self) -> None:
+    def test_repository_config_follows_production_branches_and_resolves_exact_refs(self) -> None:
         data = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
         env = data["managed_environment"]
         self.assertEqual(env["manifest_schema"], 2)
         self.assertEqual(env["tool_spec_schema"], TOOL_SPEC_SCHEMA)
+
+        raw_ssh = env["tools"]["ssh_relay"]
+        self.assertEqual(raw_ssh["update_policy"], "follow-branch")
+        self.assertEqual(raw_ssh["branch"], "main")
+        self.assertNotIn("ref", raw_ssh)
+
+        raw_safe = env["tools"]["agent-safe"]
+        self.assertEqual(raw_safe["update_policy"], "follow-branch")
+        self.assertEqual(raw_safe["branch"], "master")
+        self.assertNotIn("ref", raw_safe)
+
         parsed, error = parse_tool_specs(env)
         self.assertIsNone(error)
         self.assertEqual(set(parsed), {"ssh_relay", "agent-safe", "proxy-tools"})
 
         ssh = parsed["ssh_relay"]
         self.assertEqual(ssh.update_policy, "pinned-tested")
+        self.assertEqual(ssh.tracking_branch, "main")
         self.assertEqual(ssh.runtime, "python-venv")
-        self.assertEqual(ssh.ref, SSH_RELAY_REF)
+        self.assertRegex(ssh.ref or "", _SHA_RE)
         self.assertEqual(ssh.entrypoints, ("ssh_relay",))
         self.assertIn(("ssh_relay", "doctor"), tuple(check.argv for check in ssh.health_contract))
 
         safe = parsed["agent-safe"]
         self.assertEqual(safe.update_policy, "pinned-tested")
+        self.assertEqual(safe.tracking_branch, "master")
         self.assertEqual(safe.runtime, "python-venv")
-        self.assertEqual(safe.ref, AGENT_SAFE_REF)
+        self.assertRegex(safe.ref or "", _SHA_RE)
         self.assertEqual(safe.entrypoints, ("safe",))
 
         proxy = parsed["proxy-tools"]

@@ -1,14 +1,21 @@
-"""Declarative ToolSpec model and validation for managed helper runtimes."""
+"""Declarative ToolSpec model, validation, and production-branch resolution."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+import re
+import shutil
+import subprocess
+from dataclasses import dataclass, replace
 from typing import Any
+from urllib.parse import urlsplit
 
 TOOL_SPEC_SCHEMA = 1
 VALID_SOURCES = {"git", "builtin"}
-VALID_UPDATE_POLICIES = {"latest", "pinned-tested", "bundled-with-setup"}
+VALID_UPDATE_POLICIES = {"latest", "pinned-tested", "follow-branch", "bundled-with-setup"}
 VALID_RUNTIMES = {"python-venv", "python-builtin", "python", "go-binary", "binary", "external"}
 VALID_PLATFORMS = {"windows", "linux"}
+_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+_BRANCH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]*$")
 
 
 @dataclass(frozen=True)
@@ -29,6 +36,7 @@ class ToolSpec:
     ref: str | None = None
     project_directory: str | None = None
     module: str | None = None
+    tracking_branch: str | None = None
 
 
 def _nonempty_string(value: Any) -> bool:
@@ -63,6 +71,83 @@ def _parse_health(value: Any) -> tuple[tuple[HealthCheckSpec, ...] | None, str |
     return tuple(checks), None
 
 
+def _valid_branch_name(value: str) -> bool:
+    if not _BRANCH_RE.fullmatch(value):
+        return False
+    return (
+        ".." not in value
+        and not value.endswith(("/", ".", ".lock"))
+        and not value.startswith("/")
+        and "//" not in value
+        and "@{" not in value
+    )
+
+
+def _github_repo_parts(repo: str) -> tuple[str, str] | None:
+    parsed = urlsplit(repo)
+    if parsed.scheme != "https" or parsed.netloc.lower() != "github.com":
+        return None
+    parts = [part for part in parsed.path.split("/") if part]
+    if len(parts) != 2:
+        return None
+    owner, name = parts
+    if name.endswith(".git"):
+        name = name[:-4]
+    if not owner or not name:
+        return None
+    return owner, name
+
+
+def _resolve_github_branch(repo: str, branch: str) -> str:
+    if _github_repo_parts(repo) is None:
+        raise ValueError("follow-branch currently requires an https://github.com/OWNER/REPO(.git) source")
+    if not _valid_branch_name(branch):
+        raise ValueError(f"invalid production branch name: {branch!r}")
+    git = shutil.which("git")
+    if not git:
+        raise ValueError("git is required to resolve a git-sourced production branch")
+    remote_ref = f"refs/heads/{branch}"
+    env = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
+    try:
+        completed = subprocess.run(
+            [git, "ls-remote", "--refs", repo, remote_ref],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=15,
+            env=env,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ValueError(f"git ls-remote failed: {exc}") from exc
+    if completed.returncode != 0:
+        raise ValueError(f"git ls-remote failed with exit code {completed.returncode}")
+    try:
+        output = completed.stdout.decode("ascii").strip().splitlines()
+    except UnicodeDecodeError as exc:
+        raise ValueError("git ls-remote returned non-ASCII output") from exc
+    if len(output) != 1:
+        raise ValueError(f"production branch resolved to {len(output)} refs instead of exactly one")
+    fields = output[0].split()
+    if len(fields) != 2 or fields[1] != remote_ref:
+        raise ValueError("git ls-remote returned an unexpected ref")
+    sha = fields[0]
+    if _SHA_RE.fullmatch(sha) is None:
+        raise ValueError(f"git ls-remote returned an invalid commit SHA: {sha!r}")
+    return sha.lower()
+
+
+def _resolve_follow_branch(spec: ToolSpec) -> tuple[ToolSpec | None, str | None]:
+    assert spec.repo is not None and spec.tracking_branch is not None
+    try:
+        sha = _resolve_github_branch(spec.repo, spec.tracking_branch)
+    except ValueError as exc:
+        return None, f"ToolSpec {spec.name!r}: cannot resolve production branch {spec.tracking_branch!r}: {exc}"
+    # Product policy selects the moving production branch. The existing deployer then
+    # consumes an exact immutable snapshot; this is execution identity, not a second
+    # approval gate. Runtime and bound skills receive this same resolved SHA.
+    return replace(spec, update_policy="pinned-tested", ref=sha), None
+
+
 def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
     if not _nonempty_string(name):
         return None, "ToolSpec name must be a non-empty string"
@@ -95,16 +180,26 @@ def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
 
     repo = raw.get("repo")
     ref = raw.get("ref")
+    branch = raw.get("branch")
     project_directory = raw.get("project_directory")
     module = raw.get("module")
     if source == "git" and not _nonempty_string(repo):
         return None, f"ToolSpec {name!r}: git source requires repo"
     if update_policy == "pinned-tested" and not _nonempty_string(ref):
         return None, f"ToolSpec {name!r}: pinned-tested requires an explicit ref"
+    if update_policy == "follow-branch":
+        if source != "git":
+            return None, f"ToolSpec {name!r}: follow-branch requires git source"
+        if not _nonempty_string(branch):
+            return None, f"ToolSpec {name!r}: follow-branch requires an explicit branch"
+        if ref is not None:
+            return None, f"ToolSpec {name!r}: follow-branch must not define a fixed ref"
+    elif branch is not None:
+        return None, f"ToolSpec {name!r}: branch is only valid with update_policy='follow-branch'"
     if source == "git" and not _nonempty_string(project_directory):
         return None, f"ToolSpec {name!r}: git source requires project_directory"
-    if source == "builtin" and any(value is not None for value in (repo, ref, project_directory)):
-        return None, f"ToolSpec {name!r}: builtin source must not define repo/ref/project_directory"
+    if source == "builtin" and any(value is not None for value in (repo, ref, branch, project_directory)):
+        return None, f"ToolSpec {name!r}: builtin source must not define repo/ref/branch/project_directory"
     if module is not None and not _nonempty_string(module):
         return None, f"ToolSpec {name!r}: module must be a non-empty string"
     if source == "builtin" and runtime == "python-builtin" and not _nonempty_string(module):
@@ -112,7 +207,7 @@ def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
     if source != "builtin" and module is not None:
         return None, f"ToolSpec {name!r}: module is only valid for builtin source"
 
-    return ToolSpec(
+    spec = ToolSpec(
         name=name,
         source=source,
         runtime=runtime,
@@ -124,7 +219,11 @@ def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
         ref=ref.strip() if _nonempty_string(ref) else None,
         project_directory=project_directory.strip() if _nonempty_string(project_directory) else None,
         module=module.strip() if _nonempty_string(module) else None,
-    ), None
+        tracking_branch=branch.strip() if _nonempty_string(branch) else None,
+    )
+    if update_policy == "follow-branch":
+        return _resolve_follow_branch(spec)
+    return spec, None
 
 
 def parse_tool_specs(managed_environment: Any) -> tuple[dict[str, ToolSpec], str | None]:
