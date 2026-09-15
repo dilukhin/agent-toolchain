@@ -140,16 +140,19 @@ def promote_owned_public_bin_before(manifest: dict[str, Any], reference: Path) -
     except OSError as exc:
         raise PathOwnershipError(f"cannot read Windows user PATH: {exc}") from exc
 
+    # Validate both persistent and current-process views before any mutation.
+    # A malformed/ambiguous process PATH must not leave a partially changed
+    # user PATH behind.
     user_entries = _split(user_path)
     reordered_user, user_changed = _move_entry_before(user_entries, desired, reference)
+    process_entries = _split(os.environ.get("PATH", ""))
+    reordered_process, process_changed = _move_entry_before(process_entries, desired, reference)
+
     if user_changed:
         try:
             _write_user_path(";".join(reordered_user), kind)
         except OSError as exc:
             raise PathOwnershipError(f"cannot update Windows user PATH: {exc}") from exc
-
-    process_entries = _split(os.environ.get("PATH", ""))
-    reordered_process, process_changed = _move_entry_before(process_entries, desired, reference)
     if process_changed:
         os.environ["PATH"] = ";".join(reordered_process)
 
