@@ -250,6 +250,73 @@ class PathOwnershipTests(unittest.TestCase):
             self.assertEqual(manifest["managed_path_entries"], {})
             self.assertEqual(reporter.results[-1].state, STATE_INFO)
 
+    def test_windows_targeted_promotion_moves_only_owned_bin_before_exact_legacy_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            desired = root / "agent-toolchain" / "bin"
+            legacy = root / "LanFabric" / "yc-guard" / "bin"
+            manifest = setup_manifest.empty_manifest()
+            manifest["managed_path_entries"]["agent-toolchain-bin"] = {
+                "owner": "agent-toolchain",
+                "scope": "user",
+                "path": str(desired),
+            }
+            registry_path = ";".join((r"C:\Other", str(legacy), str(desired), r"C:\Tail"))
+            process_path = ";".join((r"C:\System", str(legacy), str(desired), r"C:\After"))
+            writes: list[tuple[str, int]] = []
+            with mock.patch.object(setup_path, "platform_name", return_value="windows"), \
+                    mock.patch.object(setup_path, "public_bin_dir", return_value=desired), \
+                    mock.patch.object(setup_path, "_read_user_path", return_value=(registry_path, 2)), \
+                    mock.patch.object(setup_path, "_write_user_path", side_effect=lambda value, kind: writes.append((value, kind))), \
+                    mock.patch.dict(os.environ, {"PATH": process_path}, clear=False):
+                changed = setup_path.promote_owned_public_bin_before(manifest, legacy)
+                observed_process = setup_path._split(os.environ["PATH"])
+
+            self.assertTrue(changed)
+            self.assertEqual(len(writes), 1)
+            observed_user = setup_path._split(writes[0][0])
+            self.assertEqual(observed_user[0], r"C:\Other")
+            self.assertEqual(observed_user[-1], r"C:\Tail")
+            self.assertLess(observed_user.index(str(desired)), observed_user.index(str(legacy)))
+            self.assertEqual(observed_process[0], r"C:\System")
+            self.assertEqual(observed_process[-1], r"C:\After")
+            self.assertLess(observed_process.index(str(desired)), observed_process.index(str(legacy)))
+
+    def test_windows_targeted_promotion_refuses_unowned_managed_bin(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            desired = root / "agent-toolchain" / "bin"
+            legacy = root / "LanFabric" / "yc-guard" / "bin"
+            manifest = setup_manifest.empty_manifest()
+            with mock.patch.object(setup_path, "platform_name", return_value="windows"), \
+                    mock.patch.object(setup_path, "public_bin_dir", return_value=desired), \
+                    mock.patch.object(setup_path, "_read_user_path") as read, \
+                    mock.patch.object(setup_path, "_write_user_path") as write:
+                with self.assertRaises(setup_path.PathOwnershipError):
+                    setup_path.promote_owned_public_bin_before(manifest, legacy)
+            read.assert_not_called()
+            write.assert_not_called()
+
+    def test_windows_targeted_promotion_refuses_duplicate_reference_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            desired = root / "agent-toolchain" / "bin"
+            legacy = root / "LanFabric" / "yc-guard" / "bin"
+            manifest = setup_manifest.empty_manifest()
+            manifest["managed_path_entries"]["agent-toolchain-bin"] = {
+                "owner": "agent-toolchain",
+                "scope": "user",
+                "path": str(desired),
+            }
+            registry_path = ";".join((str(legacy), str(desired), str(legacy)))
+            with mock.patch.object(setup_path, "platform_name", return_value="windows"), \
+                    mock.patch.object(setup_path, "public_bin_dir", return_value=desired), \
+                    mock.patch.object(setup_path, "_read_user_path", return_value=(registry_path, 2)), \
+                    mock.patch.object(setup_path, "_write_user_path") as write:
+                with self.assertRaises(setup_path.PathOwnershipError):
+                    setup_path.promote_owned_public_bin_before(manifest, legacy)
+            write.assert_not_called()
+
     def test_linux_missing_path_is_advisory_and_not_owned(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             desired = Path(td) / "bin"
