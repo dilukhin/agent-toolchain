@@ -46,11 +46,14 @@ toolchainctl update --apply
 ## Команды
 
 ```text
+toolchainctl --version       показать версию и build identity запущенного core
 toolchainctl check           read-only диагностика target state
 toolchainctl apply           привести управляемое состояние к target state
 toolchainctl update          обновить установленный управляющий core из актуального main
 toolchainctl update --apply  обновить core и затем применить новый target state
 ```
+
+`--version` использует semantic version управляющего core `0.1.0` и идентичность именно запущенного установленного payload. Для production core с доказанным `source_ref` формат — `toolchainctl 0.1.0.<8hex>`, где `<8hex>` — первые восемь символов полного source SHA из managed-core marker. Старый или локально опубликованный core без доказанного Git SHA явно помечается как `local.<fingerprint8>` (либо `dev` без marker), поэтому версия не подменяется текущим checkout или удалённым `main`.
 
 `check` не создаёт state/runtime/skills, не выполняет package install, clone/pull, chmod или backup. `apply` меняет только доказанно управляемые ресурсы. Неизвестное содержимое не усыновляется автоматически.
 
