@@ -90,11 +90,21 @@ def _ensure_process_path(desired: Path) -> None:
         os.environ["PATH"] = (current.rstrip(";") + ";" if current else "") + str(desired)
 
 
+def _path_identity(value: str | Path) -> str:
+    expanded = os.path.expandvars(str(value).strip().strip('"'))
+    try:
+        resolved = str(Path(expanded).resolve(strict=False))
+    except (OSError, RuntimeError, ValueError):
+        resolved = expanded
+    return os.path.normcase(os.path.normpath(resolved)).rstrip("\\/")
+
+
 def _unique_index(entries: list[str], target: Path, *, label: str) -> int:
+    target_identity = _path_identity(target)
     positions = [
         index
         for index, item in enumerate(entries)
-        if _normalized(item) == _normalized(str(target))
+        if _path_identity(item) == target_identity
     ]
     if len(positions) != 1:
         raise PathOwnershipError(
@@ -128,7 +138,7 @@ def promote_owned_public_bin_before(manifest: dict[str, Any], reference: Path) -
 
     desired = public_bin_dir()
     reference = Path(reference).resolve()
-    if _normalized(str(desired)) == _normalized(str(reference)):
+    if _path_identity(desired) == _path_identity(reference):
         raise PathOwnershipError("managed and reference PATH entries must differ")
     if not _owned_record(manifest, desired):
         raise PathOwnershipError(
