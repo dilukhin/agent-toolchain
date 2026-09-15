@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -227,6 +228,106 @@ class YcTransitionalDeploymentTests(unittest.TestCase):
                 )
             self.assertEqual(ctx.exception.code, "YC_ARTIFACT_FILE_SIZE_MISMATCH")
             self.assertFalse((root / "bin" / "yc.cmd").exists())
+
+    def test_apply_promotes_owned_bin_only_for_exact_legacy_shadow(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            artifact, legacy, _downstream = self.fixture(root)
+            data = root / "data"
+            public_bin = root / "managed-bin"
+            state = root / "state"
+            path_manifest = {
+                "managed_path_entries": {
+                    "agent-toolchain-bin": {
+                        "owner": "agent-toolchain",
+                        "scope": "user",
+                        "path": str(public_bin),
+                    }
+                }
+            }
+            legacy_yc = legacy / "bin" / "yc.cmd"
+            managed_yc = public_bin / "yc.cmd"
+
+            shadow = ycsetup.YcGuardDeploymentError("YC_PATH_SHADOW_CONFLICT", str(legacy / "bin"))
+            with mock.patch.object(ycsetup, "preflight_effective_path", side_effect=[shadow, {"ok": True}]), \
+                    mock.patch.object(ycsetup.shutil, "which", side_effect=[str(legacy_yc), str(legacy_yc), str(managed_yc)]), \
+                    mock.patch.object(ycsetup.setup_path, "promote_owned_public_bin_before", return_value=True) as promote:
+                result = ycsetup.apply_guard(
+                    artifact_dir=artifact,
+                    legacy_guard_root=legacy,
+                    entry_script_source=ROOT / "yc_transitional_entry.py",
+                    data_dir=data,
+                    bin_dir=public_bin,
+                    state_dir=state,
+                    require_effective_path=True,
+                    path_manifest=path_manifest,
+                )
+
+            self.assertTrue(result["changed"])
+            self.assertTrue(result["path_promoted"])
+            self.assertEqual(result["effective_readback"], "PASS")
+            promote.assert_called_once_with(path_manifest, (legacy / "bin").resolve())
+
+    def test_apply_does_not_promote_unrelated_shadow(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            artifact, legacy, _downstream = self.fixture(root)
+            public_bin = root / "managed-bin"
+            other = root / "other" / "yc.cmd"
+            path_manifest = {
+                "managed_path_entries": {
+                    "agent-toolchain-bin": {
+                        "owner": "agent-toolchain",
+                        "scope": "user",
+                        "path": str(public_bin),
+                    }
+                }
+            }
+            shadow = ycsetup.YcGuardDeploymentError("YC_PATH_SHADOW_CONFLICT", str(other.parent))
+            with mock.patch.object(ycsetup, "preflight_effective_path", side_effect=shadow), \
+                    mock.patch.object(ycsetup.shutil, "which", return_value=str(other)), \
+                    mock.patch.object(ycsetup.setup_path, "promote_owned_public_bin_before") as promote:
+                with self.assertRaises(ycsetup.YcGuardDeploymentError) as ctx:
+                    ycsetup.apply_guard(
+                        artifact_dir=artifact,
+                        legacy_guard_root=legacy,
+                        entry_script_source=ROOT / "yc_transitional_entry.py",
+                        data_dir=root / "data",
+                        bin_dir=public_bin,
+                        state_dir=root / "state",
+                        require_effective_path=True,
+                        path_manifest=path_manifest,
+                    )
+            self.assertEqual(ctx.exception.code, "YC_PATH_SHADOW_NOT_LEGACY_GUARD")
+            promote.assert_not_called()
+
+    def test_apply_maps_unprovable_path_promotion_to_fail_closed_conflict(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            artifact, legacy, _downstream = self.fixture(root)
+            public_bin = root / "managed-bin"
+            path_manifest = {"managed_path_entries": {}}
+            legacy_yc = legacy / "bin" / "yc.cmd"
+            shadow = ycsetup.YcGuardDeploymentError("YC_PATH_SHADOW_CONFLICT", str(legacy / "bin"))
+            with mock.patch.object(ycsetup, "preflight_effective_path", side_effect=shadow), \
+                    mock.patch.object(ycsetup.shutil, "which", return_value=str(legacy_yc)), \
+                    mock.patch.object(
+                        ycsetup.setup_path,
+                        "promote_owned_public_bin_before",
+                        side_effect=ycsetup.setup_path.PathOwnershipError("unowned"),
+                    ):
+                with self.assertRaises(ycsetup.YcGuardDeploymentError) as ctx:
+                    ycsetup.apply_guard(
+                        artifact_dir=artifact,
+                        legacy_guard_root=legacy,
+                        entry_script_source=ROOT / "yc_transitional_entry.py",
+                        data_dir=root / "data",
+                        bin_dir=public_bin,
+                        state_dir=root / "state",
+                        require_effective_path=True,
+                        path_manifest=path_manifest,
+                    )
+            self.assertEqual(ctx.exception.code, "YC_PATH_PROMOTION_UNSAFE")
 
     def test_path_shadow_conflict_is_preflight(self):
         with tempfile.TemporaryDirectory() as td:
