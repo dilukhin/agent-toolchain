@@ -29,7 +29,7 @@ Pinned source:
 
 Если managed bin отсутствует в текущем PATH, apply завершается conflict **до** публикации runtime/entrypoint.
 
-Для уже установленного historical LanFabric guard предусмотрена узкая migration semantics: если текущий `yc` разрешается **ровно** из `%LOCALAPPDATA%\\LanFabric\\yc-guard\\bin`, а `agent-toolchain\\bin` доказан как owned user-PATH entry в ownership manifest, apply может переставить только owned managed bin непосредственно перед exact legacy guard bin. Legacy PATH entry сохраняется как fallback, остальные PATH entries не переставляются и не удаляются. Mutation применяется и к user PATH, и к текущему process PATH, после чего выполняется повторный preflight и обычный effective read-back.
+Для уже установленного historical LanFabric guard предусмотрена узкая migration semantics: если текущий `yc` разрешается **ровно** из `%LOCALAPPDATA%\LanFabric\yc-guard\bin`, а `agent-toolchain\bin` доказан как owned user-PATH entry в ownership manifest, apply может переставить только owned managed bin непосредственно перед exact legacy guard bin. Legacy PATH entry сохраняется как fallback, остальные PATH entries не переставляются и не удаляются. Mutation применяется и к user PATH, и к текущему process PATH, после чего выполняется повторный preflight и обычный effective read-back.
 
 Unknown shadow path, отсутствие ownership record, отсутствие/дублирование одной из exact PATH entries или любой неоднозначный PATH state дают fail-closed conflict. Generic `toolchainctl apply` по-прежнему не reorder'ит существующие PATH entries; это исключение принадлежит только ownership-aware migration transitional YC guard.
 
@@ -66,7 +66,7 @@ Safe fallback:
 
 `toolchainctl yc-guard disable`
 
-Disable удаляет только доказанно owned `yc.cmd`; versioned runtime остаётся cached. Legacy LanFabric guard не удаляется. Если migration ранее подняла `agent-toolchain\\bin` перед legacy PATH entry, порядок PATH не откатывается: после удаления managed `yc.cmd` lookup естественно проходит дальше к сохранённому legacy shim.
+Disable удаляет только доказанно owned `yc.cmd`; versioned runtime остаётся cached. Legacy LanFabric guard не удаляется. Если migration ранее подняла `agent-toolchain\bin` перед legacy PATH entry, порядок PATH не откатывается: после удаления managed `yc.cmd` lookup естественно проходит дальше к сохранённому legacy shim.
 
 ## Acceptance перед LanFabric
 
