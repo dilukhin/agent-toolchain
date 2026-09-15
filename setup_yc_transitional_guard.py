@@ -26,6 +26,9 @@ import zipfile
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
+import setup_path
+from setup_manifest import load_manifest
+
 SOURCE_REPOSITORY = "dilukhin/opencode_permissions"
 SOURCE_REF = "7922d612f244882aae3d843a64393b1363b593d9"
 SOURCE_ARCHIVE_URL = f"https://codeload.github.com/{SOURCE_REPOSITORY}/zip/{SOURCE_REF}"
@@ -520,6 +523,45 @@ def _load_existing_state(state_dir: Path) -> dict[str, Any] | None:
     return state
 
 
+def _load_toolchain_path_manifest(state_dir: Path) -> dict[str, Any]:
+    manifest, error, _migration_pending = load_manifest(Path(state_dir) / "manifest.json")
+    _require(error is None, "YC_TOOLCHAIN_MANIFEST_INVALID", error)
+    return manifest
+
+
+def _promote_exact_legacy_shadow(
+    *,
+    path_manifest: dict[str, Any],
+    legacy_guard_root: Path,
+    bin_dir: Path,
+) -> bool:
+    observed = shutil.which("yc")
+    _require(observed is not None, "YC_CURRENT_YC_MISSING")
+    observed_path = Path(observed).resolve()
+    legacy_bin = (Path(legacy_guard_root).resolve() / "bin").resolve()
+    _require(
+        observed_path.parent == legacy_bin,
+        "YC_PATH_SHADOW_NOT_LEGACY_GUARD",
+        str(observed_path.parent),
+    )
+    try:
+        changed = setup_path.promote_owned_public_bin_before(path_manifest, legacy_bin)
+    except setup_path.PathOwnershipError as exc:
+        raise YcGuardDeploymentError("YC_PATH_PROMOTION_UNSAFE", str(exc)) from exc
+
+    # Promotion must affect this process immediately so publish/read-back cannot
+    # succeed only in some future shell.
+    resolved = shutil.which("yc")
+    if resolved is not None:
+        current_parent = Path(resolved).resolve().parent
+        _require(
+            current_parent in {Path(bin_dir).resolve(), legacy_bin},
+            "YC_PATH_PROMOTION_READBACK_UNEXPECTED",
+            str(current_parent),
+        )
+    return changed
+
+
 def inspect_guard(
     *,
     legacy_guard_root: Path | None = None,
@@ -567,6 +609,7 @@ def apply_guard(
     python_executable: Path | None = None,
     downstream_yc: Path | None = None,
     require_effective_path: bool = True,
+    path_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     legacy = Path(legacy_guard_root).resolve()
     data = Path(data_dir).resolve()
@@ -582,8 +625,6 @@ def apply_guard(
         data_dir=data,
         bin_dir=public_bin,
     )
-    if require_effective_path:
-        preflight_effective_path(public_bin)
 
     existing_state = _load_existing_state(state_root)
     entrypoint = public_bin / "yc.cmd"
@@ -592,6 +633,20 @@ def apply_guard(
             raise YcGuardDeploymentError("YC_ENTRYPOINT_UNKNOWN_CONFLICT", str(entrypoint))
         _require(entrypoint.is_file() and not entrypoint.is_symlink(), "YC_ENTRYPOINT_INVALID")
         _require(_sha256_file(entrypoint) == existing_state.get("entrypoint_sha256"), "YC_ENTRYPOINT_MODIFIED")
+
+    path_promoted = False
+    if require_effective_path:
+        try:
+            preflight_effective_path(public_bin)
+        except YcGuardDeploymentError as exc:
+            if exc.code != "YC_PATH_SHADOW_CONFLICT" or path_manifest is None:
+                raise
+            path_promoted = _promote_exact_legacy_shadow(
+                path_manifest=path_manifest,
+                legacy_guard_root=legacy,
+                bin_dir=public_bin,
+            )
+            preflight_effective_path(public_bin)
 
     release, marker = _publish_release(
         artifact_dir=Path(artifact_dir),
@@ -630,7 +685,12 @@ def apply_guard(
             if require_effective_path:
                 resolved = shutil.which("yc")
                 _require(resolved is not None and Path(resolved).resolve() == entrypoint.resolve(), "YC_EFFECTIVE_READBACK_FAILED", resolved)
-            return {"changed": False, "artifact_id": manifest["artifact_id"], "effective_readback": "PASS"}
+            return {
+                "changed": False,
+                "artifact_id": manifest["artifact_id"],
+                "effective_readback": "PASS",
+                "path_promoted": path_promoted,
+            }
 
     _atomic_write(_state_path(state_root), (json.dumps(desired_state, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
     public_bin.mkdir(parents=True, exist_ok=True)
@@ -645,7 +705,12 @@ def apply_guard(
     if require_effective_path:
         resolved = shutil.which("yc")
         _require(resolved is not None and Path(resolved).resolve() == entrypoint.resolve(), "YC_EFFECTIVE_READBACK_FAILED", resolved)
-    return {"changed": True, "artifact_id": manifest["artifact_id"], "effective_readback": "PASS"}
+    return {
+        "changed": True,
+        "artifact_id": manifest["artifact_id"],
+        "effective_readback": "PASS",
+        "path_promoted": path_promoted,
+    }
 
 
 def disable_guard(*, bin_dir: Path, state_dir: Path) -> dict[str, Any]:
@@ -708,15 +773,18 @@ def run_cli(args) -> int:
         with tempfile.TemporaryDirectory(prefix="agent-toolchain-yc-") as td:
             root = Path(td)
             artifact = _materialize_for_apply(Path(args.source_root).resolve() if args.source_root else None, root)
+            state_dir = default_state_dir()
+            path_manifest = _load_toolchain_path_manifest(state_dir)
             result = apply_guard(
                 artifact_dir=artifact,
                 legacy_guard_root=legacy,
                 entry_script_source=Path(__file__).resolve().parent / ENTRY_SCRIPT,
                 data_dir=default_data_dir(),
                 bin_dir=default_bin_dir(),
-                state_dir=default_state_dir(),
+                state_dir=state_dir,
                 downstream_yc=downstream,
                 require_effective_path=True,
+                path_manifest=path_manifest,
             )
         print(json.dumps(result, sort_keys=True, ensure_ascii=False))
         return 0
