@@ -11,6 +11,11 @@ from setup_managed_tools import public_bin_dir
 _RECORD_KEY = "agent-toolchain-bin"
 
 
+class PathOwnershipError(RuntimeError):
+    """Raised when a targeted PATH mutation cannot prove exact ownership/scope."""
+
+
+
 def platform_name() -> str:
     return "windows" if os.name == "nt" else "linux"
 
@@ -83,6 +88,85 @@ def _ensure_process_path(desired: Path) -> None:
     current = os.environ.get("PATH", "")
     if not _process_path_has(desired):
         os.environ["PATH"] = (current.rstrip(";") + ";" if current else "") + str(desired)
+
+
+def _path_identity(value: str | Path) -> str:
+    expanded = os.path.expandvars(str(value).strip().strip('"'))
+    try:
+        resolved = str(Path(expanded).resolve(strict=False))
+    except (OSError, RuntimeError, ValueError):
+        resolved = expanded
+    return os.path.normcase(os.path.normpath(resolved)).rstrip("\\/")
+
+
+def _unique_index(entries: list[str], target: Path, *, label: str) -> int:
+    target_identity = _path_identity(target)
+    positions = [
+        index
+        for index, item in enumerate(entries)
+        if _path_identity(item) == target_identity
+    ]
+    if len(positions) != 1:
+        raise PathOwnershipError(
+            f"{label} must appear exactly once in PATH, found {len(positions)}: {target}"
+        )
+    return positions[0]
+
+
+def _move_entry_before(entries: list[str], desired: Path, reference: Path) -> tuple[list[str], bool]:
+    desired_index = _unique_index(entries, desired, label="managed agent-toolchain bin")
+    reference_index = _unique_index(entries, reference, label="legacy guard bin")
+    if desired_index < reference_index:
+        return list(entries), False
+
+    reordered = list(entries)
+    desired_raw = reordered.pop(desired_index)
+    reference_index = _unique_index(reordered, reference, label="legacy guard bin")
+    reordered.insert(reference_index, desired_raw)
+    return reordered, True
+
+
+def promote_owned_public_bin_before(manifest: dict[str, Any], reference: Path) -> bool:
+    """Promote the owned managed bin before one exact Windows PATH entry.
+
+    This is intentionally narrower than the generic PATH reconciler. It may be
+    used by an ownership-aware migration only after the caller has identified
+    the exact legacy entry that currently shadows a managed command.
+    """
+    if platform_name() != "windows":
+        raise PathOwnershipError("targeted PATH promotion is supported only on Windows")
+
+    desired = public_bin_dir()
+    reference = Path(reference).resolve()
+    if _path_identity(desired) == _path_identity(reference):
+        raise PathOwnershipError("managed and reference PATH entries must differ")
+    if not _owned_record(manifest, desired):
+        raise PathOwnershipError(
+            f"managed PATH entry is not proven agent-toolchain-owned: {desired}"
+        )
+
+    try:
+        user_path, kind = _read_user_path()
+    except OSError as exc:
+        raise PathOwnershipError(f"cannot read Windows user PATH: {exc}") from exc
+
+    # Validate both persistent and current-process views before any mutation.
+    # A malformed/ambiguous process PATH must not leave a partially changed
+    # user PATH behind.
+    user_entries = _split(user_path)
+    reordered_user, user_changed = _move_entry_before(user_entries, desired, reference)
+    process_entries = _split(os.environ.get("PATH", ""))
+    reordered_process, process_changed = _move_entry_before(process_entries, desired, reference)
+
+    if user_changed:
+        try:
+            _write_user_path(";".join(reordered_user), kind)
+        except OSError as exc:
+            raise PathOwnershipError(f"cannot update Windows user PATH: {exc}") from exc
+    if process_changed:
+        os.environ["PATH"] = ";".join(reordered_process)
+
+    return user_changed or process_changed
 
 
 def _stale_session_detail(desired: Path) -> str:

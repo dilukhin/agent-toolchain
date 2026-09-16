@@ -42,6 +42,8 @@ import setup_yc_transitional_guard
 
 PRODUCT = "agent-toolchain"
 LEGACY_PRODUCT = "opencode_setup"
+CORE_SEMVER = "0.1.0"
+CORE_MARKER = ".agent-toolchain-managed-core.json"
 UPDATE_REPOSITORY = "dilukhin/agent-toolchain"
 UPDATE_BRANCH = "main"
 _GITHUB_API_BRANCH = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/branches/{UPDATE_BRANCH}"
@@ -80,6 +82,28 @@ class StateMigrationError(RuntimeError):
 
 class SelfUpdateError(RuntimeError):
     pass
+
+
+def _version_text() -> str:
+    """Return identity for the running core without consulting a checkout or remote state."""
+    marker_path = Path(__file__).resolve().parent / CORE_MARKER
+    try:
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return f"toolchainctl {CORE_SEMVER}.dev"
+
+    source_ref = marker.get("source_ref") if isinstance(marker, dict) else None
+    if isinstance(source_ref, str) and _SHA_RE.fullmatch(source_ref):
+        return f"toolchainctl {CORE_SEMVER}.{source_ref[:8]}"
+
+    fingerprint = marker.get("fingerprint") if isinstance(marker, dict) else None
+    if (
+        isinstance(fingerprint, str)
+        and len(fingerprint) == 64
+        and all(ch in "0123456789abcdef" for ch in fingerprint)
+    ):
+        return f"toolchainctl {CORE_SEMVER}.local.{fingerprint[:8]}"
+    return f"toolchainctl {CORE_SEMVER}.unknown"
 
 
 def _state_base() -> Path:
@@ -194,6 +218,7 @@ def _default_paths() -> dict[str, Path]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="toolchainctl", description="Manage the installed agent toolchain safely.")
+    parser.add_argument("--version", action="version", version=_version_text(), help="show running core version and exit")
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("check", "apply"):
         cmd = sub.add_parser(name, help="read-only state check" if name == "check" else "apply desired state")
