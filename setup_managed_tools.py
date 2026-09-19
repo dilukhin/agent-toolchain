@@ -1,4 +1,4 @@
-"""Pinned ToolSpec deployment for agent-toolchain managed Python CLI tools."""
+"""Exact-ref ToolSpec deployment for agent-toolchain managed Python CLI tools."""
 from __future__ import annotations
 
 import json
@@ -201,7 +201,7 @@ def _validate_supported_spec(spec: ToolSpec) -> str | None:
             "update_policy=pinned-tested"
         )
     if not spec.repo or not _is_commit_sha(spec.ref):
-        return "pinned Python tool requires repository and an immutable 40-hex commit ref"
+        return "exact-ref Python tool requires repository and an immutable 40-hex commit ref"
     if len(spec.entrypoints) != 1:
         return "current Python tool deployer requires exactly one public entrypoint"
     for check in spec.health_contract:
@@ -269,7 +269,7 @@ def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Pat
         reporter.add(
             f"{spec.name} runtime",
             STATE_FAILED,
-            "Git is required to install the pinned repository ref. MANUAL ACTION REQUIRED: install Git and rerun toolchainctl apply",
+            "Git is required to install the exact repository ref. MANUAL ACTION REQUIRED: install Git and rerun toolchainctl apply",
         )
         return None
 
@@ -319,7 +319,7 @@ def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Pat
             reporter.add(
                 f"{spec.name} runtime",
                 STATE_FAILED,
-                "pinned package installation failed: " + install.stderr.strip()[-400:],
+                "exact-ref package installation failed: " + install.stderr.strip()[-400:],
             )
             return None
 
@@ -347,7 +347,7 @@ def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Pat
         reporter.add(
             f"{spec.name} runtime",
             STATE_CONFIGURED,
-            f"installed pinned non-editable runtime {spec.ref[:12]} from {spec.repo}: {release}",
+            f"installed exact-ref non-editable runtime {spec.ref[:12]} from {spec.repo}: {release}",
         )
         return release
     finally:
@@ -641,14 +641,14 @@ def reconcile_python_tool(
                 reporter.add(
                     f"{spec.name} runtime",
                     STATE_MISSING,
-                    f"toolchainctl apply will install pinned isolated runtime {spec.ref[:12]} from {spec.repo}",
+                    f"toolchainctl apply will install exact-ref isolated runtime {spec.ref[:12]} from {spec.repo}",
                 )
             return False
         release = _install_release(spec, python_exe, reporter)
         if release is None:
             return False
     else:
-        reporter.add(f"{spec.name} runtime", STATE_OK, f"pinned ref {spec.ref[:12]}: {release}")
+        reporter.add(f"{spec.name} runtime", STATE_OK, f"exact ref {spec.ref[:12]}: {release}")
 
     ok, detail = _health(spec, release)
     if not ok:
@@ -677,7 +677,7 @@ def reconcile_python_tool(
             reporter.add(
                 f"{spec.name} ownership metadata",
                 STATE_OUTDATED,
-                "managed_tools metadata does not match the pinned installed runtime; toolchainctl apply will record it",
+                "managed_tools metadata does not match the exact-ref installed runtime; toolchainctl apply will record it",
             )
             return False
         managed_tools[spec.name] = desired

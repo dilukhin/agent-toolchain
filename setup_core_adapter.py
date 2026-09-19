@@ -2,7 +2,7 @@
 
 The monolithic legacy setup_core still owns OpenCode/npm/config reconciliation. When
 called by toolchainctl, helper runtimes and skills have already been reconciled from
-pinned ToolSpecs, so tracking checkouts must not become production dependencies.
+exact-ref execution ToolSpecs, so tracking checkouts must not become production dependencies.
 """
 from __future__ import annotations
 
@@ -68,13 +68,13 @@ def _toolchain_main(argv: list[str] | None = None) -> int:
         reporter.add(
             component,
             STATE_SKIPPED,
-            "tracking checkout is not a production dependency; pinned ToolSpec phase already reconciled this tool",
+            "tracking checkout is not a production dependency; managed ToolSpec phase already reconciled this tool from an exact ref",
         )
         return True, STATE_OK
 
     def validate_skill(path: Path, expected_name: str) -> tuple[bool, str]:
         if path in external_sources:
-            return True, "validated by pinned ToolSpec phase"
+            return True, "validated by managed exact-ref ToolSpec phase"
         return original_validate(path, expected_name)
 
     def reconcile_file(**kwargs: Any) -> bool:
@@ -84,7 +84,7 @@ def _toolchain_main(argv: list[str] | None = None) -> int:
             reporter.add(
                 component,
                 STATE_SKIPPED,
-                "managed from the same pinned ToolSpec ref as the installed runtime",
+                "managed from the same exact ToolSpec ref as the installed runtime",
             )
             return False
         return bool(original_reconcile_file(**kwargs))
@@ -100,7 +100,7 @@ def _toolchain_main(argv: list[str] | None = None) -> int:
         if path in external_sources:
             # setup_core reads helper SKILL.md before calling reconcile_file. In
             # toolchain mode the authoritative payload was already validated and
-            # reconciled from the pinned ToolSpec ref, so an inert in-memory value is
+            # reconciled from the exact ToolSpec ref, so an inert in-memory value is
             # sufficient and avoids any temporary filesystem staging during check.
             return _PLACEHOLDER_SKILL_BYTES
         return original_read_bytes(path)
