@@ -101,7 +101,9 @@ class BootstrapCoreTests(unittest.TestCase):
                 "AGENT_TOOLCHAIN_BIN_DIR": str(bin_dir),
                 "PATH": str(bin_dir) + os.pathsep + os.environ.get("PATH", ""),
             }
-            with mock.patch.object(bootstrap_core, "SOURCE_ROOT", source), mock.patch.dict(os.environ, env, clear=False):
+            with mock.patch.object(bootstrap_core, "SOURCE_ROOT", source), mock.patch.dict(os.environ, env, clear=False), \
+                    mock.patch.object(bootstrap_core, "_validate_published"):
+                # Synthetic payloads exercise publication only; real access has separate integration coverage.
                 first_out = io.StringIO()
                 with contextlib.redirect_stdout(first_out):
                     self.assertEqual(bootstrap_core.main(), 0)
@@ -139,7 +141,9 @@ class BootstrapCoreTests(unittest.TestCase):
                 "AGENT_TOOLCHAIN_DATA_DIR": str(data),
                 "AGENT_TOOLCHAIN_BIN_DIR": str(bin_dir),
             }
-            with mock.patch.object(bootstrap_core, "SOURCE_ROOT", source), mock.patch.dict(os.environ, env, clear=False):
+            with mock.patch.object(bootstrap_core, "SOURCE_ROOT", source), mock.patch.dict(os.environ, env, clear=False), \
+                    mock.patch.object(bootstrap_core, "_validate_published"):
+                # Synthetic payloads exercise publication only; real access has separate integration coverage.
                 with contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(bootstrap_core.main(), 0)
 
@@ -207,7 +211,9 @@ class BootstrapCoreTests(unittest.TestCase):
                 "AGENT_TOOLCHAIN_DATA_DIR": str(data),
                 "AGENT_TOOLCHAIN_BIN_DIR": str(bin_dir),
             }
-            with mock.patch.object(bootstrap_core, "SOURCE_ROOT", source), mock.patch.dict(os.environ, env, clear=False):
+            with mock.patch.object(bootstrap_core, "SOURCE_ROOT", source), mock.patch.dict(os.environ, env, clear=False), \
+                    mock.patch.object(bootstrap_core, "_validate_published"):
+                # Synthetic payloads exercise publication only; real access has separate integration coverage.
                 err = io.StringIO()
                 with contextlib.redirect_stderr(err):
                     self.assertEqual(bootstrap_core.main(), 2)

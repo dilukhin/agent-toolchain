@@ -7,9 +7,11 @@ import json
 import os
 import py_compile
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from pathlib import Path, PurePosixPath
 
 SOURCE_ROOT = Path(__file__).resolve().parent
@@ -303,7 +305,7 @@ def _publish_core(source: Path, core: Path, fingerprint: str) -> tuple[bool, Pat
 
     root = core.parent
     root.mkdir(parents=True, exist_ok=True)
-    staging: Path | None = Path(tempfile.mkdtemp(prefix=".core.tmp-", dir=str(root)))
+    staging: Path | None = _new_staging(root)
     backup: Path | None = None
     try:
         _copy_payload(source, staging, fingerprint)
@@ -354,6 +356,45 @@ def _publish_entrypoint(core: Path) -> bool:
     return True
 
 
+def _new_staging(root: Path) -> Path:
+    if os.name != "nt":
+        return Path(tempfile.mkdtemp(prefix=".core.tmp-", dir=str(root)))
+    # Python 3.13+ mkdir(0700), used by mkdtemp, installs a protected DACL.
+    # A rename preserves it. New Windows core directories must inherit from
+    # their target parent; never change ACLs of an existing object.
+    staging = root / (".core.tmp-" + uuid.uuid4().hex)
+    staging.mkdir(mode=0o777, exist_ok=False)
+    return staging
+
+
+def _validate_published(core: Path, fingerprint: str) -> None:
+    marker = _owned_core(core)
+    if marker is None or marker.get("fingerprint") != fingerprint:
+        raise RuntimeError(f"Published core/marker is unreadable or differs from the expected payload: {core}")
+    entry = _entrypoint_path()
+    if entry.is_symlink() or entry.read_bytes() != _entrypoint_bytes(core):
+        raise RuntimeError(f"Published entrypoint differs from its expected target: {entry}")
+    # Execute the actual public command, not Python from the source checkout.
+    completed = subprocess.run(
+        [str(entry), "--bootstrap-access-check"], cwd=core.parent,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30, check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"Published entrypoint cannot validate core access (exit {completed.returncode}): {entry}")
+    try:
+        evidence = json.loads(completed.stdout.decode("utf-8"))
+    except (UnicodeError, ValueError) as exc:
+        raise RuntimeError("Published entrypoint returned invalid access evidence") from exc
+    if not isinstance(evidence, dict) or evidence.get("core") != str(core.resolve()) or evidence.get("fingerprint") != fingerprint:
+        raise RuntimeError("Published entrypoint did not execute the expected core")
+    if evidence.get("non_elevated") is not True:
+        raise RuntimeError(
+            "Ordinary-user access is not verified from an elevated/root process. "
+            "Run bootstrap again as the intended non-elevated user with the same target paths; "
+            "do not repair ACLs automatically."
+        )
+
+
 def _report_resolution() -> None:
     entry = _entrypoint_path()
     resolved = shutil.which("toolchainctl")
@@ -378,6 +419,15 @@ def main() -> int:
         entry_changed = _publish_entrypoint(core)
     except (OSError, RuntimeError, py_compile.PyCompileError) as exc:
         print(f"modified/conflict  agent-toolchain bootstrap  {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        _validate_published(core, fingerprint)
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        print(f"failed            agent-toolchain core access  {exc}", file=sys.stderr)
+        print("info              Published paths retained for read-only diagnosis; ACLs were not repaired.", file=sys.stderr)
+        if backup is not None:
+            print(f"info              previous managed core retained  {backup}", file=sys.stderr)
         return 2
 
     print(("configured" if core_changed else "up-to-date").ljust(18) + f"agent-toolchain core  {core}")
