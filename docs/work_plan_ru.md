@@ -16,6 +16,7 @@
 | 4 | [#45](https://github.com/dilukhin/agent-toolchain/issues/45) | Реестр доверенных рабочих каталогов и read-only provider | Ожидает этап 3 по очереди; upstream consumer contract существует |
 | 5 | [#28](https://github.com/dilukhin/agent-toolchain/issues/28) | Operational alerts/staleness и anomaly guard RouterAI | Частично: status/observability уже реализованы PR #31 |
 | 6 | [#29](https://github.com/dilukhin/agent-toolchain/issues/29) | Общая конфигурация, явные профили, локальные настройки и безопасная миграция | Дизайн и реализация после #28 |
+| Отдельно | [#61](https://github.com/dilukhin/agent-toolchain/issues/61) | Явный Linux opt-in CLI P0, status/metrics/disable поверх существующего reconciler | Добавлена параллельным диалогом 2026-09-19; реализацию CLI согласовать по времени с #46/#45 |
 | 7 | [#60](https://github.com/dilukhin/agent-toolchain/issues/60) | Готовность ScopedKB, затем добровольное подключение через ToolSpec | Readiness можно проверять независимо; установка отложена до доказанного контракта |
 
 Это рабочая последовательность, не утверждение, что каждая предыдущая функция
@@ -105,6 +106,24 @@ doctor/status без работающей требуемой функции не
 существующий ToolSpec/python-venv механизм. Не создавать общую writable KB,
 не мигрировать пользовательские знания скрыто и не включать телеметрию.
 Результат «подключение отложено» допустим; ложный healthy runtime — нет.
+
+## Новая задача MP-3 (#61)
+
+[#61](https://github.com/dilukhin/agent-toolchain/issues/61) создана параллельным
+диалогом после исходной инвентаризации. Она добавляет явный Linux opt-in интерфейс
+P0: enable/status/metrics/disable поверх существующего pilot reconciler.
+Workspace trust #45 в неё не входит. Обычный apply/update не активирует pilot;
+реальное включение на пользовательской машине остаётся отдельной задачей.
+
+Сначала короткий дизайн CLI, immutable bundle, canonical paths, effective layers,
+version drift при disable и семантики агрегированных метрик; затем fixtures и
+существующие MP-1/MP-2 gates для нового кода. Уже выполненный MP-2 с метриками
+не повторять только из-за старого closure-документа. Доказательства upstream
+и точная проверенная пара перечислены в issue и перед реализацией проверяются заново.
+
+Дизайн можно вести отдельно сейчас; реализацию изменений toolchainctl выполнять
+последовательно с #46/#45, согласовав порядок с ведущим MP-3 диалогом. #61 не
+является разрешением автоматически включать P0, менять policy ALLOW или YC guard.
 
 ## Отдельная очередь и параллельность
 
