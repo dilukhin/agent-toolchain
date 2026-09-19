@@ -19,6 +19,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 import setup_core
+from core_identity import CORE_SEMVER, read_identity, version_text
 from setup_lib import (
     Reporter,
     STATE_CONFIGURED,
@@ -42,7 +43,6 @@ import setup_yc_transitional_guard
 
 PRODUCT = "agent-toolchain"
 LEGACY_PRODUCT = "opencode_setup"
-CORE_SEMVER = "0.1.0"
 CORE_MARKER = ".agent-toolchain-managed-core.json"
 UPDATE_REPOSITORY = "dilukhin/agent-toolchain"
 UPDATE_BRANCH = "main"
@@ -70,6 +70,7 @@ _CORE_REQUIRED_FILES = (
     "setup_yc_transitional_guard.py",
     "yc_transitional_entry.py",
     "proxy_tools.py",
+    "core_identity.py",
     "config_data.json",
 )
 _CORE_REQUIRED_TREES = ("templates", "skills/remote-long-running")
@@ -86,24 +87,7 @@ class SelfUpdateError(RuntimeError):
 
 def _version_text() -> str:
     """Return identity for the running core without consulting a checkout or remote state."""
-    marker_path = Path(__file__).resolve().parent / CORE_MARKER
-    try:
-        marker = json.loads(marker_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return f"toolchainctl {CORE_SEMVER}.dev"
-
-    source_ref = marker.get("source_ref") if isinstance(marker, dict) else None
-    if isinstance(source_ref, str) and _SHA_RE.fullmatch(source_ref):
-        return f"toolchainctl {CORE_SEMVER}.{source_ref[:8]}"
-
-    fingerprint = marker.get("fingerprint") if isinstance(marker, dict) else None
-    if (
-        isinstance(fingerprint, str)
-        and len(fingerprint) == 64
-        and all(ch in "0123456789abcdef" for ch in fingerprint)
-    ):
-        return f"toolchainctl {CORE_SEMVER}.local.{fingerprint[:8]}"
-    return f"toolchainctl {CORE_SEMVER}.unknown"
+    return version_text("toolchainctl", read_identity(Path(__file__).resolve().parent))
 
 
 def _state_base() -> Path:
@@ -756,7 +740,10 @@ def _bootstrap_access_check() -> int:
 def main(argv: list[str] | None = None) -> int:
     if (sys.argv[1:] if argv is None else argv) == ["--bootstrap-access-check"]:
         return _bootstrap_access_check()
-    args = build_parser().parse_args(argv)
+    arguments = sys.argv[1:] if argv is None else argv
+    if arguments not in (["--version"], ["--help"], ["-h"]):
+        print(_version_text(), file=sys.stderr)
+    args = build_parser().parse_args(arguments)
     if args.command == "updates":
         return _updates_phase(args)
     if args.command == "update":

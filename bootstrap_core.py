@@ -14,6 +14,8 @@ import time
 import uuid
 from pathlib import Path, PurePosixPath
 
+from core_identity import emit_identity, read_identity
+
 SOURCE_ROOT = Path(__file__).resolve().parent
 CORE_MARKER = ".agent-toolchain-managed-core.json"
 ENTRYPOINT_MARKER = "agent-toolchain:managed-core-entrypoint:v1"
@@ -59,6 +61,7 @@ REQUIRED_FILES = (
     "setup_yc_transitional_guard.py",
     "yc_transitional_entry.py",
     "proxy_tools.py",
+    "core_identity.py",
     "config_data.json",
 )
 REQUIRED_TREES = ("templates", "skills/remote-long-running")
@@ -263,7 +266,57 @@ def _preflight_entrypoint(core: Path) -> None:
         raise RuntimeError(f"Refusing to replace foreign toolchainctl entrypoint: {path}")
 
 
-def _copy_payload(source: Path, staging: Path, fingerprint: str) -> None:
+def _source_ref(source: Path, fingerprint: str) -> str | None:
+    """Resolve provenance at publication, never at installed runtime startup."""
+    supplied = os.environ.get("AGENT_TOOLCHAIN_UPDATE_REF")
+    if supplied is not None and (len(supplied) != 40 or any(c not in "0123456789abcdef" for c in supplied)):
+        raise RuntimeError("Invalid exact source ref supplied by the self-update caller")
+    if not (source / ".git").exists():
+        # Backward-compatible internal contract: self-update downloads the exact
+        # GitHub SHA archive before invoking bootstrap. Not a user override flag.
+        return supplied
+    try:
+        env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
+        def git(*args: str) -> str:
+            cp = subprocess.run(["git", "-C", str(source), *args], env=env,
+                                capture_output=True, check=True, timeout=10)
+            return cp.stdout.decode("utf-8").strip()
+        head = git("rev-parse", "HEAD")
+        if len(head) != 40 or any(c not in "0123456789abcdef" for c in head):
+            raise ValueError("unsupported Git object identity")
+        if Path(git("rev-parse", "--show-toplevel")).resolve() != source.resolve():
+            raise ValueError("different Git root")
+        if git("status", "--porcelain", "--untracked-files=all"):
+            raise ValueError("dirty checkout")
+        entries = git("ls-tree", "-rz", "--full-tree", head).split("\0")
+        blobs = {}
+        for entry in entries:
+            if not entry:
+                continue
+            meta, relative = entry.split("\t", 1)
+            mode, kind, sha = meta.split()
+            if kind == "blob" and mode in {"100644", "100755"}:
+                blobs[relative] = sha
+        for relative, path in _iter_source_files(source):
+            content = path.read_bytes()
+            variants = [content]
+            if b"\0" not in content:
+                variants.append(content.replace(b"\r\n", b"\n"))
+            hashes = {hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest() for raw in variants}
+            if path.is_symlink() or blobs.get(relative) not in hashes:
+                raise ValueError("payload does not match Git tree")
+        if source_fingerprint(source) != fingerprint or git("rev-parse", "HEAD") != head:
+            raise ValueError("source changed during provenance validation")
+    except (OSError, ValueError, subprocess.SubprocessError):
+        if supplied is not None:
+            raise RuntimeError("Cannot prove supplied source ref against the local checkout")
+        return None
+    if supplied is not None and supplied != head:
+        raise RuntimeError("Supplied source ref differs from the verified checkout HEAD")
+    return head
+
+
+def _copy_payload(source: Path, staging: Path, fingerprint: str, source_ref: str | None = None) -> None:
     for relative in REQUIRED_FILES:
         target = staging / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -281,9 +334,8 @@ def _copy_payload(source: Path, staging: Path, fingerprint: str) -> None:
         "fingerprint": staged_fingerprint,
         "payload": source_payload(staging),
     }
-    update_ref = os.environ.get("AGENT_TOOLCHAIN_UPDATE_REF")
-    if update_ref and len(update_ref) == 40 and all(ch in "0123456789abcdef" for ch in update_ref):
-        marker["source_ref"] = update_ref
+    if source_ref is not None:
+        marker["source_ref"] = source_ref
     (staging / CORE_MARKER).write_text(
         json.dumps(marker, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -296,11 +348,12 @@ def _validate_staged(staging: Path) -> None:
 
 
 def _publish_core(source: Path, core: Path, fingerprint: str) -> tuple[bool, Path | None]:
+    source_ref = _source_ref(source, fingerprint)
     core_present = core.exists() or core.is_symlink()
     current = _owned_core(core) if core_present else None
     if core_present and current is None:
         raise RuntimeError(f"Refusing to replace modified or unowned core directory: {core}")
-    if current is not None and current.get("fingerprint") == fingerprint:
+    if current is not None and current.get("fingerprint") == fingerprint and current.get("source_ref") == source_ref:
         return False, None
 
     root = core.parent
@@ -308,7 +361,7 @@ def _publish_core(source: Path, core: Path, fingerprint: str) -> tuple[bool, Pat
     staging: Path | None = _new_staging(root)
     backup: Path | None = None
     try:
-        _copy_payload(source, staging, fingerprint)
+        _copy_payload(source, staging, fingerprint, source_ref)
         _validate_staged(staging)
         if core_present:
             backup = root / f"core.previous.{time.strftime('%Y%m%d%H%M%S')}.{os.getpid()}"
@@ -408,6 +461,7 @@ def _report_resolution() -> None:
 
 
 def main() -> int:
+    emit_identity("agent-toolchain-bootstrap", read_identity(SOURCE_ROOT))
     if sys.version_info < (3, 10):
         print("agent-toolchain requires Python 3.10+ for its stdlib-only core.", file=sys.stderr)
         return 2

@@ -12,8 +12,8 @@
 | 0 | #54, #53, #46, #28, #45, #29 | Закрыть дубликат; актуализировать остаток работы и зависимости | Выполнено: #54 закрыт как duplicate #53; описания остальных уточнены |
 | 1 | [#58](https://github.com/dilukhin/agent-toolchain/issues/58) | Доставить правила Windows literal verifier и CLI preflight; проверить пример и обновление managed instructions | Выполнено: [PR #62](https://github.com/dilukhin/agent-toolchain/pull/62), merge 6b900b581a360ec5e8d0a9b2a3c55d9fd1be1737; Windows/Linux CI success |
 | 2 | [#53](https://github.com/dilukhin/agent-toolchain/issues/53) | Проверить доступность опубликованного core/marker/entrypoint обычному пользователю | Выполнено: [PR #64](https://github.com/dilukhin/agent-toolchain/pull/64); Windows/Linux CI и реальный standard-user regression прошли |
-| 3 | [#46](https://github.com/dilukhin/agent-toolchain/issues/46) | Завершить identity обычных команд, ранних ошибок и proxy-tools | Следующий этап; частично: --version уже реализован PR #56 |
-| 4 | [#45](https://github.com/dilukhin/agent-toolchain/issues/45) | Реестр доверенных рабочих каталогов и read-only provider | Ожидает этап 3 по очереди; upstream consumer contract существует |
+| 3 | [#46](https://github.com/dilukhin/agent-toolchain/issues/46) | Завершить identity обычных команд, ранних ошибок и proxy-tools | Реализовано: stderr identity, wrapper version/JSON health, exact provenance и автономный runtime; Windows/Linux CI — обязательный gate слияния |
+| 4 | [#45](https://github.com/dilukhin/agent-toolchain/issues/45) | Реестр доверенных рабочих каталогов и read-only provider | Следующий этап после приёмки #46; upstream consumer contract существует |
 | 5 | [#28](https://github.com/dilukhin/agent-toolchain/issues/28) | Operational alerts/staleness и anomaly guard RouterAI | Частично: status/observability уже реализованы PR #31 |
 | 6 | [#29](https://github.com/dilukhin/agent-toolchain/issues/29) | Общая конфигурация, явные профили, локальные настройки и безопасная миграция | Дизайн и реализация после #28 |
 | Отдельно | [#61](https://github.com/dilukhin/agent-toolchain/issues/61) | Явный Linux opt-in CLI P0, status/metrics/disable поверх существующего reconciler | Добавлена параллельным диалогом 2026-09-19; реализацию CLI согласовать по времени с #46/#45 |
@@ -49,14 +49,17 @@ bootstrap, CLI, конфигурации и миграциях.
 
 ## Этап 3: диагностическая identity (#46)
 
-Сохранить уже работающий toolchainctl --version. Завершить:
-- diagnostic identity обычных check/apply/updates/update и ранних ошибок;
-- собственную identity proxy-tools без перехвата child --version и без баннера в stdout;
-- provenance поддерживаемых production install/update путей и честные local/dev случаи.
+Реализация: [контракт diagnostic identity](diagnostic_identity_ru.md).
+Сохранены `toolchainctl --version` и semver `0.1.0`; общий модуль добавляет stderr
+identity обычных команд и ранних ошибок. Proxy предоставляет `--wrapper-version`
+и `--health-json`, сохраняя child `--version` и stdout. Чистый checkout проверяется
+по Git blobs до публикации; self-update сохраняет exact-archive caller contract.
+Не доказанный SHA остаётся local/dev. Proxy получает immutable snapshot provenance,
+полный source SHA остаётся в metadata/manifest. Runtime не читает developer checkout.
 
-Допустимы два последовательных PR: core, затем proxy-tools. Runtime не читает
-developer checkout для определения своей версии; полный source SHA остаётся
-authoritative provenance.
+Приёмка: общий regression runner и public proxy fixtures на Windows/Linux,
+существующие #53, managed-helper, MP-1/MP-2 и RouterAI gates на финальном PR head.
+После merge/read-back следующий этап — #45; реальные устройства/облако не изменяются.
 
 ## Этап 4: доверенные каталоги (#45)
 

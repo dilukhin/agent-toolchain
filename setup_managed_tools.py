@@ -23,6 +23,7 @@ from setup_lib import (
     run,
 )
 from setup_tools import ToolSpec
+from core_identity import BUNDLED_IDENTITY, read_identity
 
 _RUNTIME_MARKER = ".agent-toolchain-managed-tool.json"
 _ENTRYPOINT_MARKER = "agent-toolchain:managed-entrypoint:v1"
@@ -88,7 +89,7 @@ def _marker_path(release: Path) -> Path:
 
 def _marker_payload(spec: ToolSpec) -> dict[str, object]:
     release = _release_dir(spec) if spec.runtime == "python-builtin" else None
-    return {
+    result = {
         "schema": 1,
         "owner": "agent-toolchain",
         "tool": spec.name,
@@ -97,6 +98,10 @@ def _marker_payload(spec: ToolSpec) -> dict[str, object]:
         "runtime": spec.runtime,
         "payload_sha256": release.name.removeprefix("builtin-") if release else None,
     }
+
+    if spec.name == "proxy-tools" and spec.runtime == "python-builtin":
+        result["core_identity"] = read_identity(Path(__file__).resolve().parent)
+    return result
 
 
 def _canonical_text_payload(path: Path) -> bytes:
@@ -110,8 +115,9 @@ def _builtin_payload(spec: ToolSpec) -> dict[str, bytes]:
     source = source_dir / f"{spec.module}.py"
     payload = {f"{spec.module}.py": _canonical_text_payload(source)}
     if spec.name == "proxy-tools":
-        for dependency in ("setup_inventory.py", "setup_external_updates.py", "setup_lib.py"):
+        for dependency in ("setup_inventory.py", "setup_external_updates.py", "setup_lib.py", "core_identity.py"):
             payload[dependency] = _canonical_text_payload(source_dir / dependency)
+        payload[BUNDLED_IDENTITY] = (json.dumps(read_identity(source_dir), sort_keys=True) + "\n").encode("utf-8")
     for command in spec.entrypoints:
         script = (
             "#!/usr/bin/env python3\n"
@@ -507,7 +513,7 @@ def _manifest_record(spec: ToolSpec, release: Path) -> dict[str, object]:
             "public_path": str(_public_entrypoint(spec, command)),
             "target": str(_venv_command(venv, command) if spec.runtime == "python-venv" else release / f"{command}.py"),
         }
-    return {
+    result = {
         "owner": "agent-toolchain",
         "source": spec.source,
         "repo": spec.repo,
@@ -518,6 +524,10 @@ def _manifest_record(spec: ToolSpec, release: Path) -> dict[str, object]:
         "health_contract": [list(check.argv) for check in spec.health_contract],
         "platforms": list(spec.platforms),
     }
+
+    if spec.name == "proxy-tools" and spec.runtime == "python-builtin":
+        result["core_identity"] = json.loads((release / BUNDLED_IDENTITY).read_text(encoding="utf-8"))
+    return result
 
 
 def _install_builtin(spec: ToolSpec, reporter: Reporter) -> Path | None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import ipaddress
+import json
 import os
 import select
 import socket
@@ -11,6 +12,8 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+
+from core_identity import emit_identity, read_identity, version_text
 
 from setup_external_updates import (
     advisory,
@@ -213,6 +216,7 @@ def _show_routerai_status() -> None:
 
 
 def launch(command: str, argv: list[str]) -> int:
+    emit_identity(command + "-proxied", read_identity(Path(__file__).resolve().parent, bundled=True))
     inventory = external_cli_inventory(ExternalCliSpec(command, command.title()))
     if not inventory.active:
         print(f"{command}: no executable found", file=sys.stderr)
@@ -254,6 +258,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("command", choices=("opencode", "codex"))
     parser.add_argument("args", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
+    identity = read_identity(Path(__file__).resolve().parent, bundled=True)
+    if args.args == ["--wrapper-version"]:
+        print(version_text(args.command + "-proxied", identity))
+        return 0
+    if args.args == ["--health-json"]:
+        print(json.dumps({"tool": args.command + "-proxied", "identity": identity,
+                          "scope": "wrapper-runtime", "network_checked": False}, sort_keys=True))
+        return 0
     if args.args == ["--health"]:
         print(f"{args.command}-proxied: launch {args.command} through the managed SOCKS5 proxy")
         return 0
