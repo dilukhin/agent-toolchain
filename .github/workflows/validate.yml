@@ -32,6 +32,9 @@ jobs:
           py -3 -m py_compile `
             .\bootstrap_core.py `
             .\core_identity.py `
+            .\toolchain_state.py `
+            .\workspace_trust_contract.py `
+            .\setup_workspace_trust.py `
             .\toolchainctl.py `
             .\setup_core.py `
             .\setup_core_adapter.py `
@@ -108,6 +111,9 @@ jobs:
           python3 -m py_compile \
             ./bootstrap_core.py \
             ./core_identity.py \
+            ./toolchain_state.py \
+            ./workspace_trust_contract.py \
+            ./setup_workspace_trust.py \
             ./toolchainctl.py \
             ./setup_core.py \
             ./setup_core_adapter.py \

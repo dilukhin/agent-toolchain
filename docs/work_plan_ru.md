@@ -12,9 +12,9 @@
 | 0 | #54, #53, #46, #28, #45, #29 | Закрыть дубликат; актуализировать остаток работы и зависимости | Выполнено: #54 закрыт как duplicate #53; описания остальных уточнены |
 | 1 | [#58](https://github.com/dilukhin/agent-toolchain/issues/58) | Доставить правила Windows literal verifier и CLI preflight; проверить пример и обновление managed instructions | Выполнено: [PR #62](https://github.com/dilukhin/agent-toolchain/pull/62), merge 6b900b581a360ec5e8d0a9b2a3c55d9fd1be1737; Windows/Linux CI success |
 | 2 | [#53](https://github.com/dilukhin/agent-toolchain/issues/53) | Проверить доступность опубликованного core/marker/entrypoint обычному пользователю | Выполнено: [PR #64](https://github.com/dilukhin/agent-toolchain/pull/64); Windows/Linux CI и реальный standard-user regression прошли |
-| 3 | [#46](https://github.com/dilukhin/agent-toolchain/issues/46) | Завершить identity обычных команд, ранних ошибок и proxy-tools | Реализовано: stderr identity, wrapper version/JSON health, exact provenance и автономный runtime; Windows/Linux CI — обязательный gate слияния |
-| 4 | [#45](https://github.com/dilukhin/agent-toolchain/issues/45) | Реестр доверенных рабочих каталогов и read-only provider | Следующий этап после приёмки #46; upstream consumer contract существует |
-| 5 | [#28](https://github.com/dilukhin/agent-toolchain/issues/28) | Operational alerts/staleness и anomaly guard RouterAI | Частично: status/observability уже реализованы PR #31 |
+| 3 | [#46](https://github.com/dilukhin/agent-toolchain/issues/46) | Завершить identity обычных команд, ранних ошибок и proxy-tools | Выполнено: [PR #65](https://github.com/dilukhin/agent-toolchain/pull/65), merge c068f057; Windows/Linux и обязательные проверки успешны |
+| 4 | [#45](https://github.com/dilukhin/agent-toolchain/issues/45) | Реестр доверенных рабочих каталогов и read-only provider | Реализовано: явные add/update/remove/list, точный поставщик данных, атомарная запись и регрессии; Windows/Linux — обязательное условие слияния |
+| 5 | [#28](https://github.com/dilukhin/agent-toolchain/issues/28) | Operational alerts/staleness и anomaly guard RouterAI | Следующий после приёмки #45; status/observability уже реализованы PR #31 |
 | 6 | [#29](https://github.com/dilukhin/agent-toolchain/issues/29) | Общая конфигурация, явные профили, локальные настройки и безопасная миграция | Дизайн и реализация после #28 |
 | Отдельно | [#61](https://github.com/dilukhin/agent-toolchain/issues/61) | Явный Linux opt-in CLI P0, status/metrics/disable поверх существующего reconciler | Добавлена параллельным диалогом 2026-09-19; реализацию CLI согласовать по времени с #46/#45 |
 | 7 | [#60](https://github.com/dilukhin/agent-toolchain/issues/60) | Готовность ScopedKB, затем добровольное подключение через ToolSpec | Readiness можно проверять независимо; установка отложена до доказанного контракта |
@@ -67,10 +67,14 @@ identity обычных команд и ранних ошибок. Proxy пре�
 - [producer contract](https://github.com/dilukhin/opencode_permissions/blob/main/docs/trusted_workspace_producer_contract_ru.md);
 - [consumer contract](https://github.com/dilukhin/opencode_permissions/blob/main/docs/trusted_workspace_fact_design_ru.md).
 
-Реализовать add/list/remove, canonical registry, atomic write/read-back и read-only
-provider. Повторный exact add с теми же scopes — no-op; дубли внутри registry —
-conflict; другие scopes — explicit update. Изменившаяся object identity не
-сохраняет доверие автоматически. Проверить Windows/Linux и corrupt state.
+Реализация и ограничения: [реестр доверенных каталогов](workspace_trust_ru.md).
+Добавлены add/update/remove/list и поставщик данных без записи. Повторный exact add
+с теми же scopes — no-op; дубли внутри registry — conflict; другие scopes требуют
+explicit update. Изменившаяся object identity не сохраняет доверие автоматически.
+Состояние должно иметь валидный manifest; чтение отсутствующего реестра ничего
+не создаёт. Атомарная запись включает блокировку, проверку внешних изменений
+и read-back. Consumer validator закреплён за upstream 7922d612, blob bd8ce9d1.
+Приёмка включает Windows/Linux и существующие обязательные проверки проекта.
 
 Первый trust-conditioned ALLOW — отдельный этап opencode_permissions после
 приёмки producer, без скрытого расширения разрешений в этой задаче.
