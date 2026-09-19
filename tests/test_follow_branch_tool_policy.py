@@ -124,6 +124,30 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         self.assertEqual(resolved, {})
         self.assertIn("git is required", error or "")
 
+    def test_exact_ref_reporting_avoids_stale_pinned_wording(self) -> None:
+        sources = {
+            "managed": (ROOT / "setup_managed_tools.py").read_text(encoding="utf-8"),
+            "skills": (ROOT / "setup_tool_skills_impl.py").read_text(encoding="utf-8"),
+            "adapter": (ROOT / "setup_core_adapter.py").read_text(encoding="utf-8"),
+        }
+        stale_phrases = (
+            "installed pinned non-editable runtime",
+            "install pinned isolated runtime",
+            "from pinned ref",
+            "pinned ref {spec.ref[:12]}",
+            "pinned skill reconciliation skipped",
+            "pinned ToolSpec phase",
+            "same pinned ToolSpec ref",
+        )
+        for phrase in stale_phrases:
+            with self.subTest(phrase=phrase):
+                self.assertFalse(any(phrase in source for source in sources.values()))
+
+        self.assertIn("installed exact-ref non-editable runtime", sources["managed"])
+        self.assertIn("exact ref {spec.ref[:12]}", sources["managed"])
+        self.assertIn("exact ref {spec.ref[:12]} with verified payload hashes", sources["skills"])
+        self.assertIn("managed ToolSpec phase already reconciled this tool from an exact ref", sources["adapter"])
+
     def test_repository_policy_follows_first_party_production_branches(self) -> None:
         config = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
         tools = config["managed_environment"]["tools"]
