@@ -51,6 +51,35 @@ def _old_block() -> bytes:
 
 
 class GlobalAgentsSplitTests(unittest.TestCase):
+    def test_current_template_updates_owned_instructions_without_touching_user_agents(self) -> None:
+        template = (Path(__file__).resolve().parents[1] / "templates" / "AGENTS.md").read_bytes()
+        with tempfile.TemporaryDirectory() as tmp:
+            agents, managed, state = self._paths(Path(tmp))
+            agents.parent.mkdir(parents=True)
+            agents.write_bytes(b"# User instructions\n\n- Preserve my own rule.\n")
+            manifest = {"managed_files": {}}
+            self._apply(agents=agents, state=state, manifest=manifest)
+            original_agents = agents.read_bytes()
+            old_instructions = managed.read_bytes()
+
+            for check in (True, False, True, False):
+                reporter = lib.Reporter()
+                before = {str(p.relative_to(tmp)): p.read_bytes() for p in Path(tmp).rglob("*") if p.is_file()}
+                lib.reconcile_agents_file(
+                    destination=agents, template_data=template,
+                    source_label="opencode_setup:templates/AGENTS.md", manifest=manifest,
+                    reporter=reporter, check=check, force=False, state_dir=state,
+                )
+                self.assertEqual(agents.read_bytes(), original_agents)
+                if check:
+                    self.assertEqual({str(p.relative_to(tmp)): p.read_bytes() for p in Path(tmp).rglob("*") if p.is_file()}, before)
+                else:
+                    self.assertEqual(managed.read_bytes(), template)
+                    if old_instructions == template:
+                        self.assertEqual(_result(reporter, "OpenCode managed instructions").state, lib.STATE_OK)
+                        self.assertEqual({str(p.relative_to(tmp)): p.read_bytes() for p in Path(tmp).rglob("*") if p.is_file()}, before)
+                    old_instructions = template
+
     def _paths(self, root: Path) -> tuple[Path, Path, Path]:
         config = root / "config"
         agents = config / "AGENTS.md"

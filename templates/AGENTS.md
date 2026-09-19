@@ -8,3 +8,12 @@
 - Before builds, CMake, CTest, integration/load tests, long scripts, or other long-running operations, load `remote-long-running`.
 - Before risky state-changing actions or work in an unfamiliar subsystem, load the relevant agent-safe skill: `risk-gate`, `safe-cli`, `unknown-system-safety`, or `recovery-mode`.
 - Do not preload specialized skills unless the current task needs them.
+
+## Проверка CLI и команд Windows перед изменениями
+
+- Перед первым изменением через `safe` в задаче проверь именно установленный CLI: `safe --version`, `safe --help`, затем `safe <нужная-подкоманда> --help`. После смены executable/runtime повтори проверку. Help подтверждает синтаксис, но не разрешение на действие; не угадывай старые команды вроде `safe run`.
+- Для PowerShell verify/rollback/receipt с `$`, обратной кавычкой, вложенными кавычками, JSON или сложным кодом используй поддержанные установленным CLI `--expected-state-file`, `--verify-command-file`, `--rollback-command-file`, `--receipt-command-file`. Файлы содержат UTF-8; команда в command-file должна явно запускать нужный интерпретатор. Формируй буквальный текст через single-quoted строки/here-strings или файловый редактор, не через интерполируемые double-quoted строки.
+- Перед mutation проверь содержимое подготовленных файлов и точную цель: например, `AmneziaWGTunnel$alice` должна сохранить буквальное `$alice`. Сам `--*-file` не исправляет текст, уже искажённый оболочкой при создании файла.
+- Verify получает фактическую identity цели и состояние независимо от expected-state; не подставляй ожидаемое значение вместо наблюдаемого. При неожиданном результате сначала read-only проверка той же точной цели и состояния транзакции; не повторяй mutation вслепую.
+- Ошибка usage во время предварительного `--help`, до первого изменения, означает несовпадение CLI contract и не требует system rollback. Если изменение уже могло начаться или результат неизвестен, сначала проверь actual state/journal и следуй `recovery-mode`.
+- Командные файлы не предназначены для секретов: не добавляй туда credentials и не копируй полный чувствительный текст команд в журнал, receipt или отчёт. Эти правила не ослабляют Linux/YC safety contracts.
