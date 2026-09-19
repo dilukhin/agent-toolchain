@@ -178,10 +178,10 @@
       "agent-safe": {
         "source": "git",
         "repo": "https://github.com/dilukhin/agent-safe.git",
-        "ref": "95545d20533b2dfa1de7d75a30fa1bbfb1d428e3",
+        "branch": "master",
         "project_directory": "agent-safe",
         "runtime": "python-venv",
-        "update_policy": "pinned-tested",
+        "update_policy": "follow-branch",
         "entrypoints": [
           "safe"
         ],
@@ -201,10 +201,10 @@
       "ssh_relay": {
         "source": "git",
         "repo": "https://github.com/dilukhin/ssh_relay.git",
-        "ref": "1a794f84bb3664fe580716195ee939bbe2295675",
+        "branch": "main",
         "project_directory": "ssh_relay",
         "runtime": "python-venv",
-        "update_policy": "pinned-tested",
+        "update_policy": "follow-branch",
         "entrypoints": [
           "ssh_relay"
         ],

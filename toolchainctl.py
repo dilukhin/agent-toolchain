@@ -35,7 +35,7 @@ from setup_managed_tools import reconcile_tool_specs
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
 from setup_path import reconcile_public_bin_path
 from setup_tool_skills import reconcile_pinned_tool_skills
-from setup_tools import parse_tool_specs
+from setup_tools import parse_tool_specs, resolve_tool_specs
 from setup_external_updates import cache_path, load_cache, refresh
 from setup_inventory import common_external_cli_inventory
 import setup_yc_transitional_guard
@@ -308,6 +308,11 @@ def _managed_phase(state_dir: Path, *, check: bool, skip_install: bool, force: b
         return 2
     if not specs:
         reporter.add("ToolSpec registry", STATE_CONFLICT, "no managed production tools are declared")
+        reporter.render()
+        return 2
+    specs, error = resolve_tool_specs(specs)
+    if error:
+        reporter.add("ToolSpec source resolution", STATE_CONFLICT, error)
         reporter.render()
         return 2
 
