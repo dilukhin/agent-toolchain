@@ -221,3 +221,6 @@ Windows:
 - Windows и Linux считаются first-class платформами.
 
 Реализованный ToolSpec/manifest слой описан в [`docs/tooling_foundation_ru.md`](docs/tooling_foundation_ru.md).
+
+Проверка core после bootstrap, поведение при повышенных правах и ограничения:
+[доступность опубликованного core](docs/core_access_validation_ru.md).

@@ -23,6 +23,18 @@ class ToolchainUpdateTests(unittest.TestCase):
         self.assertEqual(args.command, "update")
         self.assertTrue(args.apply)
 
+    def test_failed_bootstrap_access_blocks_update_apply(self) -> None:
+        with mock.patch.object(toolchainctl, "_owned_installed_core", return_value={"fingerprint": "a" * 64}), \
+                mock.patch.object(toolchainctl, "_resolve_update_sha", return_value="b" * 40), \
+                mock.patch.object(toolchainctl, "_urlopen_bytes", return_value=b"fixture"), \
+                mock.patch.object(toolchainctl, "_extract_update_archive", return_value=Path("fixture")), \
+                mock.patch.object(toolchainctl.subprocess, "run", return_value=mock.Mock(returncode=2)) as run, \
+                contextlib.redirect_stdout(io.StringIO()) as output, \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(toolchainctl._run_self_update(apply_after=True), 2)
+        self.assertEqual(output.getvalue(), "")
+        self.assertEqual(run.call_count, 1, "apply must not follow failed bootstrap validation")
+
     def test_version_command_reports_installed_source_ref(self) -> None:
         source_ref = "39dea792ee2923a8853ba5fa416fde7be24a7db6"
         with tempfile.TemporaryDirectory() as temporary:

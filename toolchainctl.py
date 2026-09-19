@@ -716,7 +716,46 @@ def _run_self_update(*, apply_after: bool) -> int:
     return int(completed.returncode)
 
 
+def _non_elevated() -> bool:
+    if os.name != "nt":
+        return os.geteuid() != 0
+    import ctypes
+    from ctypes import wintypes
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    advapi.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    advapi.GetTokenInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
+    token = wintypes.HANDLE()
+    if not advapi.OpenProcessToken(kernel.GetCurrentProcess(), 0x0008, ctypes.byref(token)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        elevated, length = wintypes.DWORD(), wintypes.DWORD()
+        if not advapi.GetTokenInformation(token, 20, ctypes.byref(elevated), ctypes.sizeof(elevated), ctypes.byref(length)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return elevated.value == 0
+    finally:
+        kernel.CloseHandle(token)
+
+
+def _bootstrap_access_check() -> int:
+    """Private, read-only probe called through the published entrypoint."""
+    try:
+        marker = _owned_installed_core()
+        evidence = {"core": str(Path(__file__).resolve().parent),
+                    "fingerprint": marker["fingerprint"], "non_elevated": _non_elevated()}
+    except (OSError, SelfUpdateError, ValueError, TypeError, AttributeError):
+        print("failed            toolchainctl core access probe", file=sys.stderr)
+        return 2
+    print(json.dumps(evidence, ensure_ascii=True, sort_keys=True))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    if (sys.argv[1:] if argv is None else argv) == ["--bootstrap-access-check"]:
+        return _bootstrap_access_check()
     args = build_parser().parse_args(argv)
     if args.command == "updates":
         return _updates_phase(args)

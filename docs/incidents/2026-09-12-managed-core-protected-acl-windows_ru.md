@@ -124,7 +124,17 @@ unknown != ours
 
 Не установлено, что актуальный installer/reconciler систематически создаёт такой protected ACL. Поэтому этот incident сам по себе не является основанием для изменения installation algorithm.
 
-Если проблема повторится или будет воспроизведена в изолированном тесте, следует отдельно открыть implementation task с regression coverage для Windows install/reconciliation.
+Продолжение ведётся в [issue #53](https://github.com/dilukhin/agent-toolchain/issues/53).
+
+В [PR #64](https://github.com/dilukhin/agent-toolchain/pull/64) изолированный
+Windows regression воспроизвёл отказ старого способа публикации:
+`tempfile.mkdtemp()` с режимом `0700` на Python 3.13, затем rename в `core`.
+Проверка сопоставляет чтение администратором с запуском отдельным обычным
+пользователем. Новый staging наследует ACL родителя; существующие ACL не меняются.
+[Контракт, проверки и ограничения](../core_access_validation_ru.md).
+
+Даже успешное воспроизведение этого механизма не устанавливает происхождение
+ACL на DIMA-HP: для исторической установки нет точного Python/build evidence.
 
 ## Historical evidence
 

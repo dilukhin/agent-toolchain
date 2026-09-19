@@ -54,7 +54,7 @@ jobs:
       - name: Validate PowerShell bootstrap and retired interface syntax
         shell: powershell
         run: |
-          foreach ($script in @("bootstrap_windows.ps1", "setup_windows.ps1", "install_bmad_windows.ps1", "validate_setup.ps1")) {
+          foreach ($script in @("bootstrap_windows.ps1", "setup_windows.ps1", "install_bmad_windows.ps1", "validate_setup.ps1", "tests/run_core_access_windows.ps1")) {
             $path = (Resolve-Path ".\$script").Path
             $tokens = $null
             $errors = $null
@@ -67,49 +67,12 @@ jobs:
       - name: Validate managed helper exact-ref integration
         shell: powershell
         run: py -3 .\tests\run_managed_tools_integration.py
-      - name: Validate installed toolchainctl bootstrap contract
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate core access as a standard Windows user
         shell: powershell
-        run: |
-          $root = Join-Path $env:RUNNER_TEMP ("agent-toolchain-bootstrap-" + [guid]::NewGuid().ToString("N"))
-          $data = Join-Path $root "data"
-          $bin = Join-Path $root "bin"
-          $state = Join-Path $root "state"
-          $config = Join-Path $root "config"
-          $credential = Join-Path $config "credentials"
-          $skills = Join-Path $root "skills"
-          $projects = Join-Path $root "projects"
-          $stash = Join-Path $root "stash"
-
-          $env:AGENT_TOOLCHAIN_DATA_DIR = $data
-          $env:AGENT_TOOLCHAIN_BIN_DIR = $bin
-          $env:AGENT_TOOLCHAIN_STATE_DIR = $state
-          $env:OPENCODE_CONFIG_DIR = $config
-          $env:OPENCODE_CREDENTIAL_DIR = $credential
-          $env:OPENCODE_SKILLS_DIR = $skills
-          $env:OPENCODE_PROJECTS_DIR = $projects
-          $env:OPENCODE_STASH_DIR = $stash
-          $env:PATH = "$bin;$env:PATH"
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\bootstrap_windows.ps1
-          if ($LASTEXITCODE -ne 0) { throw "bootstrap_windows.ps1 failed: $LASTEXITCODE" }
-          $tool = Join-Path $bin "toolchainctl.cmd"
-          if (-not (Test-Path -LiteralPath $tool -PathType Leaf)) { throw "toolchainctl entrypoint was not published: $tool" }
-
-          & $tool check --skip-package-install --skip-dependency-install
-          if ($LASTEXITCODE -ne 0) { throw "installed toolchainctl check failed: $LASTEXITCODE" }
-          foreach ($path in @($state, $config, $skills, $projects, $stash)) {
-            if (Test-Path -LiteralPath $path) { throw "read-only toolchainctl check unexpectedly created: $path" }
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\bootstrap_windows.ps1
-          if ($LASTEXITCODE -ne 0) { throw "repeat bootstrap_windows.ps1 failed: $LASTEXITCODE" }
-          if (Get-ChildItem -LiteralPath $data -Filter "core.previous.*" -ErrorAction SilentlyContinue) {
-            throw "repeat bootstrap created a core backup despite unchanged fingerprint"
-          }
-
-          $tombstone = (Resolve-Path ".\setup_windows.ps1").Path
-          $tombstoneProc = Start-Process powershell.exe -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $tombstone) -Wait -PassThru -NoNewWindow
-          if ($tombstoneProc.ExitCode -ne 2) { throw "retired setup_windows.ps1 must fail with exit 2, got $($tombstoneProc.ExitCode)" }
+        run: .\tests\run_core_access_windows.ps1
       - name: Validate OpenCode core and BMAD regressions
         shell: powershell
         run: |
