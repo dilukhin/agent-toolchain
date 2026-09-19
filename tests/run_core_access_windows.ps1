@@ -37,6 +37,8 @@ try {
     Get-ChildItem -LiteralPath (Split-Path $PSScriptRoot -Parent) -Force |
         Where-Object { $_.Name -notin @('.git', '__pycache__') } |
         Copy-Item -Destination $source -Recurse -Force
+    @{ root = $root; environment = 'disposable-github-actions' } | ConvertTo-Json |
+        Set-Content -LiteralPath (Join-Path $root 'fixture.json') -Encoding UTF8
     $worker = Join-Path $source 'tests\core_access_windows_fixture.py'
     function Run-StandardUser([string] $mode) {
         $out = Join-Path $root ($mode + '.out')
@@ -44,6 +46,8 @@ try {
         $proc = Start-Process -FilePath $python -Credential $credential -LoadUserProfile `
             -ArgumentList @('-B', "`"$worker`"", "`"$root`"", $mode) `
             -WorkingDirectory $root -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+        # Retain the native handle before exit; PS 5.1 can otherwise lose ExitCode.
+        $processHandle = $proc.Handle
         if (-not $proc.WaitForExit(120000)) {
             $proc.Kill()
             throw "Fixture child timed out: $mode"

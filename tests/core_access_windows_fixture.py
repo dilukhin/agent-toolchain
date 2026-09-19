@@ -18,7 +18,9 @@ sys.path.insert(0, str(source))
 import bootstrap_core as bootstrap
 import toolchainctl
 
-assert os.name == 'nt' and os.environ.get('GITHUB_ACTIONS') == 'true'
+# Alternate logon has a fresh environment. The guarded parent creates this marker.
+fixture = json.loads((root / 'fixture.json').read_text(encoding='utf-8-sig'))
+assert os.name == 'nt' and fixture == {'root': str(root), 'environment': 'disposable-github-actions'}
 case = 'legacy' if mode in ('legacy', 'legacy-denied') else 'current'
 base = root / case
 os.environ.update({
