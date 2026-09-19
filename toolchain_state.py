@@ -24,9 +24,12 @@ def canonical_state_dir() -> Path:
     return base / "agent-toolchain"
 
 
-def default_state_dir() -> Path:
+def default_state_dir(*, resolve_override: bool = True) -> Path:
     # Existing CLI fixture/deployment override. The provider never uses it.
     override = os.environ.get("AGENT_TOOLCHAIN_STATE_DIR")
     if override:
-        return Path(override).expanduser().absolute()
+        path = Path(override).expanduser()
+        # Ordinary reconciliation retains its historical alias resolution.
+        # Trust commands must inspect the final state object before following it.
+        return path.resolve() if resolve_override else path.absolute()
     return canonical_state_dir()

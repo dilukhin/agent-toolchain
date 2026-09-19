@@ -292,6 +292,8 @@ class WorkspaceTrustRegistryTests(unittest.TestCase):
         moved = self.root / "moved-state"
         self.state.rename(moved)
         self.state.symlink_to(moved, target_is_directory=True)
+        self.assertEqual(toolchain_state.default_state_dir(), moved)
+        self.assertEqual(toolchain_state.default_state_dir(resolve_override=False), self.state)
         self.assertEqual(self.add()[0], 2)
         self.assertTrue(self.state.is_symlink())
 

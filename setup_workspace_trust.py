@@ -268,7 +268,7 @@ def add_cli_parser(sub) -> None:
 
 def run_cli(args) -> int:
     try:
-        state = default_state_dir()
+        state = default_state_dir(resolve_override=False)
         if args.trust_command == "list":
             print(json.dumps(_read_registry(state)[0], ensure_ascii=True, sort_keys=True, indent=2))
         else:
