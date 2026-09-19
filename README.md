@@ -59,6 +59,8 @@ toolchainctl update --apply  обновить core и затем примени�
 
 `check` не создаёт state/runtime/skills, не выполняет package install, clone/pull, chmod или backup. `apply` меняет только доказанно управляемые ресурсы. Неизвестное содержимое не усыновляется автоматически.
 
+`toolchainctl workspace-trust add|update|remove|list` управляет явным постоянным доверием к точному рабочему каталогу для `build`, `test`, `static_check`, `git_read`. Например: `toolchainctl workspace-trust add /absolute/project --scope build --scope test`. `list` читает реестр без изменений; другие команды требуют уже подготовленное через `apply` состояние. Текущие разрешения OpenCode эта возможность не расширяет: подключение к политике проходит отдельную приёмку в `opencode_permissions`. [Команды, хранение и границы доверия](docs/workspace_trust_ru.md).
+
 `update` запрашивает точный SHA актуального `dilukhin/agent-toolchain@main`, скачивает архив именно этого SHA и публикует его штатным bootstrap-механизмом. Перед заменой повторно проверяется ownership и fingerprint фактического установленного core; локально изменённый или неизвестный core сохраняется и блокирует автоматическое обновление. Developer checkout при этом не читается и не изменяется.
 
 Состояния отчёта:

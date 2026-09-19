@@ -62,6 +62,9 @@ REQUIRED_FILES = (
     "yc_transitional_entry.py",
     "proxy_tools.py",
     "core_identity.py",
+    "toolchain_state.py",
+    "setup_workspace_trust.py",
+    "workspace_trust_contract.py",
     "config_data.json",
 )
 REQUIRED_TREES = ("templates", "skills/remote-long-running")

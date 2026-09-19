@@ -19,6 +19,8 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 import setup_core
+import setup_workspace_trust
+from toolchain_state import state_base as _state_base, default_state_dir
 from core_identity import CORE_SEMVER, read_identity, version_text
 from setup_lib import (
     Reporter,
@@ -71,6 +73,9 @@ _CORE_REQUIRED_FILES = (
     "yc_transitional_entry.py",
     "proxy_tools.py",
     "core_identity.py",
+    "toolchain_state.py",
+    "setup_workspace_trust.py",
+    "workspace_trust_contract.py",
     "config_data.json",
 )
 _CORE_REQUIRED_TREES = ("templates", "skills/remote-long-running")
@@ -88,28 +93,6 @@ class SelfUpdateError(RuntimeError):
 def _version_text() -> str:
     """Return identity for the running core without consulting a checkout or remote state."""
     return version_text("toolchainctl", read_identity(Path(__file__).resolve().parent))
-
-
-def _state_base() -> Path:
-    if os.name == "nt":
-        local = os.environ.get("LOCALAPPDATA")
-        if local:
-            return Path(local).resolve()
-        return (Path.home() / ".local" / "state").resolve()
-    xdg = os.environ.get("XDG_STATE_HOME")
-    if xdg:
-        return Path(xdg).expanduser().resolve()
-    return (Path.home() / ".local" / "state").resolve()
-
-
-def default_state_dir() -> Path:
-    override = os.environ.get("AGENT_TOOLCHAIN_STATE_DIR")
-    if override:
-        return Path(override).expanduser().resolve()
-    base = _state_base()
-    if os.name == "nt" and os.environ.get("LOCALAPPDATA"):
-        return base / PRODUCT / "state"
-    return base / PRODUCT
 
 
 def legacy_state_dir() -> Path:
@@ -218,6 +201,7 @@ def build_parser() -> argparse.ArgumentParser:
     update = sub.add_parser("update", help="update the installed agent-toolchain core from GitHub main")
     update.add_argument("--apply", action="store_true", help="run the freshly installed toolchainctl apply after update")
     setup_yc_transitional_guard.add_cli_parser(sub)
+    setup_workspace_trust.add_cli_parser(sub)
     return parser
 
 
@@ -744,6 +728,8 @@ def main(argv: list[str] | None = None) -> int:
     if arguments not in (["--version"], ["--help"], ["-h"]):
         print(_version_text(), file=sys.stderr)
     args = build_parser().parse_args(arguments)
+    if args.command == "workspace-trust":
+        return setup_workspace_trust.run_cli(args)
     if args.command == "updates":
         return _updates_phase(args)
     if args.command == "update":
