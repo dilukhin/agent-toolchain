@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
 
 from setup_tools import TOOL_SPEC_SCHEMA, parse_tool_spec, parse_tool_specs  # noqa: E402
 
+
 class ToolSpecTests(unittest.TestCase):
     def test_valid_pinned_git_tool(self) -> None:
         raw = {
