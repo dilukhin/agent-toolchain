@@ -11,8 +11,8 @@
 |---|---|---|---|
 | 0 | #54, #53, #46, #28, #45, #29 | Закрыть дубликат; актуализировать остаток работы и зависимости | Выполнено: #54 закрыт как duplicate #53; описания остальных уточнены |
 | 1 | [#58](https://github.com/dilukhin/agent-toolchain/issues/58) | Доставить правила Windows literal verifier и CLI preflight; проверить пример и обновление managed instructions | Выполнено: [PR #62](https://github.com/dilukhin/agent-toolchain/pull/62), merge 6b900b581a360ec5e8d0a9b2a3c55d9fd1be1737; Windows/Linux CI success |
-| 2 | [#53](https://github.com/dilukhin/agent-toolchain/issues/53) | Проверить доступность опубликованного core/marker/entrypoint обычному пользователю | Реализованы post-publication проверка и регрессии; приёмка — Windows/Linux CI этой поставки |
-| 3 | [#46](https://github.com/dilukhin/agent-toolchain/issues/46) | Завершить identity обычных команд, ранних ошибок и proxy-tools | Частично: --version уже реализован PR #56 |
+| 2 | [#53](https://github.com/dilukhin/agent-toolchain/issues/53) | Проверить доступность опубликованного core/marker/entrypoint обычному пользователю | Выполнено: [PR #64](https://github.com/dilukhin/agent-toolchain/pull/64); Windows/Linux CI и реальный standard-user regression прошли |
+| 3 | [#46](https://github.com/dilukhin/agent-toolchain/issues/46) | Завершить identity обычных команд, ранних ошибок и proxy-tools | Следующий этап; частично: --version уже реализован PR #56 |
 | 4 | [#45](https://github.com/dilukhin/agent-toolchain/issues/45) | Реестр доверенных рабочих каталогов и read-only provider | Ожидает этап 3 по очереди; upstream consumer contract существует |
 | 5 | [#28](https://github.com/dilukhin/agent-toolchain/issues/28) | Operational alerts/staleness и anomaly guard RouterAI | Частично: status/observability уже реализованы PR #31 |
 | 6 | [#29](https://github.com/dilukhin/agent-toolchain/issues/29) | Общая конфигурация, явные профили, локальные настройки и безопасная миграция | Дизайн и реализация после #28 |

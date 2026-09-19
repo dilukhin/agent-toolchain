@@ -126,7 +126,8 @@ unknown != ours
 
 Продолжение ведётся в [issue #53](https://github.com/dilukhin/agent-toolchain/issues/53).
 
-Добавлен изолированный Windows regression старого способа публикации:
+В [PR #64](https://github.com/dilukhin/agent-toolchain/pull/64) изолированный
+Windows regression воспроизвёл отказ старого способа публикации:
 `tempfile.mkdtemp()` с режимом `0700` на Python 3.13, затем rename в `core`.
 Проверка сопоставляет чтение администратором с запуском отдельным обычным
 пользователем. Новый staging наследует ACL родителя; существующие ACL не меняются.

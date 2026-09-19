@@ -84,3 +84,18 @@ Linux-регрессия запускает настоящий обычный п
 Модульные тесты дополнительно проверяют ложный путь/fingerprint, elevated-ответ,
 неправильную форму ответа, ошибку запуска/timeout, сохранение результата публикации
 и запрет перехода к `update --apply` после ошибки bootstrap.
+
+## Приёмка 2026-09-19
+
+Исполняемый changeset `49cdfb679c231e67454c0e72fbfa370cd79c5d67` прошёл
+[PR workflow 35440307815](https://github.com/dilukhin/agent-toolchain/actions/runs/35440307815):
+оба jobs `windows` и `linux`, включая полный validate, managed-helper integration,
+Windows standard-user/ACL fixture и Linux обычного пользователя. Отдельные
+PR workflow MP-1, MP-2 и RouterAI ownership также завершились успешно.
+
+В первом прогоне тестовая обвязка неверно ожидала наследование переменной
+`GITHUB_ACTIONS` при отдельном Windows logon. Исправлены передача контекста
+в пределах fixture и сохранение process handle для достоверного ExitCode.
+Ошибка не обходилась пропуском проверки или подменой обычного пользователя.
+Итоговый commit и CI документационного завершения доступны в
+[PR #64](https://github.com/dilukhin/agent-toolchain/pull/64).
