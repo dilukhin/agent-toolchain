@@ -73,7 +73,7 @@ Global skills:          ~/.agents/skills
 
 ## 4. Managed CLI tools
 
-Production helper tool устанавливается не из developer checkout, а из ToolSpec `repo@exact-ref`.
+Production helper tool устанавливается не из developer checkout. Для `follow-branch` production branch один раз за reconciliation-run разрешается в exact 40-hex SHA; для `pinned-tested` exact SHA задан в ToolSpec. Дальше deployment всегда работает только с `repo@exact-ref`.
 
 Текущие managed tools:
 
@@ -84,7 +84,7 @@ agent-safe → isolated venv → safe
 
 Для каждого инструмента:
 
-1. проверяется immutable 40-hex ref;
+1. source policy валидируется без network I/O, затем `follow-branch` ровно один раз разрешается в immutable 40-hex ref;
 2. эксклюзивно резервируется final versioned release directory;
 3. venv создаётся **сразу по финальному пути**, потому что стандартный Python venv не relocatable;
 4. package ставится non-editable из exact Git ref;
@@ -97,11 +97,11 @@ agent-safe → isolated venv → safe
 
 Developer checkout может быть dirty, содержать локальные commits или отсутствовать — production runtime от этого не зависит.
 
-## 5. Pinned skills
+## 5. Skills, привязанные к exact ref
 
 Skills helper tools должны соответствовать тому же exact ref, что и runtime.
 
-Для `ssh_relay` и `agent-safe` toolchain получает SKILL.md через временный clean checkout pinned SHA, проверяет фактический `HEAD`, валидирует front matter и сохраняет owned skill bundle. Затем destination reconciles обычным file-ownership механизмом.
+Для `ssh_relay` и `agent-safe` toolchain получает SKILL.md через временный clean checkout того же exact SHA, который уже выбран для runtime, проверяет фактический `HEAD`, валидирует front matter и сохраняет owned skill bundle. Затем destination reconciles обычным file-ownership механизмом.
 
 Tracking checkout `~/projects/ssh_relay` / `~/projects/agent-safe` не является production source для skill.
 

@@ -41,12 +41,15 @@ ToolSpec policy:
 
 Reconciler:
 
-1. read-only получает HEAD production branch;
-2. валидирует exact 40-hex SHA;
-3. использует этот SHA как immutable execution identity для всего текущего reconciliation-run;
-4. runtime и tool-owned skills получают один и тот же resolved SHA;
-5. versioned release path строится по exact SHA;
-6. полный SHA записывается в ownership manifest/markers.
+1. чисто разбирает и валидирует ToolSpec без network I/O;
+2. в отдельной source-resolution phase read-only получает HEAD production branch ровно один раз за текущий reconciliation-run;
+3. валидирует exact 40-hex SHA;
+4. создаёт immutable execution ToolSpec для downstream deployer;
+5. runtime и tool-owned skills получают один и тот же resolved SHA;
+6. versioned release path строится по exact SHA;
+7. полный SHA записывается в ownership manifest/markers.
+
+Повторный разбор ToolSpec внутри legacy/compatibility частей процесса не выполняет повторный branch lookup и не может изменить execution identity уже начатого run.
 
 Недоступный или неоднозначный branch resolution не является разрешением использовать произвольный ref: автоматическая mutation останавливается.
 

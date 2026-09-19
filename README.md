@@ -46,11 +46,14 @@ toolchainctl update --apply
 ## Команды
 
 ```text
+toolchainctl --version       показать версию и build identity запущенного core
 toolchainctl check           read-only диагностика target state
 toolchainctl apply           привести управляемое состояние к target state
 toolchainctl update          обновить установленный управляющий core из актуального main
 toolchainctl update --apply  обновить core и затем применить новый target state
 ```
+
+`--version` использует semantic version управляющего core `0.1.0` и идентичность именно запущенного установленного payload. Для production core с доказанным `source_ref` формат — `toolchainctl 0.1.0.<8hex>`, где `<8hex>` — первые восемь символов полного source SHA из managed-core marker. Старый или локально опубликованный core без доказанного Git SHA явно помечается как `local.<fingerprint8>` (либо `dev` без marker), поэтому версия не подменяется текущим checkout или удалённым `main`.
 
 `check` не создаёт state/runtime/skills, не выполняет package install, clone/pull, chmod или backup. `apply` меняет только доказанно управляемые ресурсы. Неизвестное содержимое не усыновляется автоматически.
 
@@ -92,23 +95,25 @@ Bootstrap публикует core атомарно из staging-каталога
 
 Сейчас через ToolSpec реально управляются два Python CLI:
 
-| Tool | Production command | Pinned ref | Runtime |
+| Tool | Production command | Production source | Runtime |
 |---|---|---|---|
-| `ssh_relay` | `ssh_relay` | `1a794f84bb3664fe580716195ee939bbe2295675` | отдельный non-editable Python venv |
-| `agent-safe` | `safe` | `95545d20533b2dfa1de7d75a30fa1bbfb1d428e3` | отдельный non-editable Python venv |
+| `ssh_relay` | `ssh_relay` | `main` (`follow-branch`) | отдельный non-editable Python venv |
+| `agent-safe` | `safe` | `master` (`follow-branch`) | отдельный non-editable Python venv |
+
+В начале одного reconciliation-run production branch разрешается ровно один раз в точный 40-hex commit SHA. Этот SHA становится immutable execution identity для runtime и принадлежащих tool skills. Если branch изменился после resolution, новый commit относится к следующему запуску.
 
 Установка Python tool выполняется из `repo@exact-commit`, а не из `~/projects/...`. Health запускается из установленного runtime. Для `ssh_relay` это в том числе `ssh_relay doctor`, который реально импортирует `paramiko`, не выполняя SSH/network соединение.
 
 Developer checkouts `~/projects/ssh_relay` и `~/projects/agent-safe` могут существовать, быть dirty или вообще отсутствовать: это не должно менять production runtime.
 
-### Skills из того же pinned ref
+### Skills из того же exact ref
 
 `ssh-relay`, `recovery-mode`, `risk-gate`, `safe-cli`, `unknown-system-safety` получают source из того же exact commit, что соответствующий runtime:
 
 ```text
 ToolSpec repo@ref
   ├─ package → isolated runtime
-  └─ SKILL.md → owned pinned skill bundle → ~/.agents/skills/<name>/SKILL.md
+  └─ SKILL.md → owned exact-ref skill bundle → ~/.agents/skills/<name>/SKILL.md
 ```
 
 Для получения skill используется временный clean checkout exact SHA; фактический `HEAD` проверяется до публикации. В ownership manifest source label содержит точный tool/ref/path. Tracking checkout пользователя не является authoritative production source.
@@ -192,7 +197,7 @@ Windows:
 
 ## Что пока не реализовано
 
-Текущий managed-tool deployer поддерживает первый production runtime family `git + pinned-tested + python-venv`.
+Текущий Python managed-tool deployer поддерживает `git + python-venv` с policy `follow-branch` и `pinned-tested`; перед deployment всегда используется immutable exact commit SHA.
 
 Пока **не** подключены как реальные managed tools:
 
@@ -211,7 +216,7 @@ Windows:
 - apply idempotent;
 - никаких `git reset --hard`, `git clean`, force-update пользовательских checkout;
 - source checkout отделён от installed runtime;
-- production ref immutable/pinned-tested;
+- installed production ref immutable; moving production branch сначала разрешается в exact SHA;
 - secrets не записываются в manifest и не выводятся;
 - Windows и Linux считаются first-class платформами.
 

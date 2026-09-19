@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import io
 import json
@@ -21,6 +22,44 @@ class ToolchainUpdateTests(unittest.TestCase):
         args = toolchainctl.build_parser().parse_args(["update", "--apply"])
         self.assertEqual(args.command, "update")
         self.assertTrue(args.apply)
+
+    def test_version_command_reports_installed_source_ref(self) -> None:
+        source_ref = "39dea792ee2923a8853ba5fa416fde7be24a7db6"
+        with tempfile.TemporaryDirectory() as temporary:
+            core = Path(temporary) / "core"
+            core.mkdir()
+            tool = core / "toolchainctl.py"
+            tool.write_text("# managed core\n", encoding="utf-8")
+            marker = {
+                "schema": 1,
+                "owner": "agent-toolchain",
+                "fingerprint": "a" * 64,
+                "source_ref": source_ref,
+            }
+            (core / toolchainctl.CORE_MARKER).write_text(json.dumps(marker), encoding="utf-8")
+            with mock.patch.object(toolchainctl, "__file__", str(tool)):
+                expected = "toolchainctl 0.1.0.39dea792"
+                self.assertEqual(toolchainctl._version_text(), expected)
+                stdout = io.StringIO()
+                with contextlib.redirect_stdout(stdout), self.assertRaises(SystemExit) as exited:
+                    toolchainctl.build_parser().parse_args(["--version"])
+                self.assertEqual(exited.exception.code, 0)
+                self.assertEqual(stdout.getvalue(), expected + "\n")
+
+    def test_version_distinguishes_bootstrap_without_source_ref(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            core = Path(temporary) / "core"
+            core.mkdir()
+            tool = core / "toolchainctl.py"
+            tool.write_text("# managed core\n", encoding="utf-8")
+            marker = {
+                "schema": 1,
+                "owner": "agent-toolchain",
+                "fingerprint": "b" * 64,
+            }
+            (core / toolchainctl.CORE_MARKER).write_text(json.dumps(marker), encoding="utf-8")
+            with mock.patch.object(toolchainctl, "__file__", str(tool)):
+                self.assertEqual(toolchainctl._version_text(), "toolchainctl 0.1.0.local.bbbbbbbb")
 
     def test_update_archive_rejects_path_traversal(self) -> None:
         buffer = io.BytesIO()

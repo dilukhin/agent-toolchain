@@ -1,0 +1,80 @@
+name: Validate MP-2 disposable exact OpenCode
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-exact-opencode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout agent-toolchain
+        uses: actions/checkout@v5
+
+      - name: Checkout current opencode_permissions source of truth
+        uses: actions/checkout@v5
+        with:
+          repository: dilukhin/opencode_permissions
+          ref: main
+          path: opencode_permissions
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Resolve current runtime-revalidated official target
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          from pathlib import Path
+          root = Path("opencode_permissions/tests/compatibility")
+          registry = json.loads((root / "registry.json").read_text(encoding="utf-8"))
+          assert registry["selection"] == "exact_version_only"
+          assert registry["nearest_version_fallback"] is False
+          version = registry["current_target"]
+          profile = json.loads((root / registry["profiles"][version]).read_text(encoding="utf-8"))
+          assert profile["platform_status"]["linux"] == "RUNTIME_REVALIDATED"
+          assert profile["deployable"] is True and "linux" in profile["deployable_platforms"]
+          asset = profile["release_artifacts"]["linux_x64"]
+          print(f"OPENCODE_TARGET_VERSION={version}")
+          print(f"OPENCODE_TARGET_ASSET={asset['name']}")
+          print(f"OPENCODE_TARGET_SHA256={asset['sha256']}")
+          PY
+
+      - name: Download and verify exact official OpenCode binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/$OPENCODE_TARGET_ASSET"
+          curl -fL --retry 3 --retry-all-errors \
+            -o "$archive" \
+            "https://github.com/anomalyco/opencode/releases/download/v$OPENCODE_TARGET_VERSION/$OPENCODE_TARGET_ASSET"
+          echo "$OPENCODE_TARGET_SHA256  $archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/opencode-mp2"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/opencode-mp2"
+          binary="$(find "$RUNNER_TEMP/opencode-mp2" -type f -name opencode -print -quit)"
+          test -n "$binary"
+          chmod +x "$binary"
+          test "$($binary --version)" = "$OPENCODE_TARGET_VERSION"
+          echo "OPENCODE_RUNTIME_BINARY=$binary" >> "$GITHUB_ENV"
+          echo "OPENCODE_RELEASE_ARCHIVE=$archive" >> "$GITHUB_ENV"
+
+      - name: Compile MP-2 disposable harness
+        run: python -m py_compile tests/run_opencode_permissions_mp2_disposable.py
+
+      - name: Run MP-2 disposable production integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tests/run_opencode_permissions_mp2_disposable.py \
+            --opencode "$OPENCODE_RUNTIME_BINARY" \
+            --release-archive "$OPENCODE_RELEASE_ARCHIVE" \
+            --permissions-root "$GITHUB_WORKSPACE/opencode_permissions"

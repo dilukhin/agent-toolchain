@@ -54,6 +54,8 @@ REQUIRED_FILES = (
     "setup_inventory.py",
     "setup_external_updates.py",
     "setup_tools.py",
+    "setup_yc_transitional_guard.py",
+    "yc_transitional_entry.py",
     "proxy_tools.py",
     "config_data.json",
 )

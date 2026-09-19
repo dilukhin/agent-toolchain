@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 import sys
 import unittest
 from pathlib import Path
@@ -11,9 +10,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from setup_tools import TOOL_SPEC_SCHEMA, parse_tool_spec, parse_tool_specs  # noqa: E402
-
-_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-
 
 class ToolSpecTests(unittest.TestCase):
     def test_valid_pinned_git_tool(self) -> None:
@@ -100,7 +96,7 @@ class ToolSpecTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(parsed, {})
 
-    def test_repository_config_follows_production_branches_and_resolves_exact_refs(self) -> None:
+    def test_repository_config_declares_follow_branch_policy_without_resolution(self) -> None:
         data = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
         env = data["managed_environment"]
         self.assertEqual(env["manifest_schema"], 2)
@@ -121,18 +117,18 @@ class ToolSpecTests(unittest.TestCase):
         self.assertEqual(set(parsed), {"ssh_relay", "agent-safe", "proxy-tools"})
 
         ssh = parsed["ssh_relay"]
-        self.assertEqual(ssh.update_policy, "pinned-tested")
+        self.assertEqual(ssh.update_policy, "follow-branch")
         self.assertEqual(ssh.tracking_branch, "main")
         self.assertEqual(ssh.runtime, "python-venv")
-        self.assertRegex(ssh.ref or "", _SHA_RE)
+        self.assertIsNone(ssh.ref)
         self.assertEqual(ssh.entrypoints, ("ssh_relay",))
         self.assertIn(("ssh_relay", "doctor"), tuple(check.argv for check in ssh.health_contract))
 
         safe = parsed["agent-safe"]
-        self.assertEqual(safe.update_policy, "pinned-tested")
+        self.assertEqual(safe.update_policy, "follow-branch")
         self.assertEqual(safe.tracking_branch, "master")
         self.assertEqual(safe.runtime, "python-venv")
-        self.assertRegex(safe.ref or "", _SHA_RE)
+        self.assertIsNone(safe.ref)
         self.assertEqual(safe.entrypoints, ("safe",))
 
         proxy = parsed["proxy-tools"]

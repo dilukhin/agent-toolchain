@@ -194,6 +194,11 @@ def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
             return None, f"ToolSpec {name!r}: follow-branch requires an explicit branch"
         if ref is not None:
             return None, f"ToolSpec {name!r}: follow-branch must not define a fixed ref"
+        assert isinstance(repo, str) and isinstance(branch, str)
+        if _github_repo_parts(repo.strip()) is None:
+            return None, f"ToolSpec {name!r}: follow-branch currently requires an https://github.com/OWNER/REPO(.git) source"
+        if not _valid_branch_name(branch.strip()):
+            return None, f"ToolSpec {name!r}: invalid production branch name: {branch!r}"
     elif branch is not None:
         return None, f"ToolSpec {name!r}: branch is only valid with update_policy='follow-branch'"
     if source == "git" and not _nonempty_string(project_directory):
@@ -221,9 +226,23 @@ def parse_tool_spec(name: str, raw: Any) -> tuple[ToolSpec | None, str | None]:
         module=module.strip() if _nonempty_string(module) else None,
         tracking_branch=branch.strip() if _nonempty_string(branch) else None,
     )
-    if update_policy == "follow-branch":
-        return _resolve_follow_branch(spec)
     return spec, None
+
+
+def resolve_tool_specs(specs: dict[str, ToolSpec]) -> tuple[dict[str, ToolSpec], str | None]:
+    """Resolve moving production branches once into immutable execution specs."""
+    resolved: dict[str, ToolSpec] = {}
+    for name in sorted(specs):
+        spec = specs[name]
+        if spec.update_policy != "follow-branch":
+            resolved[name] = spec
+            continue
+        execution_spec, error = _resolve_follow_branch(spec)
+        if error:
+            return {}, error
+        assert execution_spec is not None
+        resolved[name] = execution_spec
+    return resolved, None
 
 
 def parse_tool_specs(managed_environment: Any) -> tuple[dict[str, ToolSpec], str | None]:

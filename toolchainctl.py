@@ -35,12 +35,15 @@ from setup_managed_tools import reconcile_tool_specs
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
 from setup_path import reconcile_public_bin_path
 from setup_tool_skills import reconcile_pinned_tool_skills
-from setup_tools import parse_tool_specs
+from setup_tools import parse_tool_specs, resolve_tool_specs
 from setup_external_updates import cache_path, load_cache, refresh
 from setup_inventory import common_external_cli_inventory
+import setup_yc_transitional_guard
 
 PRODUCT = "agent-toolchain"
 LEGACY_PRODUCT = "opencode_setup"
+CORE_SEMVER = "0.1.0"
+CORE_MARKER = ".agent-toolchain-managed-core.json"
 UPDATE_REPOSITORY = "dilukhin/agent-toolchain"
 UPDATE_BRANCH = "main"
 _GITHUB_API_BRANCH = f"https://api.github.com/repos/{UPDATE_REPOSITORY}/branches/{UPDATE_BRANCH}"
@@ -64,6 +67,8 @@ _CORE_REQUIRED_FILES = (
     "setup_inventory.py",
     "setup_external_updates.py",
     "setup_tools.py",
+    "setup_yc_transitional_guard.py",
+    "yc_transitional_entry.py",
     "proxy_tools.py",
     "config_data.json",
 )
@@ -77,6 +82,28 @@ class StateMigrationError(RuntimeError):
 
 class SelfUpdateError(RuntimeError):
     pass
+
+
+def _version_text() -> str:
+    """Return identity for the running core without consulting a checkout or remote state."""
+    marker_path = Path(__file__).resolve().parent / CORE_MARKER
+    try:
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return f"toolchainctl {CORE_SEMVER}.dev"
+
+    source_ref = marker.get("source_ref") if isinstance(marker, dict) else None
+    if isinstance(source_ref, str) and _SHA_RE.fullmatch(source_ref):
+        return f"toolchainctl {CORE_SEMVER}.{source_ref[:8]}"
+
+    fingerprint = marker.get("fingerprint") if isinstance(marker, dict) else None
+    if (
+        isinstance(fingerprint, str)
+        and len(fingerprint) == 64
+        and all(ch in "0123456789abcdef" for ch in fingerprint)
+    ):
+        return f"toolchainctl {CORE_SEMVER}.local.{fingerprint[:8]}"
+    return f"toolchainctl {CORE_SEMVER}.unknown"
 
 
 def _state_base() -> Path:
@@ -191,6 +218,7 @@ def _default_paths() -> dict[str, Path]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="toolchainctl", description="Manage the installed agent toolchain safely.")
+    parser.add_argument("--version", action="version", version=_version_text(), help="show running core version and exit")
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("check", "apply"):
         cmd = sub.add_parser(name, help="read-only state check" if name == "check" else "apply desired state")
@@ -205,6 +233,7 @@ def build_parser() -> argparse.ArgumentParser:
     update_sub.add_parser("show", help="show cached advisories without network access")
     update = sub.add_parser("update", help="update the installed agent-toolchain core from GitHub main")
     update.add_argument("--apply", action="store_true", help="run the freshly installed toolchainctl apply after update")
+    setup_yc_transitional_guard.add_cli_parser(sub)
     return parser
 
 
@@ -279,6 +308,11 @@ def _managed_phase(state_dir: Path, *, check: bool, skip_install: bool, force: b
         return 2
     if not specs:
         reporter.add("ToolSpec registry", STATE_CONFLICT, "no managed production tools are declared")
+        reporter.render()
+        return 2
+    specs, error = resolve_tool_specs(specs)
+    if error:
+        reporter.add("ToolSpec source resolution", STATE_CONFLICT, error)
         reporter.render()
         return 2
 
@@ -688,6 +722,8 @@ def main(argv: list[str] | None = None) -> int:
         return _updates_phase(args)
     if args.command == "update":
         return _run_self_update(apply_after=bool(args.apply))
+    if args.command == "yc-guard":
+        return setup_yc_transitional_guard.run_cli(args)
 
     check = args.command == "check"
     try:

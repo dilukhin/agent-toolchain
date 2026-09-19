@@ -29,18 +29,35 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         value.update(overrides)
         return value
 
-    def test_follow_branch_resolves_once_to_immutable_execution_ref(self) -> None:
-        expected = "a" * 40
-        with mock.patch.object(setup_tools, "_resolve_github_branch", return_value=expected) as resolver:
+    def test_follow_branch_parse_is_network_free(self) -> None:
+        with mock.patch.object(
+            setup_tools,
+            "_resolve_github_branch",
+            side_effect=AssertionError("parser must not resolve remote branches"),
+        ) as resolver:
             spec, error = setup_tools.parse_tool_spec("tool", self._raw())
         self.assertIsNone(error)
         self.assertIsNotNone(spec)
         assert spec is not None
-        resolver.assert_called_once_with("https://github.com/example/tool.git", "main")
-        self.assertEqual(spec.ref, expected)
+        resolver.assert_not_called()
+        self.assertIsNone(spec.ref)
         self.assertEqual(spec.tracking_branch, "main")
-        # Downstream deployment remains exact-ref-only after source selection.
-        self.assertEqual(spec.update_policy, "pinned-tested")
+        self.assertEqual(spec.update_policy, "follow-branch")
+
+    def test_follow_branch_resolves_once_to_immutable_execution_ref(self) -> None:
+        expected = "a" * 40
+        spec, error = setup_tools.parse_tool_spec("tool", self._raw())
+        self.assertIsNone(error)
+        self.assertIsNotNone(spec)
+        assert spec is not None
+        with mock.patch.object(setup_tools, "_resolve_github_branch", return_value=expected) as resolver:
+            resolved, error = setup_tools.resolve_tool_specs({"tool": spec})
+        self.assertIsNone(error)
+        resolver.assert_called_once_with("https://github.com/example/tool.git", "main")
+        execution = resolved["tool"]
+        self.assertEqual(execution.ref, expected)
+        self.assertEqual(execution.tracking_branch, "main")
+        self.assertEqual(execution.update_policy, "pinned-tested")
 
     def test_follow_branch_requires_branch_and_forbids_fixed_ref(self) -> None:
         missing_branch = self._raw()
@@ -60,6 +77,10 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         )
         self.assertIsNone(spec)
         self.assertIn("requires an https://github.com", error or "")
+
+        spec, error = setup_tools.parse_tool_spec("tool", self._raw(branch="../main"))
+        self.assertIsNone(spec)
+        self.assertIn("invalid production branch name", error or "")
 
     def test_git_ls_remote_yields_exact_sha_without_checkout(self) -> None:
         expected = "39dea792ee2923a8853ba5fa416fde7be24a7db6"
@@ -94,9 +115,13 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         self.assertEqual(kwargs["env"]["GIT_TERMINAL_PROMPT"], "0")
 
     def test_follow_branch_requires_git_for_resolution(self) -> None:
+        spec, error = setup_tools.parse_tool_spec("tool", self._raw())
+        self.assertIsNone(error)
+        self.assertIsNotNone(spec)
+        assert spec is not None
         with mock.patch.object(setup_tools.shutil, "which", return_value=None):
-            spec, error = setup_tools.parse_tool_spec("tool", self._raw())
-        self.assertIsNone(spec)
+            resolved, error = setup_tools.resolve_tool_specs({"tool": spec})
+        self.assertEqual(resolved, {})
         self.assertIn("git is required", error or "")
 
     def test_repository_policy_follows_first_party_production_branches(self) -> None:
@@ -112,6 +137,16 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         self.assertEqual(agent_safe["update_policy"], "follow-branch")
         self.assertEqual(agent_safe["branch"], "master")
         self.assertNotIn("ref", agent_safe)
+
+        with mock.patch.object(
+            setup_tools,
+            "_resolve_github_branch",
+            side_effect=AssertionError("repository policy validation must not access the network"),
+        ):
+            parsed, error = setup_tools.parse_tool_specs(config["managed_environment"])
+        self.assertIsNone(error)
+        self.assertEqual(parsed["ssh_relay"].update_policy, "follow-branch")
+        self.assertEqual(parsed["agent-safe"].update_policy, "follow-branch")
 
         proxy_tools = tools["proxy-tools"]
         self.assertEqual(proxy_tools["update_policy"], "bundled-with-setup")
