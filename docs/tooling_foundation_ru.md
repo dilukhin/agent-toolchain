@@ -10,7 +10,7 @@
 - `toolchainctl check/apply`;
 - manifest schema 2;
 - ToolSpec schema 1;
-- первый production deployer `git + pinned-tested + python-venv`;
+- первый production deployer `git + python-venv` с policy `follow-branch` и `pinned-tested`;
 - отдельные runtime для `ssh_relay` и `agent-safe`;
 - stable public entrypoints `ssh_relay` и `safe`;
 - exact-ref skill reconciliation из того же commit, что runtime;
@@ -45,7 +45,7 @@ Ownership manifest содержит обязательные разделы:
 
 Управляемые файлы: path/source/SHA-256 установленного содержимого. Сюда относятся OpenCode managed files и опубликованные skills.
 
-Для pinned external skill `source` содержит точный tool/ref/path, например:
+Для external tool skill `source` содержит точный tool/ref/path, например:
 
 ```text
 tool:ssh_relay@<40-hex-sha>:opencode/skills/ssh-relay/SKILL.md
@@ -83,7 +83,7 @@ Developer checkout в ownership installed runtime не входит.
 ToolSpec описывает production contract инструмента:
 
 - `source`;
-- `repo` / immutable `ref` для Git source;
+- `repo` и source policy для Git source: либо immutable `ref`, либо production `branch`;
 - `runtime`;
 - `update_policy`;
 - `entrypoints`;
@@ -91,7 +91,16 @@ ToolSpec описывает production contract инструмента:
 - `platforms`;
 - `project_directory` как metadata source/developer project, а не runtime location.
 
-Для production Python tools текущий deployer принимает только:
+Для production Python tools declarative policy поддерживает два режима:
+
+```text
+source=git
+runtime=python-venv
+update_policy=follow-branch
+branch=<production branch>
+```
+
+или:
 
 ```text
 source=git
@@ -99,6 +108,8 @@ runtime=python-venv
 update_policy=pinned-tested
 ref=<exact 40-hex commit>
 ```
+
+Parsing/validation ToolSpec не выполняет network I/O. Отдельная source-resolution phase ровно один раз за reconciliation-run разрешает каждый `follow-branch` в exact 40-hex SHA и передаёт downstream deployer immutable execution ToolSpec. Runtime и tool-owned skills используют один и тот же resolved SHA. Недоступный или неоднозначный branch resolution даёт conflict до mutation.
 
 Unsupported combinations fail closed.
 
@@ -169,7 +180,7 @@ External helper skills больше не берутся из tracking checkout.
 1. во временном каталоге инициализируется Git repository;
 2. fetch выполняется по exact ToolSpec SHA;
 3. checkout detached `FETCH_HEAD`;
-4. `rev-parse HEAD` обязан совпасть с pinned SHA;
+4. `rev-parse HEAD` обязан совпасть с resolved exact SHA;
 5. SKILL.md проходит validation;
 6. source checkout удаляется;
 7. validated payload публикуется как owned versioned skill bundle;
