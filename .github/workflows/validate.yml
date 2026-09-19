@@ -31,6 +31,7 @@ jobs:
         run: |
           py -3 -m py_compile `
             .\bootstrap_core.py `
+            .\core_identity.py `
             .\toolchainctl.py `
             .\setup_core.py `
             .\setup_core_adapter.py `
@@ -106,6 +107,7 @@ jobs:
         run: |
           python3 -m py_compile \
             ./bootstrap_core.py \
+            ./core_identity.py \
             ./toolchainctl.py \
             ./setup_core.py \
             ./setup_core_adapter.py \
