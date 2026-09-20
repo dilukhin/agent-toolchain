@@ -58,6 +58,8 @@ Read-only:
 
 `toolchainctl yc-guard check`
 
+Для `active` deployment эта команда также проверяет целостность owned `yc.cmd` и фактическое разрешение `yc` в текущем `PATH`. Успех означает, что effective-команда — именно `%LOCALAPPDATA%\\agent-toolchain\\bin\\yc.cmd`. Затенение legacy/чужим `yc`, отсутствие managed entrypoint или изменение его содержимого дают `modified/conflict` и ненулевой код. Проверка не меняет PATH, state, entrypoint или legacy guard.
+
 Install/reconcile:
 
 `toolchainctl yc-guard apply`
@@ -72,7 +74,7 @@ Disable удаляет только доказанно owned `yc.cmd`; versioned
 
 После merge и обновления установленного agent-toolchain:
 
-1. `toolchainctl yc-guard check` подтверждает legacy state и downstream reference;
+1. `toolchainctl yc-guard check` подтверждает legacy state, downstream reference и что effective `yc` — owned managed entrypoint;
 2. `toolchainctl yc-guard apply` завершается `effective_readback=PASS`;
 3. новый shell: `Get-Command yc` указывает на `agent-toolchain\bin\yc.cmd`;
 4. read-only smoke `yc compute instance list` успешен;
