@@ -86,7 +86,7 @@ class PublicProxyIntegrationTests(unittest.TestCase):
     def test_builtin_payload_identity_ignores_checkout_line_endings(self) -> None:
         with tempfile.TemporaryDirectory(prefix="agent-toolchain-builtin-newlines-") as td:
             root = Path(td)
-            files = ("proxy_tools.py", "setup_inventory.py", "setup_external_updates.py", "setup_lib.py")
+            files = ("proxy_tools.py", "setup_inventory.py", "setup_external_updates.py", "setup_lib.py", "core_identity.py")
             for name in files:
                 (root / name).write_bytes((f"# {name}\nprint('ok')\n").encode("utf-8"))
             spec = ToolSpec(
@@ -193,6 +193,14 @@ class PublicProxyIntegrationTests(unittest.TestCase):
                     public_paths.append(public)
                     if os.name == "nt":
                         self.assertFalse(public.read_bytes().startswith(b"\xef\xbb\xbf"))
+                    child_version = subprocess.run([str(public), "--version"], cwd=root, env=os.environ, capture_output=True)
+                    self.assertEqual(child_version.returncode, 0)
+                    self.assertEqual(child_version.stdout.decode().strip(), "fake-cli 1.0")
+                    self.assertEqual(child_version.stderr.decode().count(command + " 0.1.0."), 1)
+                    wrapper_version = subprocess.run([str(public), "--wrapper-version"], cwd=root, env=os.environ, capture_output=True)
+                    self.assertEqual(wrapper_version.returncode, 0)
+                    self.assertTrue(wrapper_version.stdout.decode().startswith(command + " 0.1.0."))
+                    self.assertEqual(wrapper_version.stderr, b"")
                     completed = subprocess.run([str(public), "--help", "--test"], cwd=root, env=os.environ, check=False)
                     self.assertEqual(completed.returncode, 37)
                     payload = json.loads(result.read_text(encoding="utf-8"))
@@ -214,8 +222,10 @@ class PublicProxyIntegrationTests(unittest.TestCase):
                     os.environ["AGENT_TOOLCHAIN_SOCKS_PORT"] = str(unavailable.getsockname()[1])
                     for public in public_paths:
                         result.unlink(missing_ok=True)
-                        completed = subprocess.run([str(public), "--missing-socks"], cwd=root, env=os.environ, check=False)
+                        completed = subprocess.run([str(public), "--missing-socks"], cwd=root, env=os.environ, check=False, capture_output=True)
                         self.assertEqual(completed.returncode, 78)
+                        self.assertEqual(completed.stdout, b"")
+                        self.assertEqual(completed.stderr.decode().count(public.stem + " 0.1.0."), 1)
                         self.assertFalse(result.exists())
             finally:
                 os.environ.clear()

@@ -1,4 +1,4 @@
-"""Pinned ToolSpec deployment for agent-toolchain managed Python CLI tools."""
+"""Exact-ref ToolSpec deployment for agent-toolchain managed Python CLI tools."""
 from __future__ import annotations
 
 import json
@@ -23,6 +23,7 @@ from setup_lib import (
     run,
 )
 from setup_tools import ToolSpec
+from core_identity import BUNDLED_IDENTITY, read_identity
 
 _RUNTIME_MARKER = ".agent-toolchain-managed-tool.json"
 _ENTRYPOINT_MARKER = "agent-toolchain:managed-entrypoint:v1"
@@ -88,7 +89,7 @@ def _marker_path(release: Path) -> Path:
 
 def _marker_payload(spec: ToolSpec) -> dict[str, object]:
     release = _release_dir(spec) if spec.runtime == "python-builtin" else None
-    return {
+    result = {
         "schema": 1,
         "owner": "agent-toolchain",
         "tool": spec.name,
@@ -97,6 +98,10 @@ def _marker_payload(spec: ToolSpec) -> dict[str, object]:
         "runtime": spec.runtime,
         "payload_sha256": release.name.removeprefix("builtin-") if release else None,
     }
+
+    if spec.name == "proxy-tools" and spec.runtime == "python-builtin":
+        result["core_identity"] = read_identity(Path(__file__).resolve().parent)
+    return result
 
 
 def _canonical_text_payload(path: Path) -> bytes:
@@ -110,8 +115,9 @@ def _builtin_payload(spec: ToolSpec) -> dict[str, bytes]:
     source = source_dir / f"{spec.module}.py"
     payload = {f"{spec.module}.py": _canonical_text_payload(source)}
     if spec.name == "proxy-tools":
-        for dependency in ("setup_inventory.py", "setup_external_updates.py", "setup_lib.py"):
+        for dependency in ("setup_inventory.py", "setup_external_updates.py", "setup_lib.py", "core_identity.py"):
             payload[dependency] = _canonical_text_payload(source_dir / dependency)
+        payload[BUNDLED_IDENTITY] = (json.dumps(read_identity(source_dir), sort_keys=True) + "\n").encode("utf-8")
     for command in spec.entrypoints:
         script = (
             "#!/usr/bin/env python3\n"
@@ -201,7 +207,7 @@ def _validate_supported_spec(spec: ToolSpec) -> str | None:
             "update_policy=pinned-tested"
         )
     if not spec.repo or not _is_commit_sha(spec.ref):
-        return "pinned Python tool requires repository and an immutable 40-hex commit ref"
+        return "exact-ref Python tool requires repository and an immutable 40-hex commit ref"
     if len(spec.entrypoints) != 1:
         return "current Python tool deployer requires exactly one public entrypoint"
     for check in spec.health_contract:
@@ -269,7 +275,7 @@ def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Pat
         reporter.add(
             f"{spec.name} runtime",
             STATE_FAILED,
-            "Git is required to install the pinned repository ref. MANUAL ACTION REQUIRED: install Git and rerun toolchainctl apply",
+            "Git is required to install the exact repository ref. MANUAL ACTION REQUIRED: install Git and rerun toolchainctl apply",
         )
         return None
 
@@ -319,7 +325,7 @@ def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Pat
             reporter.add(
                 f"{spec.name} runtime",
                 STATE_FAILED,
-                "pinned package installation failed: " + install.stderr.strip()[-400:],
+                "exact-ref package installation failed: " + install.stderr.strip()[-400:],
             )
             return None
 
@@ -347,7 +353,7 @@ def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Pat
         reporter.add(
             f"{spec.name} runtime",
             STATE_CONFIGURED,
-            f"installed pinned non-editable runtime {spec.ref[:12]} from {spec.repo}: {release}",
+            f"installed exact-ref non-editable runtime {spec.ref[:12]} from {spec.repo}: {release}",
         )
         return release
     finally:
@@ -507,7 +513,7 @@ def _manifest_record(spec: ToolSpec, release: Path) -> dict[str, object]:
             "public_path": str(_public_entrypoint(spec, command)),
             "target": str(_venv_command(venv, command) if spec.runtime == "python-venv" else release / f"{command}.py"),
         }
-    return {
+    result = {
         "owner": "agent-toolchain",
         "source": spec.source,
         "repo": spec.repo,
@@ -518,6 +524,10 @@ def _manifest_record(spec: ToolSpec, release: Path) -> dict[str, object]:
         "health_contract": [list(check.argv) for check in spec.health_contract],
         "platforms": list(spec.platforms),
     }
+
+    if spec.name == "proxy-tools" and spec.runtime == "python-builtin":
+        result["core_identity"] = json.loads((release / BUNDLED_IDENTITY).read_text(encoding="utf-8"))
+    return result
 
 
 def _install_builtin(spec: ToolSpec, reporter: Reporter) -> Path | None:
@@ -641,14 +651,14 @@ def reconcile_python_tool(
                 reporter.add(
                     f"{spec.name} runtime",
                     STATE_MISSING,
-                    f"toolchainctl apply will install pinned isolated runtime {spec.ref[:12]} from {spec.repo}",
+                    f"toolchainctl apply will install exact-ref isolated runtime {spec.ref[:12]} from {spec.repo}",
                 )
             return False
         release = _install_release(spec, python_exe, reporter)
         if release is None:
             return False
     else:
-        reporter.add(f"{spec.name} runtime", STATE_OK, f"pinned ref {spec.ref[:12]}: {release}")
+        reporter.add(f"{spec.name} runtime", STATE_OK, f"exact ref {spec.ref[:12]}: {release}")
 
     ok, detail = _health(spec, release)
     if not ok:
@@ -677,7 +687,7 @@ def reconcile_python_tool(
             reporter.add(
                 f"{spec.name} ownership metadata",
                 STATE_OUTDATED,
-                "managed_tools metadata does not match the pinned installed runtime; toolchainctl apply will record it",
+                "managed_tools metadata does not match the exact-ref installed runtime; toolchainctl apply will record it",
             )
             return False
         managed_tools[spec.name] = desired

@@ -7,10 +7,14 @@ import json
 import os
 import py_compile
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from pathlib import Path, PurePosixPath
+
+from core_identity import emit_identity, read_identity
 
 SOURCE_ROOT = Path(__file__).resolve().parent
 CORE_MARKER = ".agent-toolchain-managed-core.json"
@@ -57,6 +61,10 @@ REQUIRED_FILES = (
     "setup_yc_transitional_guard.py",
     "yc_transitional_entry.py",
     "proxy_tools.py",
+    "core_identity.py",
+    "toolchain_state.py",
+    "setup_workspace_trust.py",
+    "workspace_trust_contract.py",
     "config_data.json",
 )
 REQUIRED_TREES = ("templates", "skills/remote-long-running")
@@ -261,7 +269,57 @@ def _preflight_entrypoint(core: Path) -> None:
         raise RuntimeError(f"Refusing to replace foreign toolchainctl entrypoint: {path}")
 
 
-def _copy_payload(source: Path, staging: Path, fingerprint: str) -> None:
+def _source_ref(source: Path, fingerprint: str) -> str | None:
+    """Resolve provenance at publication, never at installed runtime startup."""
+    supplied = os.environ.get("AGENT_TOOLCHAIN_UPDATE_REF")
+    if supplied is not None and (len(supplied) != 40 or any(c not in "0123456789abcdef" for c in supplied)):
+        raise RuntimeError("Invalid exact source ref supplied by the self-update caller")
+    if not (source / ".git").exists():
+        # Backward-compatible internal contract: self-update downloads the exact
+        # GitHub SHA archive before invoking bootstrap. Not a user override flag.
+        return supplied
+    try:
+        env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
+        def git(*args: str) -> str:
+            cp = subprocess.run(["git", "-C", str(source), *args], env=env,
+                                capture_output=True, check=True, timeout=10)
+            return cp.stdout.decode("utf-8").strip()
+        head = git("rev-parse", "HEAD")
+        if len(head) != 40 or any(c not in "0123456789abcdef" for c in head):
+            raise ValueError("unsupported Git object identity")
+        if Path(git("rev-parse", "--show-toplevel")).resolve() != source.resolve():
+            raise ValueError("different Git root")
+        if git("status", "--porcelain", "--untracked-files=all"):
+            raise ValueError("dirty checkout")
+        entries = git("ls-tree", "-rz", "--full-tree", head).split("\0")
+        blobs = {}
+        for entry in entries:
+            if not entry:
+                continue
+            meta, relative = entry.split("\t", 1)
+            mode, kind, sha = meta.split()
+            if kind == "blob" and mode in {"100644", "100755"}:
+                blobs[relative] = sha
+        for relative, path in _iter_source_files(source):
+            content = path.read_bytes()
+            variants = [content]
+            if b"\0" not in content:
+                variants.append(content.replace(b"\r\n", b"\n"))
+            hashes = {hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest() for raw in variants}
+            if path.is_symlink() or blobs.get(relative) not in hashes:
+                raise ValueError("payload does not match Git tree")
+        if source_fingerprint(source) != fingerprint or git("rev-parse", "HEAD") != head:
+            raise ValueError("source changed during provenance validation")
+    except (OSError, ValueError, subprocess.SubprocessError):
+        if supplied is not None:
+            raise RuntimeError("Cannot prove supplied source ref against the local checkout")
+        return None
+    if supplied is not None and supplied != head:
+        raise RuntimeError("Supplied source ref differs from the verified checkout HEAD")
+    return head
+
+
+def _copy_payload(source: Path, staging: Path, fingerprint: str, source_ref: str | None = None) -> None:
     for relative in REQUIRED_FILES:
         target = staging / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -279,9 +337,8 @@ def _copy_payload(source: Path, staging: Path, fingerprint: str) -> None:
         "fingerprint": staged_fingerprint,
         "payload": source_payload(staging),
     }
-    update_ref = os.environ.get("AGENT_TOOLCHAIN_UPDATE_REF")
-    if update_ref and len(update_ref) == 40 and all(ch in "0123456789abcdef" for ch in update_ref):
-        marker["source_ref"] = update_ref
+    if source_ref is not None:
+        marker["source_ref"] = source_ref
     (staging / CORE_MARKER).write_text(
         json.dumps(marker, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -294,19 +351,20 @@ def _validate_staged(staging: Path) -> None:
 
 
 def _publish_core(source: Path, core: Path, fingerprint: str) -> tuple[bool, Path | None]:
+    source_ref = _source_ref(source, fingerprint)
     core_present = core.exists() or core.is_symlink()
     current = _owned_core(core) if core_present else None
     if core_present and current is None:
         raise RuntimeError(f"Refusing to replace modified or unowned core directory: {core}")
-    if current is not None and current.get("fingerprint") == fingerprint:
+    if current is not None and current.get("fingerprint") == fingerprint and current.get("source_ref") == source_ref:
         return False, None
 
     root = core.parent
     root.mkdir(parents=True, exist_ok=True)
-    staging: Path | None = Path(tempfile.mkdtemp(prefix=".core.tmp-", dir=str(root)))
+    staging: Path | None = _new_staging(root)
     backup: Path | None = None
     try:
-        _copy_payload(source, staging, fingerprint)
+        _copy_payload(source, staging, fingerprint, source_ref)
         _validate_staged(staging)
         if core_present:
             backup = root / f"core.previous.{time.strftime('%Y%m%d%H%M%S')}.{os.getpid()}"
@@ -354,6 +412,45 @@ def _publish_entrypoint(core: Path) -> bool:
     return True
 
 
+def _new_staging(root: Path) -> Path:
+    if os.name != "nt":
+        return Path(tempfile.mkdtemp(prefix=".core.tmp-", dir=str(root)))
+    # Python 3.13+ mkdir(0700), used by mkdtemp, installs a protected DACL.
+    # A rename preserves it. New Windows core directories must inherit from
+    # their target parent; never change ACLs of an existing object.
+    staging = root / (".core.tmp-" + uuid.uuid4().hex)
+    staging.mkdir(mode=0o777, exist_ok=False)
+    return staging
+
+
+def _validate_published(core: Path, fingerprint: str) -> None:
+    marker = _owned_core(core)
+    if marker is None or marker.get("fingerprint") != fingerprint:
+        raise RuntimeError(f"Published core/marker is unreadable or differs from the expected payload: {core}")
+    entry = _entrypoint_path()
+    if entry.is_symlink() or entry.read_bytes() != _entrypoint_bytes(core):
+        raise RuntimeError(f"Published entrypoint differs from its expected target: {entry}")
+    # Execute the actual public command, not Python from the source checkout.
+    completed = subprocess.run(
+        [str(entry), "--bootstrap-access-check"], cwd=core.parent,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30, check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(f"Published entrypoint cannot validate core access (exit {completed.returncode}): {entry}")
+    try:
+        evidence = json.loads(completed.stdout.decode("utf-8"))
+    except (UnicodeError, ValueError) as exc:
+        raise RuntimeError("Published entrypoint returned invalid access evidence") from exc
+    if not isinstance(evidence, dict) or evidence.get("core") != str(core.resolve()) or evidence.get("fingerprint") != fingerprint:
+        raise RuntimeError("Published entrypoint did not execute the expected core")
+    if evidence.get("non_elevated") is not True:
+        raise RuntimeError(
+            "Ordinary-user access is not verified from an elevated/root process. "
+            "Run bootstrap again as the intended non-elevated user with the same target paths; "
+            "do not repair ACLs automatically."
+        )
+
+
 def _report_resolution() -> None:
     entry = _entrypoint_path()
     resolved = shutil.which("toolchainctl")
@@ -367,6 +464,7 @@ def _report_resolution() -> None:
 
 
 def main() -> int:
+    emit_identity("agent-toolchain-bootstrap", read_identity(SOURCE_ROOT))
     if sys.version_info < (3, 10):
         print("agent-toolchain requires Python 3.10+ for its stdlib-only core.", file=sys.stderr)
         return 2
@@ -378,6 +476,15 @@ def main() -> int:
         entry_changed = _publish_entrypoint(core)
     except (OSError, RuntimeError, py_compile.PyCompileError) as exc:
         print(f"modified/conflict  agent-toolchain bootstrap  {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        _validate_published(core, fingerprint)
+    except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+        print(f"failed            agent-toolchain core access  {exc}", file=sys.stderr)
+        print("info              Published paths retained for read-only diagnosis; ACLs were not repaired.", file=sys.stderr)
+        if backup is not None:
+            print(f"info              previous managed core retained  {backup}", file=sys.stderr)
         return 2
 
     print(("configured" if core_changed else "up-to-date").ljust(18) + f"agent-toolchain core  {core}")

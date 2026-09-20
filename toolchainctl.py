@@ -19,6 +19,9 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 import setup_core
+import setup_workspace_trust
+from toolchain_state import state_base as _state_base, default_state_dir
+from core_identity import CORE_SEMVER, read_identity, version_text
 from setup_lib import (
     Reporter,
     STATE_CONFIGURED,
@@ -42,7 +45,6 @@ import setup_yc_transitional_guard
 
 PRODUCT = "agent-toolchain"
 LEGACY_PRODUCT = "opencode_setup"
-CORE_SEMVER = "0.1.0"
 CORE_MARKER = ".agent-toolchain-managed-core.json"
 UPDATE_REPOSITORY = "dilukhin/agent-toolchain"
 UPDATE_BRANCH = "main"
@@ -70,6 +72,10 @@ _CORE_REQUIRED_FILES = (
     "setup_yc_transitional_guard.py",
     "yc_transitional_entry.py",
     "proxy_tools.py",
+    "core_identity.py",
+    "toolchain_state.py",
+    "setup_workspace_trust.py",
+    "workspace_trust_contract.py",
     "config_data.json",
 )
 _CORE_REQUIRED_TREES = ("templates", "skills/remote-long-running")
@@ -86,46 +92,7 @@ class SelfUpdateError(RuntimeError):
 
 def _version_text() -> str:
     """Return identity for the running core without consulting a checkout or remote state."""
-    marker_path = Path(__file__).resolve().parent / CORE_MARKER
-    try:
-        marker = json.loads(marker_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return f"toolchainctl {CORE_SEMVER}.dev"
-
-    source_ref = marker.get("source_ref") if isinstance(marker, dict) else None
-    if isinstance(source_ref, str) and _SHA_RE.fullmatch(source_ref):
-        return f"toolchainctl {CORE_SEMVER}.{source_ref[:8]}"
-
-    fingerprint = marker.get("fingerprint") if isinstance(marker, dict) else None
-    if (
-        isinstance(fingerprint, str)
-        and len(fingerprint) == 64
-        and all(ch in "0123456789abcdef" for ch in fingerprint)
-    ):
-        return f"toolchainctl {CORE_SEMVER}.local.{fingerprint[:8]}"
-    return f"toolchainctl {CORE_SEMVER}.unknown"
-
-
-def _state_base() -> Path:
-    if os.name == "nt":
-        local = os.environ.get("LOCALAPPDATA")
-        if local:
-            return Path(local).resolve()
-        return (Path.home() / ".local" / "state").resolve()
-    xdg = os.environ.get("XDG_STATE_HOME")
-    if xdg:
-        return Path(xdg).expanduser().resolve()
-    return (Path.home() / ".local" / "state").resolve()
-
-
-def default_state_dir() -> Path:
-    override = os.environ.get("AGENT_TOOLCHAIN_STATE_DIR")
-    if override:
-        return Path(override).expanduser().resolve()
-    base = _state_base()
-    if os.name == "nt" and os.environ.get("LOCALAPPDATA"):
-        return base / PRODUCT / "state"
-    return base / PRODUCT
+    return version_text("toolchainctl", read_identity(Path(__file__).resolve().parent))
 
 
 def legacy_state_dir() -> Path:
@@ -234,6 +201,7 @@ def build_parser() -> argparse.ArgumentParser:
     update = sub.add_parser("update", help="update the installed agent-toolchain core from GitHub main")
     update.add_argument("--apply", action="store_true", help="run the freshly installed toolchainctl apply after update")
     setup_yc_transitional_guard.add_cli_parser(sub)
+    setup_workspace_trust.add_cli_parser(sub)
     return parser
 
 
@@ -716,8 +684,52 @@ def _run_self_update(*, apply_after: bool) -> int:
     return int(completed.returncode)
 
 
+def _non_elevated() -> bool:
+    if os.name != "nt":
+        return os.geteuid() != 0
+    import ctypes
+    from ctypes import wintypes
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel.GetCurrentProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    advapi.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    advapi.GetTokenInformation.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)]
+    token = wintypes.HANDLE()
+    if not advapi.OpenProcessToken(kernel.GetCurrentProcess(), 0x0008, ctypes.byref(token)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        elevated, length = wintypes.DWORD(), wintypes.DWORD()
+        if not advapi.GetTokenInformation(token, 20, ctypes.byref(elevated), ctypes.sizeof(elevated), ctypes.byref(length)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return elevated.value == 0
+    finally:
+        kernel.CloseHandle(token)
+
+
+def _bootstrap_access_check() -> int:
+    """Private, read-only probe called through the published entrypoint."""
+    try:
+        marker = _owned_installed_core()
+        evidence = {"core": str(Path(__file__).resolve().parent),
+                    "fingerprint": marker["fingerprint"], "non_elevated": _non_elevated()}
+    except (OSError, SelfUpdateError, ValueError, TypeError, AttributeError):
+        print("failed            toolchainctl core access probe", file=sys.stderr)
+        return 2
+    print(json.dumps(evidence, ensure_ascii=True, sort_keys=True))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    if (sys.argv[1:] if argv is None else argv) == ["--bootstrap-access-check"]:
+        return _bootstrap_access_check()
+    arguments = sys.argv[1:] if argv is None else argv
+    if arguments not in (["--version"], ["--help"], ["-h"]):
+        print(_version_text(), file=sys.stderr)
+    args = build_parser().parse_args(arguments)
+    if args.command == "workspace-trust":
+        return setup_workspace_trust.run_cli(args)
     if args.command == "updates":
         return _updates_phase(args)
     if args.command == "update":

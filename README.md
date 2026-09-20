@@ -39,7 +39,7 @@ toolchainctl apply
 toolchainctl update --apply
 ```
 
-`bootstrap_*` использует только базовый Python 3.10+ и стандартную библиотеку. Общий bootstrap `venv` больше не создаётся. Python helper tools получают собственные изолированные runtimes.
+`bootstrap_*` использует базовый Python 3.10+ и стандартную библиотеку. Для доказательства source SHA чистого checkout bootstrap дополнительно читает локальный Git; без доказанного SHA установка получает обозначение `local`. Установленному core Git для определения версии не нужен. Общий bootstrap `venv` больше не создаётся. Python helper tools получают собственные изолированные runtimes.
 
 Старые `setup_linux.sh` и `setup_windows.ps1` больше не являются интерфейсом: они являются hard tombstones, всегда завершаются ошибкой и только указывают перейти на `bootstrap_*` + `toolchainctl`.
 
@@ -55,7 +55,11 @@ toolchainctl update --apply  обновить core и затем примени�
 
 `--version` использует semantic version управляющего core `0.1.0` и идентичность именно запущенного установленного payload. Для production core с доказанным `source_ref` формат — `toolchainctl 0.1.0.<8hex>`, где `<8hex>` — первые восемь символов полного source SHA из managed-core marker. Старый или локально опубликованный core без доказанного Git SHA явно помечается как `local.<fingerprint8>` (либо `dev` без marker), поэтому версия не подменяется текущим checkout или удалённым `main`.
 
+Обычные `check`/`apply`/`updates`/`update` и ранние ошибки оставляют identity один раз в stderr. Для `opencode-proxied` и `codex-proxied` собственная версия доступна через `--wrapper-version`, структурированные метаданные — через `--health-json`; `--version` по-прежнему передаётся дочернему CLI. [Контракт диагностической identity и provenance](docs/diagnostic_identity_ru.md).
+
 `check` не создаёт state/runtime/skills, не выполняет package install, clone/pull, chmod или backup. `apply` меняет только доказанно управляемые ресурсы. Неизвестное содержимое не усыновляется автоматически.
+
+`toolchainctl workspace-trust add|update|remove|list` управляет явным постоянным доверием к точному рабочему каталогу для `build`, `test`, `static_check`, `git_read`. Например: `toolchainctl workspace-trust add /absolute/project --scope build --scope test`. `list` читает реестр без изменений; другие команды требуют уже подготовленное через `apply` состояние. Текущие разрешения OpenCode эта возможность не расширяет: подключение к политике проходит отдельную приёмку в `opencode_permissions`. [Команды, хранение и границы доверия](docs/workspace_trust_ru.md).
 
 `update` запрашивает точный SHA актуального `dilukhin/agent-toolchain@main`, скачивает архив именно этого SHA и публикует его штатным bootstrap-механизмом. Перед заменой повторно проверяется ownership и fingerprint фактического установленного core; локально изменённый или неизвестный core сохраняется и блокирует автоматическое обновление. Developer checkout при этом не читается и не изменяется.
 
@@ -89,7 +93,7 @@ state:         %LOCALAPPDATA%\agent-toolchain\state
 
 Пути можно переопределять тестовыми/служебными переменными `AGENT_TOOLCHAIN_DATA_DIR`, `AGENT_TOOLCHAIN_BIN_DIR`, `AGENT_TOOLCHAIN_STATE_DIR`.
 
-Bootstrap публикует core атомарно из staging-каталога и создаёт стабильный `toolchainctl`. Существующий core или entrypoint принимается только при точном ownership marker. Повторный bootstrap с тем же fingerprint является no-op; при реальном обновлении предыдущий доказанно управляемый core сохраняется как backup.
+Bootstrap публикует core атомарно из staging-каталога и создаёт стабильный `toolchainctl`. Существующий core или entrypoint принимается только при точном ownership marker. Повторный bootstrap с теми же fingerprint и source_ref является no-op; при обновлении payload или provenance предыдущий доказанно управляемый core сохраняется как backup.
 
 ## Managed CLI tools
 
@@ -221,3 +225,6 @@ Windows:
 - Windows и Linux считаются first-class платформами.
 
 Реализованный ToolSpec/manifest слой описан в [`docs/tooling_foundation_ru.md`](docs/tooling_foundation_ru.md).
+
+Проверка core после bootstrap, поведение при повышенных правах и ограничения:
+[доступность опубликованного core](docs/core_access_validation_ru.md).

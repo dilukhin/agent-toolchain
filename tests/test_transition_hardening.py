@@ -70,7 +70,7 @@ class BootstrapIntegrityHardeningTests(unittest.TestCase):
             }
             with mock.patch.object(bootstrap_core, "SOURCE_ROOT", source), mock.patch.dict(
                 os.environ, env, clear=False
-            ):
+            ), mock.patch.object(bootstrap_core, "_validate_published"):
                 self.assertEqual(bootstrap_core.main(), 0)
                 installed = data / "core" / "config_data.json"
                 installed.write_text('{"locally_modified": true}\n', encoding="utf-8")

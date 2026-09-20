@@ -1,4 +1,4 @@
-"""Pinned skill reconciliation for managed tool repositories."""
+"""Exact-ref skill reconciliation for managed tool repositories."""
 from __future__ import annotations
 
 import json
@@ -176,7 +176,7 @@ def _checkout_exact_ref(spec: ToolSpec, source: Path) -> tuple[bool, str]:
     verify = run(["git", "-C", str(source), "rev-parse", "HEAD"])
     resolved = verify.stdout.strip().lower()
     if verify.returncode != 0 or resolved != spec.ref.lower():
-        return False, f"checked out {resolved or 'unknown'} instead of pinned ref {spec.ref.lower()}"
+        return False, f"checked out {resolved or 'unknown'} instead of exact ref {spec.ref.lower()}"
     return True, resolved
 
 
@@ -190,7 +190,7 @@ def _publish_bundle(spec: ToolSpec, bindings: dict[str, str], reporter: Reporter
         return None
     if not shutil.which("git"):
         reporter.add(f"{spec.name} skill source", STATE_FAILED,
-                     "Git is required to obtain pinned skill sources")
+                     "Git is required to obtain exact-ref skill sources")
         return None
 
     parent = bundle.parent
@@ -201,26 +201,26 @@ def _publish_bundle(spec: ToolSpec, bindings: dict[str, str], reporter: Reporter
         ok, detail = _checkout_exact_ref(spec, source)
         if not ok:
             reporter.add(f"{spec.name} skill source", STATE_FAILED,
-                         f"failed to obtain pinned ref {spec.ref[:12]} from {spec.repo}: {detail}")
+                         f"failed to obtain exact ref {spec.ref[:12]} from {spec.repo}: {detail}")
             return None
         source_root = source.resolve()
         for skill_name, relative in bindings.items():
             candidate = (source / relative).resolve()
             if candidate != source_root and source_root not in candidate.parents:
                 reporter.add(f"skill {skill_name}", STATE_FAILED,
-                             f"pinned source path escapes repository root: {relative}")
+                             f"exact-ref source path escapes repository root: {relative}")
                 return None
             valid, validation = validate_skill(candidate, skill_name)
             if not valid:
                 reporter.add(f"skill {skill_name}", STATE_FAILED,
-                             f"pinned source {spec.ref[:12]} is invalid: {validation}")
+                             f"exact-ref source {spec.ref[:12]} is invalid: {validation}")
                 return None
             atomic_write(_payload_path(temporary, skill_name), candidate.read_bytes())
         try:
             _remove_owned_tree(source)
         except OSError as exc:
             reporter.add(f"{spec.name} skill source", STATE_FAILED,
-                         f"failed to remove temporary pinned checkout: {exc}")
+                         f"failed to remove temporary exact-ref checkout: {exc}")
             return None
         payload_hashes = _payload_hashes(temporary, bindings)
         if payload_hashes is None:
@@ -279,7 +279,7 @@ def reconcile_pinned_tool_skills(
         if skip_install:
             for skill_name in bindings:
                 reporter.add(f"skill {skill_name}", STATE_MISSING,
-                             "pinned skill reconciliation skipped with dependency installation")
+                             "exact-ref skill reconciliation skipped with dependency installation")
             continue
         bundle = _bundle_dir(spec)
         if (bundle.exists() or bundle.is_symlink()) and not _owned_bundle(bundle, spec, bindings):
@@ -292,7 +292,7 @@ def reconcile_pinned_tool_skills(
                     reporter.add(
                         f"skill {skill_name}",
                         STATE_MISSING,
-                        f"toolchainctl apply will fetch {relative} from pinned ref {spec.ref[:12]} of {spec.repo}",
+                        f"toolchainctl apply will fetch {relative} from exact ref {spec.ref[:12]} of {spec.repo}",
                     )
                 continue
             bundle = _publish_bundle(spec, bindings, reporter)
@@ -301,14 +301,14 @@ def reconcile_pinned_tool_skills(
             changed = True
         else:
             reporter.add(f"{spec.name} skill source", STATE_OK,
-                         f"pinned ref {spec.ref[:12]} with verified payload hashes: {bundle}")
+                         f"exact ref {spec.ref[:12]} with verified payload hashes: {bundle}")
 
         for skill_name, relative in bindings.items():
             payload = _payload_path(bundle, skill_name)
             valid, validation = validate_skill(payload, skill_name)
             if not valid:
                 reporter.add(f"skill {skill_name}", STATE_CONFLICT,
-                             f"owned pinned payload is invalid: {validation}")
+                             f"owned exact-ref payload is invalid: {validation}")
                 continue
             changed |= reconcile_file(
                 component=f"skill {skill_name}",
