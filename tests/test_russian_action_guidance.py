@@ -37,7 +37,7 @@ class RussianActionGuidanceTests(unittest.TestCase):
         reporter.add(
             "global AGENTS.md",
             runtime.STATE_CONFLICT,
-            "managed file was modified locally; preserved: /tmp/managed-sample",
+            "managed file was modified locally; preserved: /tmp/opencode/AGENTS.md",
         )
         result = reporter.results[-1]
 
@@ -68,7 +68,7 @@ class RussianActionGuidanceTests(unittest.TestCase):
         summary = runtime._format_tldr(reporter.results)
 
         self.assertIn("/tmp/managed-sample", result.detail)
-        self.assertIn("обычный toolchainctl apply этот конфликт не устранит", result.detail)
+        self.assertIn("обычный `toolchainctl apply` этот конфликт не устранит", result.detail)
         self.assertIn("проверить локальные изменения в «managed sample»", summary)
         self.assertIn("автоматическая перезапись отключена", summary)
         self.assertNotIn("apply --force", summary)

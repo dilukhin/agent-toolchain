@@ -183,13 +183,13 @@ def _localize_actionable_detail(result) -> None:
         path = detail.split(": ", 1)[1]
         result.detail = (
             f"управляемый файл изменён локально и сохранён без перезаписи: {path}; "
-            "обычный toolchainctl apply этот конфликт не устранит"
+            "обычный `toolchainctl apply` этот конфликт не устранит"
         )
         return
     if detail.startswith("managed file modified; --force would backup and replace: "):
         path = detail.split(": ", 1)[1]
         result.detail = (
-            f"управляемый файл изменён локально: {path}; toolchainctl apply --force создаст backup "
+            f"управляемый файл изменён локально: {path}; `toolchainctl apply --force` создаст backup "
             "и заменит его управляемой версией"
         )
         return
@@ -230,8 +230,8 @@ def _managed_file_conflict_action(result) -> str | None:
         return None
     if result.component == "OpenCode config" and "OpenCode config изменён" in result.detail:
         return (
-            "OpenCode config: посмотреть управляемые различия: toolchainctl diff opencode-config; "
-            "если изменения допустимы — toolchainctl apply --force (сначала создаст backup)"
+            "OpenCode config: посмотреть управляемые различия: `toolchainctl diff opencode-config`; "
+            "если изменения допустимы — `toolchainctl apply --force` (сначала создаст backup)"
         )
     if "управляемый файл изменён локально" not in result.detail:
         return None
@@ -270,7 +270,7 @@ def _tldr_actions(results) -> list[str]:
         elif result.state in {STATE_MISSING, STATE_OUTDATED} and (
             "обычный apply" in result.detail or "toolchainctl apply" in result.detail
         ):
-            action = f"«{result.component}»: выполнить toolchainctl apply; {result.detail}"
+            action = f"«{result.component}»: выполнить `toolchainctl apply`; {result.detail}"
         elif result.state == STATE_FAILED and "npm metadata lookup:" in result.detail:
             action = "повторить `toolchainctl apply` после восстановления доступа к npm registry"
         elif result.state in {STATE_FAILED, STATE_CONFLICT}:

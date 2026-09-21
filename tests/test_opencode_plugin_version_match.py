@@ -301,7 +301,7 @@ class StandaloneOpenCodePluginVersionTests(unittest.TestCase):
             "managed source changed; обычный apply обновит управляемый файл автоматически",
         )
         summary = runtime._format_tldr(reporter.results)
-        self.assertIn("«skill example»: выполнить toolchainctl apply", summary)
+        self.assertIn("«skill example»: выполнить `toolchainctl apply`", summary)
 
     def test_toolchainctl_check_clarifies_routerai_placeholder_and_emits_tldr(self) -> None:
         script = r'''
