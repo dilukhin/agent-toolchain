@@ -46,7 +46,7 @@ class RussianActionGuidanceTests(unittest.TestCase):
             summary = runtime._format_tldr(reporter.results)
 
         self.assertIn("управляемый файл изменён локально", result.detail)
-        self.assertIn(os.path.join("/tmp/opencode", "AGENTS.md"), result.detail)
+        self.assertIn("/tmp/opencode/AGENTS.md", result.detail)
         self.assertIn("обычный `toolchainctl apply` этот конфликт не устранит", result.detail)
         self.assertNotIn("managed file", result.detail)
         self.assertIn("сравнить локально изменённый `global AGENTS.md`", summary)
