@@ -81,8 +81,11 @@ class ToolchainUpdateTests(unittest.TestCase):
         redacted_after = toolchainctl._redact_sensitive_config(after)
         self.assertEqual(redacted_before["provider"]["routerai"]["options"]["apiKey"], "<redacted>")
         self.assertEqual(redacted_after["provider"]["routerai"]["options"]["apiKey"], "<redacted>")
-        changes = toolchainctl._changed_json_paths(redacted_before, redacted_after)
-        self.assertEqual(changes, ["$.provider.routerai.options.baseURL"])
+        changes = toolchainctl._changed_json_paths(before, after)
+        self.assertEqual(
+            changes,
+            ["$.provider.routerai.options.apiKey", "$.provider.routerai.options.baseURL"],
+        )
 
     def test_failed_bootstrap_access_blocks_update_apply(self) -> None:
         with mock.patch.object(toolchainctl, "_owned_installed_core", return_value={"fingerprint": "a" * 64}), \

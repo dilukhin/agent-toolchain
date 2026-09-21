@@ -350,9 +350,9 @@ def _run_diff(args: argparse.Namespace) -> int:
         print(f"managed target: {target_error}", file=sys.stderr)
         return 2
 
+    changed_paths = _changed_json_paths(existing, target)
     redacted_current = _redact_sensitive_config(existing)
     redacted_target = _redact_sensitive_config(target)
-    changed_paths = _changed_json_paths(redacted_current, redacted_target)
     if not changed_paths:
         print("managed target: управляемые поля уже совпадают; semantic diff отсутствует")
         if recorded_hash and recorded_hash != current_hash:
