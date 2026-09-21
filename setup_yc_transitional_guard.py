@@ -706,7 +706,7 @@ def apply_guard(
                 resolved = shutil.which("yc")
                 _require(resolved is not None and Path(resolved).resolve() == entrypoint.resolve(), "YC_EFFECTIVE_READBACK_FAILED", resolved)
             return {
-                "changed": False,
+                "changed": path_promoted,
                 "artifact_id": manifest["artifact_id"],
                 "effective_readback": "PASS",
                 "path_promoted": path_promoted,
