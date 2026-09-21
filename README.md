@@ -161,6 +161,7 @@ Manifest schema 2 содержит:
 
 `toolchainctl` сохраняет ранее реализованные безопасные политики OpenCode:
 
+- top-level default model для нового/совместимого config — `routerai/qwen/qwen3.6-plus`, потому что `qwen/qwen3.6-plus` помечен ручной RouterAI policy как `основная`; если пользователь уже задал собственный `model`, merge его сохраняет;
 - `~/.config/opencode/opencode.jsonc` изменяется семантическим merge только когда это безопасно;
 - пользовательские неизвестные поля/models сохраняются;
 - JSONC с форматированием, которое нельзя сохранить безопасно, даёт conflict;
