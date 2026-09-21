@@ -46,6 +46,22 @@ class RouterAiCatalogTests(unittest.TestCase):
     def _template(self) -> dict:
         return {"provider": {"routerai": {"models": {}}}}
 
+    def test_repository_default_model_matches_primary_routerai_policy(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        policy = json.loads((root / "templates" / "routerai_model_policy.json").read_text(encoding="utf-8"))
+        config = json.loads((root / "config_data.json").read_text(encoding="utf-8"))
+        template = json.loads((root / "templates" / "opencode.jsonc").read_text(encoding="utf-8"))
+
+        primary = [
+            model_id
+            for model_id, spec in policy["models"].items()
+            if isinstance(spec, dict) and spec.get("role") == "основная"
+        ]
+        self.assertEqual(primary, ["qwen/qwen3.6-plus"])
+        expected = f"routerai/{primary[0]}"
+        self.assertEqual(config["config_defaults"]["model"], expected)
+        self.assertEqual(template["model"], expected)
+
     def test_normalize_and_generate_price_label(self) -> None:
         payload = self._payload()
         payload["data"].append({
