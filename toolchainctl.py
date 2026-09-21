@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import hashlib
 import http.client
 import io
@@ -32,7 +33,10 @@ from setup_lib import (
     STATE_OUTDATED,
     atomic_write,
     backup_file,
+    merge_routerai_config,
     parse_jsonc_object,
+    resolve_credential_path,
+    routerai_file_credential,
     sha256_bytes,
 )
 from setup_managed_tools import reconcile_tool_specs
@@ -201,6 +205,8 @@ def build_parser() -> argparse.ArgumentParser:
     update_sub.add_parser("show", help="show cached advisories without network access")
     update = sub.add_parser("update", help="update the installed agent-toolchain core from GitHub main")
     update.add_argument("--apply", action="store_true", help="run the freshly installed toolchainctl apply after update")
+    diff_cmd = sub.add_parser("diff", help="show a read-only diagnostic diff for a managed component")
+    diff_cmd.add_argument("component", choices=("opencode-config",), help="managed component to inspect")
     setup_yc_transitional_guard.add_cli_parser(sub)
     setup_workspace_trust.add_cli_parser(sub)
     return parser
@@ -223,6 +229,152 @@ def _updates_phase(args: argparse.Namespace) -> int:
         print(f"{name}: provider={record.get('provider', inventory.active.provider if inventory.active else 'unknown')} "
               f"installed={record.get('installed_version', inventory.active.version if inventory.active else 'unknown')} "
               f"latest={record.get('latest_version', 'unknown')} status={record.get('status', 'missing')}")
+    return 0
+
+
+
+_SENSITIVE_CONFIG_KEY_RE = re.compile(
+    r"(?:api[_-]?key|token|secret|password|credential|authorization)",
+    re.IGNORECASE,
+)
+
+
+def _redact_sensitive_config(value: object) -> object:
+    if isinstance(value, dict):
+        redacted: dict[str, object] = {}
+        for key, item in value.items():
+            redacted[key] = "<redacted>" if _SENSITIVE_CONFIG_KEY_RE.search(str(key)) else _redact_sensitive_config(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_sensitive_config(item) for item in value]
+    return value
+
+
+def _changed_json_paths(before: object, after: object, path: str = "$") -> list[str]:
+    if isinstance(before, dict) and isinstance(after, dict):
+        changes: list[str] = []
+        for key in sorted(set(before) | set(after)):
+            child = f"{path}.{key}"
+            if key not in before or key not in after:
+                changes.append(child)
+            else:
+                changes.extend(_changed_json_paths(before[key], after[key], child))
+        return changes
+    if isinstance(before, list) and isinstance(after, list):
+        return [] if before == after else [path]
+    return [] if before == after else [path]
+
+
+def _opencode_diff_target(
+    existing: dict[str, object],
+    manifest: dict[str, object],
+    config_dir: Path,
+) -> tuple[dict[str, object] | None, str | None]:
+    credential_ref = routerai_file_credential(existing)
+    credential_path: Path | None = None
+    if credential_ref:
+        credential_path = resolve_credential_path(credential_ref, config_dir)
+    else:
+        credentials = manifest.get("credentials")
+        if isinstance(credentials, dict):
+            routerai = credentials.get("routerai")
+            if isinstance(routerai, dict):
+                path = routerai.get("path")
+                if isinstance(path, str) and path:
+                    credential_path = resolve_credential_path(path, config_dir)
+    if credential_path is None:
+        return None, "не удалось определить путь RouterAI credential; безопасный target diff построить нельзя"
+
+    desired_data = setup_core.render_config(
+        Path(__file__).resolve().parent / "templates" / "opencode.jsonc",
+        credential_path,
+    )
+    desired, desired_error, _features = parse_jsonc_object(desired_data)
+    if desired_error or desired is None:
+        return None, f"не удалось разобрать управляемый шаблон OpenCode: {desired_error or 'unknown parse error'}"
+    merged, merge_error = merge_routerai_config(existing, desired)
+    if merge_error or merged is None:
+        return None, f"не удалось построить безопасный managed target: {merge_error or 'unknown merge error'}"
+    return merged, None
+
+
+def _run_diff(args: argparse.Namespace) -> int:
+    if args.component != "opencode-config":
+        print(f"unsupported diff component: {args.component}", file=sys.stderr)
+        return 2
+    try:
+        state_dir, _migration_state, _migration_detail = prepare_state(check=True)
+    except StateMigrationError as exc:
+        print(f"не удалось определить state для diff: {exc}", file=sys.stderr)
+        return 2
+
+    manifest, manifest_error, _pending = load_manifest(state_dir / "manifest.json")
+    if manifest_error:
+        print(f"не удалось прочитать ownership manifest: {manifest_error}", file=sys.stderr)
+        return 2
+
+    config_dir = _default_paths()["config"]
+    record = manifest.get("managed_files", {}).get("OpenCode config")
+    recorded_path = record.get("path") if isinstance(record, dict) else None
+    destination = (
+        Path(recorded_path).expanduser().resolve()
+        if isinstance(recorded_path, str)
+        else (config_dir / "opencode.jsonc")
+    )
+    if not destination.is_file():
+        print(f"OpenCode config не является обычным файлом: {destination}", file=sys.stderr)
+        return 2
+
+    current_data = destination.read_bytes()
+    current_hash = sha256_bytes(current_data)
+    recorded_hash = record.get("sha256") if isinstance(record, dict) else None
+    existing, parse_error, _features = parse_jsonc_object(current_data)
+    if parse_error or existing is None:
+        print(f"OpenCode config: {destination}", file=sys.stderr)
+        print(f"не удалось разобрать текущий JSONC: {parse_error or 'unknown parse error'}", file=sys.stderr)
+        return 2
+
+    target, target_error = _opencode_diff_target(existing, manifest, config_dir)
+    print(f"OpenCode config: {destination}")
+    print(f"recorded sha256: {recorded_hash or 'нет записи'}")
+    print(f"current  sha256: {current_hash}")
+    if recorded_hash and recorded_hash != current_hash:
+        print("ownership: текущий файл отличается от последнего записанного managed hash")
+        print("исторический diff недоступен: agent-toolchain хранит hash, а не копию config, чтобы не дублировать возможные секреты")
+    elif recorded_hash:
+        print("ownership: текущий файл совпадает с последним записанным managed hash")
+    else:
+        print("ownership: для OpenCode config нет записанного managed hash")
+
+    if target_error or target is None:
+        print(f"managed target: {target_error}", file=sys.stderr)
+        return 2
+
+    changed_paths = _changed_json_paths(existing, target)
+    redacted_current = _redact_sensitive_config(existing)
+    redacted_target = _redact_sensitive_config(target)
+    if not changed_paths:
+        print("managed target: управляемые поля уже совпадают; semantic diff отсутствует")
+        if recorded_hash and recorded_hash != current_hash:
+            print("вывод: конфликт вызван только drift ownership/hash; после проверки можно выполнить toolchainctl apply --force")
+            print("--force сначала создаст backup и примет совместимый config без изменения user settings")
+        return 0
+
+    print("managed target: изменятся JSON-пути:")
+    for path in changed_paths:
+        print(f"  - {path}")
+    print("sensitive values: redacted")
+    before = json.dumps(redacted_current, ensure_ascii=False, indent=2).splitlines(keepends=True)
+    after = json.dumps(redacted_target, ensure_ascii=False, indent=2).splitlines(keepends=True)
+    sys.stdout.writelines(
+        difflib.unified_diff(
+            before,
+            after,
+            fromfile=f"{destination} (current, redacted)",
+            tofile="agent-toolchain managed target (redacted)",
+        )
+    )
+    print("после проверки: toolchainctl apply --force создаст backup и выполнит безопасный merge управляемых полей")
     return 0
 
 
@@ -740,6 +892,8 @@ def main(argv: list[str] | None = None) -> int:
         return _updates_phase(args)
     if args.command == "update":
         return _run_self_update(apply_after=bool(args.apply))
+    if args.command == "diff":
+        return _run_diff(args)
     if args.command == "yc-guard":
         return setup_yc_transitional_guard.run_cli(args)
 

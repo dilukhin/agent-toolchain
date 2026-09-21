@@ -57,6 +57,36 @@ class ToolchainUpdateTests(unittest.TestCase):
                 toolchainctl._urlopen_bytes("https://example.invalid/archive", max_bytes=1024)
         self.assertEqual(urlopen.call_count, 2)
 
+    def test_diff_command_parses_opencode_config(self) -> None:
+        args = toolchainctl.build_parser().parse_args(["diff", "opencode-config"])
+        self.assertEqual(args.command, "diff")
+        self.assertEqual(args.component, "opencode-config")
+
+    def test_opencode_diff_redacts_sensitive_values_and_reports_paths(self) -> None:
+        before = {
+            "provider": {
+                "routerai": {
+                    "options": {"apiKey": "super-secret", "baseURL": "https://old.invalid"},
+                }
+            }
+        }
+        after = {
+            "provider": {
+                "routerai": {
+                    "options": {"apiKey": "another-secret", "baseURL": "https://new.invalid"},
+                }
+            }
+        }
+        redacted_before = toolchainctl._redact_sensitive_config(before)
+        redacted_after = toolchainctl._redact_sensitive_config(after)
+        self.assertEqual(redacted_before["provider"]["routerai"]["options"]["apiKey"], "<redacted>")
+        self.assertEqual(redacted_after["provider"]["routerai"]["options"]["apiKey"], "<redacted>")
+        changes = toolchainctl._changed_json_paths(before, after)
+        self.assertEqual(
+            changes,
+            ["$.provider.routerai.options.apiKey", "$.provider.routerai.options.baseURL"],
+        )
+
     def test_failed_bootstrap_access_blocks_update_apply(self) -> None:
         with mock.patch.object(toolchainctl, "_owned_installed_core", return_value={"fingerprint": "a" * 64}), \
                 mock.patch.object(toolchainctl, "_resolve_update_sha", return_value="b" * 40), \
