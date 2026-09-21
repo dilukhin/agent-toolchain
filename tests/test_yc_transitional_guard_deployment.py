@@ -329,6 +329,73 @@ class YcTransitionalDeploymentTests(unittest.TestCase):
                     )
             self.assertEqual(ctx.exception.code, "YC_PATH_PROMOTION_UNSAFE")
 
+    def test_check_active_guard_fails_closed_on_effective_legacy_shadow_without_mutation(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            artifact, legacy, _downstream = self.fixture(root)
+            data, public_bin, state = root / "data", root / "managed-bin", root / "state"
+            ycsetup.apply_guard(
+                artifact_dir=artifact,
+                legacy_guard_root=legacy,
+                entry_script_source=ROOT / "yc_transitional_entry.py",
+                data_dir=data,
+                bin_dir=public_bin,
+                state_dir=state,
+                require_effective_path=False,
+            )
+            legacy_bin = legacy / "bin"
+            legacy_bin.mkdir()
+            legacy_yc = legacy_bin / "yc.cmd"
+            legacy_yc.write_text("@echo off\n", encoding="utf-8")
+            entrypoint = public_bin / "yc.cmd"
+            state_path = state / "yc-transitional-guard.json"
+            before = (state_path.read_bytes(), entrypoint.read_bytes())
+            path_env = os.pathsep.join((str(legacy_bin), str(public_bin)))
+
+            with mock.patch.dict(os.environ, {"PATH": path_env}), \
+                    mock.patch.object(ycsetup.shutil, "which", return_value=str(legacy_yc)), \
+                    mock.patch.object(ycsetup, "default_legacy_guard_root", return_value=legacy), \
+                    mock.patch.object(ycsetup, "default_data_dir", return_value=data), \
+                    mock.patch.object(ycsetup, "default_bin_dir", return_value=public_bin), \
+                    mock.patch.object(ycsetup, "default_state_dir", return_value=state), \
+                    mock.patch("builtins.print"):
+                rc = ycsetup.run_cli(mock.Mock(yc_guard_command="check"))
+
+            self.assertEqual(rc, 2)
+            self.assertEqual((state_path.read_bytes(), entrypoint.read_bytes()), before)
+
+    def test_inspect_active_guard_confirms_effective_managed_entrypoint(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            artifact, legacy, _downstream = self.fixture(root)
+            data, public_bin, state = root / "data", root / "managed-bin", root / "state"
+            ycsetup.apply_guard(
+                artifact_dir=artifact,
+                legacy_guard_root=legacy,
+                entry_script_source=ROOT / "yc_transitional_entry.py",
+                data_dir=data,
+                bin_dir=public_bin,
+                state_dir=state,
+                require_effective_path=False,
+            )
+            legacy_bin = legacy / "bin"
+            legacy_bin.mkdir()
+            managed_yc = public_bin / "yc.cmd"
+            path_env = os.pathsep.join((str(public_bin), str(legacy_bin)))
+
+            with mock.patch.dict(os.environ, {"PATH": path_env}), \
+                    mock.patch.object(ycsetup.shutil, "which", return_value=str(managed_yc)):
+                result = ycsetup.inspect_guard(
+                    legacy_guard_root=legacy,
+                    data_dir=data,
+                    bin_dir=public_bin,
+                    state_dir=state,
+                )
+
+            self.assertTrue(result["current_yc_owned"])
+            self.assertTrue(result["effective_yc_owned"])
+            self.assertEqual(Path(result["effective_yc"]).resolve(), managed_yc.resolve())
+
     def test_path_shadow_conflict_is_preflight(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

@@ -581,6 +581,8 @@ def inspect_guard(
         "deployment_phase": None,
         "artifact_id": None,
         "downstream_reference_valid": False,
+        "effective_yc": None,
+        "effective_yc_owned": False,
     }
     if result["legacy_state_present"]:
         try:
@@ -593,8 +595,26 @@ def inspect_guard(
         result["deployment_phase"] = state.get("phase")
         result["artifact_id"] = state.get("artifact_id")
     entrypoint = public_bin / "yc.cmd"
-    if entrypoint.is_file() and state and state.get("entrypoint_sha256") == _sha256_file(entrypoint):
-        result["current_yc_owned"] = True
+    entrypoint_regular = entrypoint.is_file() and not entrypoint.is_symlink()
+    entrypoint_hash_matches = bool(
+        entrypoint_regular
+        and state
+        and state.get("entrypoint_sha256") == _sha256_file(entrypoint)
+    )
+    result["current_yc_owned"] = entrypoint_hash_matches
+
+    if state and state.get("phase") == "active":
+        _require(entrypoint_regular, "YC_ENTRYPOINT_MISSING", str(entrypoint))
+        _require(entrypoint_hash_matches, "YC_ENTRYPOINT_MODIFIED", str(entrypoint))
+        effective = preflight_effective_path(public_bin)["current_yc"]
+        _require(effective is not None, "YC_EFFECTIVE_COMMAND_MISSING")
+        _require(
+            Path(effective).resolve() == entrypoint.resolve(),
+            "YC_EFFECTIVE_READBACK_FAILED",
+            effective,
+        )
+        result["effective_yc"] = effective
+        result["effective_yc_owned"] = True
     return result
 
 
