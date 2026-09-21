@@ -274,7 +274,7 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
     current_hash = sha256_bytes(destination.read_bytes())
     legacy_owned = previous is None and current_hash in legacy
     if previous and previous.get("path") != str(destination):
-        reporter.add(component, STATE_CONFLICT, "manifest points to a different destination")
+        reporter.add(component, STATE_CONFLICT, f"manifest points to a different destination: recorded={previous.get('path')}; desired={destination}")
         return False
     if previous is None and current_hash == desired_hash:
         if check:
@@ -285,16 +285,16 @@ def reconcile_file(*, component: str, destination: Path, source_data: bytes, sou
         reporter.add(component, STATE_CONFIGURED, "содержимое уже совпадало с целевым; ownership принят этим запуском")
         return True
     if previous is None and not legacy_owned:
-        reporter.add(component, STATE_CONFLICT, "existing file is not owned by opencode_setup")
+        reporter.add(component, STATE_CONFLICT, f"existing file is not owned by agent-toolchain: {destination}")
         return False
 
     previous_hash = previous.get("sha256") if previous else current_hash
     if not legacy_owned and current_hash != previous_hash:
         if not force:
-            reporter.add(component, STATE_CONFLICT, "managed file was modified locally; preserved")
+            reporter.add(component, STATE_CONFLICT, f"managed file was modified locally; preserved: {destination}")
             return False
         if check:
-            reporter.add(component, STATE_CONFLICT, "managed file modified; --force would backup and replace")
+            reporter.add(component, STATE_CONFLICT, f"managed file modified; --force would backup and replace: {destination}")
             return False
         backup = backup_file(destination, state_dir, component)
         atomic_write(destination, source_data)
@@ -517,13 +517,27 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
     current_data = destination.read_bytes()
     current_hash = sha256_bytes(current_data)
     if previous and previous.get("path") != str(destination):
-        reporter.add(component, STATE_CONFLICT, "manifest points to a different destination")
+        reporter.add(
+            component,
+            STATE_CONFLICT,
+            f"manifest points to a different destination: recorded={previous.get('path')}; desired={destination}",
+        )
         return False
     if previous and current_hash != previous.get("sha256") and not force:
-        reporter.add(component, STATE_CONFLICT, "managed config was modified locally; preserved")
+        reporter.add(
+            component,
+            STATE_CONFLICT,
+            f"managed config was modified locally; preserved: {destination}; "
+            f"recorded_sha256={previous.get('sha256')}; current_sha256={current_hash}",
+        )
         return False
     if previous and current_hash != previous.get("sha256") and check:
-        reporter.add(component, STATE_CONFLICT, "managed config modified; --force would backup and safely merge")
+        reporter.add(
+            component,
+            STATE_CONFLICT,
+            f"managed config modified; --force would backup and safely merge: {destination}; "
+            f"recorded_sha256={previous.get('sha256')}; current_sha256={current_hash}",
+        )
         return False
 
     existing, error, has_jsonc_features = parse_jsonc_object(current_data)

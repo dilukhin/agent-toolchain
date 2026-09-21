@@ -37,7 +37,7 @@ class RussianActionGuidanceTests(unittest.TestCase):
         reporter.add(
             "global AGENTS.md",
             runtime.STATE_CONFLICT,
-            "managed file was modified locally; preserved",
+            "managed file was modified locally; preserved: /tmp/managed-sample",
         )
         result = reporter.results[-1]
 
@@ -57,13 +57,18 @@ class RussianActionGuidanceTests(unittest.TestCase):
 
     def test_generic_managed_file_conflict_is_russian_and_actionable(self) -> None:
         reporter = runtime.Reporter()
-        reporter.add("managed sample", runtime.STATE_CONFLICT, "managed file was modified locally; preserved")
+        reporter.add(
+            "managed sample",
+            runtime.STATE_CONFLICT,
+            "managed file was modified locally; preserved: /tmp/managed-sample",
+        )
         result = reporter.results[-1]
 
         runtime._localize_actionable_detail(result)
         summary = runtime._format_tldr(reporter.results)
 
-        self.assertEqual(result.detail, "управляемый файл изменён локально; файл сохранён без перезаписи")
+        self.assertIn("/tmp/managed-sample", result.detail)
+        self.assertIn("обычный toolchainctl apply этот конфликт не устранит", result.detail)
         self.assertIn("проверить локальные изменения в «managed sample»", summary)
         self.assertIn("автоматическая перезапись отключена", summary)
         self.assertNotIn("apply --force", summary)

@@ -153,27 +153,56 @@ def _localize_actionable_detail(result) -> None:
                 result.detail += f"; моделей с пользовательскими названиями: {custom_count}"
             return
 
-    if detail == "managed file was modified locally; preserved":
-        if result.component == "global AGENTS.md":
+    if result.component == "OpenCode config":
+        match = re.fullmatch(
+            r"managed config was modified locally; preserved: (.+); recorded_sha256=([0-9a-f]+|None); current_sha256=([0-9a-f]+)",
+            detail,
+        )
+        if match is not None:
+            path, recorded, current = match.groups()
             result.detail = (
-                "управляемый файл изменён локально и сохранён без перезаписи: "
-                f"{_default_global_agents_path()}; обычный `toolchainctl apply` этот конфликт не устранит"
+                f"управляемый OpenCode config изменён относительно записанного ownership и сохранён без перезаписи: {path}; "
+                f"recorded sha256={recorded}; current sha256={current}; "
+                "посмотреть безопасный diff: toolchainctl diff opencode-config"
             )
-        else:
-            result.detail = "управляемый файл изменён локально; файл сохранён без перезаписи"
-        return
-    if detail == "managed file modified; --force would backup and replace":
+            return
+        match = re.fullmatch(
+            r"managed config modified; --force would backup and safely merge: (.+); recorded_sha256=([0-9a-f]+|None); current_sha256=([0-9a-f]+)",
+            detail,
+        )
+        if match is not None:
+            path, recorded, current = match.groups()
+            result.detail = (
+                f"управляемый OpenCode config изменён: {path}; recorded sha256={recorded}; current sha256={current}; "
+                "toolchainctl diff opencode-config покажет безопасный managed-target diff; "
+                "toolchainctl apply --force после проверки создаст backup и выполнит безопасный merge"
+            )
+            return
+
+    if detail.startswith("managed file was modified locally; preserved: "):
+        path = detail.split(": ", 1)[1]
         result.detail = (
-            "управляемый файл изменён локально; `toolchainctl apply --force` создаст backup и заменит его "
-            "управляемой версией"
+            f"управляемый файл изменён локально и сохранён без перезаписи: {path}; "
+            "обычный toolchainctl apply этот конфликт не устранит"
         )
         return
-    if detail == "manifest points to a different destination":
-        result.detail = "ownership manifest указывает на другой целевой путь; автоматическая перезапись запрещена"
-        return
-    if detail == "existing file is not owned by opencode_setup":
+    if detail.startswith("managed file modified; --force would backup and replace: "):
+        path = detail.split(": ", 1)[1]
         result.detail = (
-            "существующий файл не подтверждён как управляемый agent-toolchain; файл сохранён без изменений"
+            f"управляемый файл изменён локально: {path}; toolchainctl apply --force создаст backup "
+            "и заменит его управляемой версией"
+        )
+        return
+    if detail.startswith("manifest points to a different destination: "):
+        values = detail.split(": ", 1)[1]
+        result.detail = (
+            f"ownership manifest и фактическая цель расходятся: {values}; автоматическая перезапись запрещена"
+        )
+        return
+    if detail.startswith("existing file is not owned by agent-toolchain: "):
+        path = detail.split(": ", 1)[1]
+        result.detail = (
+            f"существующий файл не подтверждён как управляемый agent-toolchain: {path}; файл сохранён без изменений"
         )
         return
     if detail.startswith("destination is not a regular file: "):
@@ -197,7 +226,14 @@ def _opencode_update_action(result) -> str | None:
 
 
 def _managed_file_conflict_action(result) -> str | None:
-    if result.state != STATE_CONFLICT or "управляемый файл изменён локально" not in result.detail:
+    if result.state != STATE_CONFLICT:
+        return None
+    if result.component == "OpenCode config" and "OpenCode config изменён" in result.detail:
+        return (
+            "OpenCode config: посмотреть управляемые различия: toolchainctl diff opencode-config; "
+            "если изменения допустимы — toolchainctl apply --force (сначала создаст backup)"
+        )
+    if "управляемый файл изменён локально" not in result.detail:
         return None
     if result.component == "global AGENTS.md":
         destination = _default_global_agents_path()
@@ -234,13 +270,13 @@ def _tldr_actions(results) -> list[str]:
         elif result.state in {STATE_MISSING, STATE_OUTDATED} and (
             "обычный apply" in result.detail or "toolchainctl apply" in result.detail
         ):
-            action = "выполнить `toolchainctl apply`"
+            action = f"«{result.component}»: выполнить toolchainctl apply; {result.detail}"
         elif result.state == STATE_FAILED and "npm metadata lookup:" in result.detail:
             action = "повторить `toolchainctl apply` после восстановления доступа к npm registry"
         elif result.state in {STATE_FAILED, STATE_CONFLICT}:
-            action = f"исправить «{result.component}»: {result.detail}"
+            action = f"«{result.component}»: {result.detail}"
         elif result.state in {STATE_MISSING, STATE_OUTDATED}:
-            action = f"проверить «{result.component}»: {result.detail}"
+            action = f"«{result.component}»: требуется действие; {result.detail}"
 
         if action is None:
             continue

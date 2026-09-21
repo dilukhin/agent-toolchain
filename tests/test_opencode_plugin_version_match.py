@@ -278,6 +278,31 @@ class StandaloneOpenCodePluginVersionTests(unittest.TestCase):
         self.assertIn("запишите реальный ключ RouterAI", summary)
         self.assertNotIn("choco upgrade opencode", summary)
 
+    def test_tldr_opencode_config_conflict_is_actionable(self) -> None:
+        reporter = runtime.Reporter()
+        reporter.add(
+            "OpenCode config",
+            runtime.STATE_CONFLICT,
+            "managed config was modified locally; preserved: /home/user/.config/opencode/opencode.jsonc; "
+            "recorded_sha256=" + "a" * 64 + "; current_sha256=" + "b" * 64,
+        )
+        for result in reporter.results:
+            runtime._localize_actionable_detail(result)
+        summary = runtime._format_tldr(reporter.results)
+        self.assertIn("toolchainctl diff opencode-config", summary)
+        self.assertIn("toolchainctl apply --force", summary)
+        self.assertNotIn("исправить «OpenCode config»", summary)
+
+    def test_tldr_automatic_apply_keeps_component_context(self) -> None:
+        reporter = runtime.Reporter()
+        reporter.add(
+            "skill example",
+            runtime.STATE_OUTDATED,
+            "managed source changed; обычный apply обновит управляемый файл автоматически",
+        )
+        summary = runtime._format_tldr(reporter.results)
+        self.assertIn("«skill example»: выполнить toolchainctl apply", summary)
+
     def test_toolchainctl_check_clarifies_routerai_placeholder_and_emits_tldr(self) -> None:
         script = r'''
 import sys
