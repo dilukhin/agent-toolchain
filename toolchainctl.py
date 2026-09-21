@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -475,28 +476,33 @@ def _reconcile_routerai_model_labels(state_dir: Path, *, check: bool) -> int:
 
 
 def _urlopen_bytes(url: str, *, max_bytes: int) -> bytes:
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "agent-toolchain-self-update/1",
-        },
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            length = response.headers.get("Content-Length")
-            if length is not None:
-                try:
-                    if int(length) > max_bytes:
-                        raise SelfUpdateError(f"remote payload is too large: {length} bytes")
-                except ValueError:
-                    pass
-            data = response.read(max_bytes + 1)
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise SelfUpdateError(f"download failed for {url}: {exc}") from exc
-    if len(data) > max_bytes:
-        raise SelfUpdateError(f"remote payload exceeds safety limit: {max_bytes} bytes")
-    return data
+    last_error: BaseException | None = None
+    for _attempt in range(2):
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "agent-toolchain-self-update/1",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                length = response.headers.get("Content-Length")
+                if length is not None:
+                    try:
+                        if int(length) > max_bytes:
+                            raise SelfUpdateError(f"remote payload is too large: {length} bytes")
+                    except ValueError:
+                        pass
+                data = response.read(max_bytes + 1)
+        except (urllib.error.URLError, TimeoutError, OSError, http.client.IncompleteRead) as exc:
+            last_error = exc
+            continue
+        if len(data) > max_bytes:
+            raise SelfUpdateError(f"remote payload exceeds safety limit: {max_bytes} bytes")
+        return data
+    assert last_error is not None
+    raise SelfUpdateError(f"download failed for {url} after 2 attempts: {last_error}") from last_error
 
 
 def _resolve_update_sha() -> str:
