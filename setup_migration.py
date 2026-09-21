@@ -65,6 +65,60 @@ def _preserve_sibling_provider_policy(destination: Path, desired_data: bytes,
     return (json.dumps(desired, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
 
 
+def preview_opencode_config_target(
+    *,
+    destination: Path,
+    desired_data: bytes,
+    previous: dict[str, Any] | None,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Return the semantic target used by reconciliation without mutating config or manifest."""
+    if not destination.is_file():
+        desired, error, _ = parse_jsonc_object(desired_data)
+        if error or desired is None:
+            return None, error or "template cannot be parsed"
+        return desired, None
+
+    desired_data = _preserve_exact_external_reference(destination, desired_data)
+    desired_data = _preserve_sibling_provider_policy(destination, desired_data, previous)
+
+    existing, error, has_jsonc_features = parse_jsonc_object(destination.read_bytes())
+    desired, desired_error, _ = parse_jsonc_object(desired_data)
+    if error or existing is None:
+        return None, error or "existing config cannot be parsed"
+    if desired_error or desired is None:
+        return None, desired_error or "template cannot be parsed"
+
+    providers = existing.get("provider")
+    existing_router = routerai_provider(existing)
+    desired_router = routerai_provider(desired)
+    if previous is None and existing_router is None and desired_router is not None:
+        provider_missing = "provider" not in existing
+        if not provider_missing and not isinstance(providers, dict):
+            return None, "existing provider value is not an object"
+        if has_jsonc_features:
+            return None, (
+                "existing config without RouterAI has comments/trailing commas; "
+                "reconciliation preserves formatting and does not apply the semantic target"
+            )
+        merged = copy.deepcopy(existing)
+        merged_providers = merged.setdefault("provider", {})
+        if not isinstance(merged_providers, dict):
+            return None, "existing provider value is not an object"
+        merged_providers["routerai"] = copy.deepcopy(desired_router)
+        if "$schema" not in merged and "$schema" in desired:
+            merged["$schema"] = copy.deepcopy(desired["$schema"])
+        if "autoupdate" in desired:
+            merged["autoupdate"] = copy.deepcopy(desired["autoupdate"])
+        return merged, None
+
+    merged, merge_error = merge_routerai_config(existing, desired)
+    if merge_error or merged is None:
+        return None, merge_error or "existing config is not safely mergeable"
+    if "autoupdate" in desired:
+        merged["autoupdate"] = copy.deepcopy(desired["autoupdate"])
+    return merged, None
+
+
 def _format_sensitive_change(destination: Path, desired_data: bytes, previous: dict[str, Any] | None) -> bool:
     if not destination.is_file() or not previous or previous.get("mode") not in {"merged-json", _SIBLING_MODE}:
         return False
