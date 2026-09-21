@@ -87,6 +87,50 @@ class ToolchainUpdateTests(unittest.TestCase):
             ["$.provider.routerai.options.apiKey", "$.provider.routerai.options.baseURL"],
         )
 
+    def test_opencode_diff_uses_sibling_provider_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary).resolve()
+            config_dir = (base / "config").resolve()
+            config_dir.mkdir()
+            credential = config_dir / "routerai-api-key.txt"
+            credential.write_text("secret\n", encoding="utf-8")
+            config_path = config_dir / "opencode.jsonc"
+            existing = {
+                "provider": {
+                    "routerai": {
+                        "npm": "@ai-sdk/openai-compatible",
+                        "name": "RouterAI",
+                        "options": {
+                            "baseURL": "https://routerai.ru/api/v1",
+                            "apiKey": "{file:" + str(credential) + "}",
+                        },
+                        "models": {},
+                    }
+                },
+                "autoupdate": "notify",
+            }
+            config_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            manifest = empty_manifest()
+            manifest["managed_files"]["OpenCode config"] = {
+                "path": str(config_path),
+                "sha256": sha256_bytes(config_path.read_bytes()),
+                "source": "test",
+                "mode": "merged-json-sibling-provider",
+            }
+
+            target, error = toolchainctl._opencode_diff_target(
+                existing,
+                manifest,
+                config_dir,
+                config_path,
+            )
+
+        self.assertIsNone(error)
+        self.assertIsNotNone(target)
+        assert target is not None
+        self.assertNotIn("model", target)
+        self.assertNotIn("small_model", target)
+
     def test_failed_bootstrap_access_blocks_update_apply(self) -> None:
         with mock.patch.object(toolchainctl, "_owned_installed_core", return_value={"fingerprint": "a" * 64}), \
                 mock.patch.object(toolchainctl, "_resolve_update_sha", return_value="b" * 40), \

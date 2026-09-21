@@ -33,7 +33,6 @@ from setup_lib import (
     STATE_OUTDATED,
     atomic_write,
     backup_file,
-    merge_routerai_config,
     parse_jsonc_object,
     resolve_credential_path,
     routerai_file_credential,
@@ -41,6 +40,7 @@ from setup_lib import (
 )
 from setup_managed_tools import reconcile_tool_specs
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
+from setup_migration import preview_opencode_config_target
 from setup_path import reconcile_public_bin_path
 from setup_tool_skills import reconcile_pinned_tool_skills
 from setup_tools import parse_tool_specs, resolve_tool_specs
@@ -269,6 +269,7 @@ def _opencode_diff_target(
     existing: dict[str, object],
     manifest: dict[str, object],
     config_dir: Path,
+    destination: Path,
 ) -> tuple[dict[str, object] | None, str | None]:
     credential_ref = routerai_file_credential(existing)
     credential_path: Path | None = None
@@ -289,13 +290,16 @@ def _opencode_diff_target(
         Path(__file__).resolve().parent / "templates" / "opencode.jsonc",
         credential_path,
     )
-    desired, desired_error, _features = parse_jsonc_object(desired_data)
-    if desired_error or desired is None:
-        return None, f"не удалось разобрать управляемый шаблон OpenCode: {desired_error or 'unknown parse error'}"
-    merged, merge_error = merge_routerai_config(existing, desired)
-    if merge_error or merged is None:
-        return None, f"не удалось построить безопасный managed target: {merge_error or 'unknown merge error'}"
-    return merged, None
+    record = manifest.get("managed_files", {}).get("OpenCode config")
+    previous = record if isinstance(record, dict) else None
+    target, target_error = preview_opencode_config_target(
+        destination=destination,
+        desired_data=desired_data,
+        previous=previous,
+    )
+    if target_error or target is None:
+        return None, f"не удалось построить фактический managed target: {target_error or 'unknown target error'}"
+    return target, None
 
 
 def _run_diff(args: argparse.Namespace) -> int:
@@ -334,7 +338,7 @@ def _run_diff(args: argparse.Namespace) -> int:
         print(f"не удалось разобрать текущий JSONC: {parse_error or 'unknown parse error'}", file=sys.stderr)
         return 2
 
-    target, target_error = _opencode_diff_target(existing, manifest, config_dir)
+    target, target_error = _opencode_diff_target(existing, manifest, config_dir, destination)
     print(f"OpenCode config: {destination}")
     print(f"recorded sha256: {recorded_hash or 'нет записи'}")
     print(f"current  sha256: {current_hash}")
