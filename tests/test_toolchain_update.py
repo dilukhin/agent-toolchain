@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -22,6 +23,39 @@ class ToolchainUpdateTests(unittest.TestCase):
         args = toolchainctl.build_parser().parse_args(["update", "--apply"])
         self.assertEqual(args.command, "update")
         self.assertTrue(args.apply)
+
+    def test_urlopen_retries_incomplete_read_and_returns_complete_payload(self) -> None:
+        incomplete = mock.Mock()
+        incomplete.headers.get.return_value = None
+        incomplete.read.side_effect = http.client.IncompleteRead(b"partial", 2)
+        complete = mock.Mock()
+        complete.headers.get.return_value = None
+        complete.read.return_value = b"complete"
+
+        with mock.patch.object(
+            toolchainctl.urllib.request,
+            "urlopen",
+            side_effect=[contextlib.nullcontext(incomplete), contextlib.nullcontext(complete)],
+        ) as urlopen:
+            self.assertEqual(toolchainctl._urlopen_bytes("https://example.invalid/archive", max_bytes=1024), b"complete")
+        self.assertEqual(urlopen.call_count, 2)
+
+    def test_urlopen_reports_repeated_incomplete_read_without_traceback_leak(self) -> None:
+        first = mock.Mock()
+        first.headers.get.return_value = None
+        first.read.side_effect = http.client.IncompleteRead(b"partial-one", 2)
+        second = mock.Mock()
+        second.headers.get.return_value = None
+        second.read.side_effect = http.client.IncompleteRead(b"partial-two", 2)
+
+        with mock.patch.object(
+            toolchainctl.urllib.request,
+            "urlopen",
+            side_effect=[contextlib.nullcontext(first), contextlib.nullcontext(second)],
+        ) as urlopen:
+            with self.assertRaisesRegex(toolchainctl.SelfUpdateError, "after 2 attempts"):
+                toolchainctl._urlopen_bytes("https://example.invalid/archive", max_bytes=1024)
+        self.assertEqual(urlopen.call_count, 2)
 
     def test_failed_bootstrap_access_blocks_update_apply(self) -> None:
         with mock.patch.object(toolchainctl, "_owned_installed_core", return_value={"fingerprint": "a" * 64}), \
