@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-09-20T08:35:05Z",
+  "observed_at": "2026-09-21T08:56:03Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -1553,9 +1553,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000046171046285",
-        "completion": "0.000009234209257",
-        "input_cache_read": "0.0000009234209257"
+        "prompt": "0.00000755251575",
+        "completion": "0.00001762253675",
+        "input_cache_read": "0.000001762253675"
       }
     },
     "deepseek/deepseek-v4-flash-0731": {
@@ -1573,7 +1573,7 @@
       },
       "pricing": {
         "prompt": "0.000004816097",
-        "completion": "0.000009632194",
+        "completion": "0.000019264388",
         "input_cache_read": "0.0000019264388"
       }
     },
@@ -1611,9 +1611,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000647127132561",
-        "completion": "0.0001294254265122",
-        "input_cache_read": "0.000005392726104675"
+        "prompt": "0.000146383517007",
+        "completion": "0.000292767034014",
+        "input_cache_read": "0.00001219862641725"
       }
     },
     "deepseek/deepseek-v4-pro-0813": {
@@ -1630,9 +1630,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00008799009219",
-        "completion": "0.00026397027657",
-        "input_cache_read": "0.000002933003073"
+        "prompt": "0.000107267615",
+        "completion": "0.000441329616",
+        "input_cache_read": "0.0000134850716"
       }
     },
     "deepseek/deepseek-v4.1-flash": {
@@ -4305,9 +4305,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000040969661525",
-        "completion": "0.000172503838",
-        "input_cache_read": "0.00000690015352"
+        "prompt": "0.0000623903475",
+        "completion": "0.0002626962",
+        "input_cache_read": "0.0000124780695"
       }
     },
     "moonshotai/kimi-k2.7-code": {
@@ -4548,7 +4548,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000437827",
+        "prompt": "0.00000711468875",
         "completion": "0.000019702215"
       }
     },
@@ -7253,8 +7253,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000054728375",
-        "completion": "0.000010945675"
+        "prompt": "0.00000875654",
+        "completion": "0.0000142293775"
       }
     },
     "qwen/qwen3.5-flash-02-23": {
@@ -7356,7 +7356,7 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00000437827",
+        "prompt": "0.0000054728375",
         "completion": "0.000076619725"
       }
     },
@@ -8557,6 +8557,23 @@
         "input_cache_read": "0.000010945675"
       }
     },
+    "typesafe/jev-1.13": {
+      "name": "TypeSafe: Jev 1.13",
+      "created": 1789689684,
+      "context_length": 32000,
+      "architecture": {
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "decisions"
+        ]
+      },
+      "pricing": {
+        "prompt": "0.0000045971835",
+        "completion": "0.0"
+      }
+    },
     "unbiased/pareto": {
       "name": "Pareto",
       "created": 1789686178,
@@ -9375,9 +9392,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00010558198105",
-        "completion": "0.0003318290833",
-        "input_cache_read": "0.000019608082195"
+        "prompt": "0.0001057352205",
+        "completion": "0.000332310693",
+        "input_cache_read": "0.00001963654095"
       }
     },
     "z-ai/glm-5.2": {
@@ -9394,9 +9411,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000606828222",
-        "completion": "0.0001907174412",
-        "input_cache_read": "0.00001126966698"
+        "prompt": "0.000061569421875",
+        "completion": "0.00019702215",
+        "input_cache_read": "0.00001149295875"
       }
     },
     "z-ai/glm-5.3": {
@@ -9413,9 +9430,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00009240338835",
-        "completion": "0.0002904106491",
-        "input_cache_read": "0.000017160629265"
+        "prompt": "0.000084664796125",
+        "completion": "0.00026608935925",
+        "input_cache_read": "0.00001390921650625"
       }
     },
     "z-ai/glm-5.3-flash": {
@@ -9607,9 +9624,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00008799009219",
-        "completion": "0.00026397027657",
-        "input_cache_read": "0.000002933003073"
+        "prompt": "0.000107267615",
+        "completion": "0.000441329616",
+        "input_cache_read": "0.0000134850716"
       }
     },
     "~google/gemini-flash-latest": {
@@ -9793,9 +9810,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00009240338835",
-        "completion": "0.0002904106491",
-        "input_cache_read": "0.000017160629265"
+        "prompt": "0.000084664796125",
+        "completion": "0.00026608935925",
+        "input_cache_read": "0.00001390921650625"
       }
     }
   },
