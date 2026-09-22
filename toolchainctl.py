@@ -40,7 +40,11 @@ from setup_lib import (
 )
 from setup_managed_tools import reconcile_tool_specs
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
-from setup_migration import preview_opencode_config_target
+from setup_migration import (
+    OPENCODE_SEMANTIC_MODE,
+    inspect_managed_opencode_paths,
+    preview_opencode_config_target,
+)
 from setup_path import reconcile_public_bin_path
 from setup_tool_skills import reconcile_pinned_tool_skills
 from setup_tools import parse_tool_specs, resolve_tool_specs
@@ -332,6 +336,7 @@ def _run_diff(args: argparse.Namespace) -> int:
     current_data = destination.read_bytes()
     current_hash = sha256_bytes(current_data)
     recorded_hash = record.get("sha256") if isinstance(record, dict) else None
+    record_mode = record.get("mode") if isinstance(record, dict) else None
     existing, parse_error, _features = parse_jsonc_object(current_data)
     if parse_error or existing is None:
         print(f"OpenCode config: {destination}", file=sys.stderr)
@@ -342,14 +347,33 @@ def _run_diff(args: argparse.Namespace) -> int:
     print(f"OpenCode config: {destination}")
     print(f"recorded sha256: {recorded_hash or 'нет записи'}")
     print(f"current  sha256: {current_hash}")
-    if recorded_hash and recorded_hash != current_hash:
-        print("ownership: текущий файл отличается от последнего записанного managed hash")
+    managed_drift: list[str] = []
+    drift_error: str | None = None
+    if isinstance(record, dict) and record_mode == OPENCODE_SEMANTIC_MODE:
+        managed_drift, drift_error = inspect_managed_opencode_paths(existing, record)
+        managed_paths = record.get("managed_paths")
+        managed_count = len(managed_paths) if isinstance(managed_paths, dict) else 0
+        print(f"ownership: semantic managed paths: {managed_count}")
+        if drift_error:
+            print(f"ownership: semantic evidence invalid: {drift_error}")
+        elif managed_drift:
+            print("ownership: изменены принадлежащие agent-toolchain JSON-пути:")
+            for path in managed_drift:
+                print(f"  - {path}")
+        elif recorded_hash and recorded_hash != current_hash:
+            print("ownership: whole-file hash differs, but managed semantic paths are intact; user fields outside ownership are allowed")
+        else:
+            print("ownership: managed semantic paths are intact")
+    elif recorded_hash and recorded_hash != current_hash:
+        print("ownership: legacy whole-file hash differs; automatic path-level migration is blocked")
         print("исторический diff недоступен: agent-toolchain хранит hash, а не копию config, чтобы не дублировать возможные секреты")
     elif recorded_hash:
-        print("ownership: текущий файл совпадает с последним записанным managed hash")
+        print("ownership: legacy whole-file hash совпадает; обычный apply может мигрировать ownership в semantic paths")
     else:
-        print("ownership: для OpenCode config нет записанного managed hash")
+        print("ownership: для OpenCode config нет записанного managed ownership")
 
+    if drift_error:
+        return 2
     if target_error or target is None:
         print(f"managed target: {target_error}", file=sys.stderr)
         return 2
@@ -359,9 +383,10 @@ def _run_diff(args: argparse.Namespace) -> int:
     redacted_target = _redact_sensitive_config(target)
     if not changed_paths:
         print("managed target: управляемые поля уже совпадают; semantic diff отсутствует")
-        if recorded_hash and recorded_hash != current_hash:
-            print("вывод: конфликт вызван только drift ownership/hash; после проверки можно выполнить toolchainctl apply --force")
-            print("--force сначала создаст backup и примет совместимый config без изменения user settings")
+        if record_mode in {"merged-json", "merged-json-sibling-provider"} and recorded_hash and recorded_hash != current_hash:
+            print("вывод: legacy ownership drift блокирует автоматическую миграцию; --force не усыновляет неизвестные изменения")
+        elif record_mode == OPENCODE_SEMANTIC_MODE and managed_drift:
+            print("вывод: изменены уже принадлежащие semantic paths; требуется review перед явным repair")
         return 0
 
     print("managed target: изменятся JSON-пути:")
@@ -378,7 +403,12 @@ def _run_diff(args: argparse.Namespace) -> int:
             tofile="agent-toolchain managed target (redacted)",
         )
     )
-    print("после проверки: toolchainctl apply --force создаст backup и выполнит безопасный merge управляемых полей")
+    if record_mode in {"merged-json", "merged-json-sibling-provider"} and recorded_hash and recorded_hash != current_hash:
+        print("после проверки: устраните legacy ownership drift вручную; --force не усыновляет неизвестные изменения")
+    elif record_mode == OPENCODE_SEMANTIC_MODE and managed_drift:
+        print("после проверки: toolchainctl apply --force восстановит только уже доказанно принадлежащие semantic paths")
+    else:
+        print("после проверки: toolchainctl apply выполнит безопасный semantic merge управляемых полей")
     return 0
 
 
@@ -539,17 +569,32 @@ def _reconcile_routerai_model_labels(state_dir: Path, *, check: bool) -> int:
         current_data = config_path.read_bytes()
         if previous.get("path") != str(config_path):
             return 0
-        if previous.get("sha256") != sha256_bytes(current_data):
-            return 0
         existing, parse_error, has_jsonc_features = parse_jsonc_object(current_data)
+        if parse_error or existing is None:
+            return 0
+        if previous.get("mode") == OPENCODE_SEMANTIC_MODE:
+            managed_drift, drift_error = inspect_managed_opencode_paths(existing, previous)
+            if drift_error:
+                reporter.add("RouterAI model labels", STATE_CONFLICT, f"cannot validate semantic ownership: {drift_error}")
+                reporter.render()
+                return 2
+            if managed_drift:
+                reporter.add(
+                    "RouterAI model labels",
+                    STATE_CONFLICT,
+                    "managed OpenCode paths were modified; model labels preserved until routing/config ownership is resolved: "
+                    + ", ".join(managed_drift),
+                )
+                reporter.render()
+                return 2
+        elif previous.get("sha256") != sha256_bytes(current_data):
+            return 0
         desired_config = json.loads((repo_root / "config_data.json").read_text(encoding="utf-8"))
         aliases = _managed_model_aliases(repo_root, desired_config)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         reporter.add("RouterAI model labels", STATE_CONFLICT, f"cannot load managed model policy: {exc}")
         reporter.render()
         return 2
-    if parse_error or existing is None:
-        return 0
 
     providers = existing.get("provider")
     if not isinstance(providers, dict):
@@ -915,10 +960,6 @@ def main(argv: list[str] | None = None) -> int:
     if managed_rc != 0 and not check:
         return managed_rc
 
-    labels_rc = _reconcile_routerai_model_labels(state_dir, check=check)
-    if labels_rc != 0 and not check:
-        return labels_rc
-
     previous = os.environ.get("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED")
     os.environ["AGENT_TOOLCHAIN_RUNTIME_PRECONCILED"] = "1"
     try:
@@ -928,6 +969,10 @@ def main(argv: list[str] | None = None) -> int:
             os.environ.pop("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED", None)
         else:
             os.environ["AGENT_TOOLCHAIN_RUNTIME_PRECONCILED"] = previous
+    if core_rc != 0 and not check:
+        return core_rc
+
+    labels_rc = _reconcile_routerai_model_labels(state_dir, check=check)
     return 2 if managed_rc != 0 or labels_rc != 0 or core_rc != 0 else 0
 
 

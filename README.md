@@ -161,9 +161,12 @@ Manifest schema 2 содержит:
 
 `toolchainctl` сохраняет ранее реализованные безопасные политики OpenCode:
 
-- top-level default model для нового/совместимого config — `routerai/qwen/qwen3.6-plus`, потому что `qwen/qwen3.6-plus` помечен ручной RouterAI policy как `основная`; если пользователь уже задал собственный `model`, merge его сохраняет;
-- `~/.config/opencode/opencode.jsonc` изменяется семантическим merge только когда это безопасно;
-- пользовательские неизвестные поля/models сохраняются;
+- текущая managed routing policy использует прямой OpenAI/Codex provider: глобальный `model=openai/gpt-5.6-terra`, `small_model=openai/gpt-5.6-luna`; `general/build/plan` направляются на Terra, `explore/luna/luna-safe-worker` на Luna, `sol-specialist` на Sol, `astra-reviewer` на Astra;
+- RouterAI provider, каталог и ссылка на credential сохраняются для явного выбора, но не используются ни одним управляемым глобальным маршрутом или управляемой рабочей ролью;
+- `~/.config/opencode/opencode.jsonc` изменяется семантическим merge только когда это безопасно; для routing и других стабильных managed fields manifest хранит evidence конкретных JSON-путей, поэтому изменение пользовательского поля вне ownership не делает весь config конфликтным;
+- прежний whole-file `merged-json` ownership мигрирует в semantic paths только при точном совпадении записанного SHA; неизвестный drift не усыновляется даже через `--force`;
+- пользовательские неизвестные поля/models и неизвестные роли сохраняются; в известных ролях toolchain меняет только доказанно принадлежащий `model`, не забирая `permission`, `prompt`, `tools`, `description` и другие пользовательские поля;
+- project-local OpenCode config и отдельные пользовательские agent-файлы могут иметь более высокий приоритет; agent-toolchain не сканирует и не переписывает произвольные проекты;
 - JSONC с форматированием, которое нельзя сохранить безопасно, даёт conflict;
 - `AGENTS.md` использует управляемый блок и не забирает произвольный пользовательский текст;
 - неизвестные global skills не удаляются.
