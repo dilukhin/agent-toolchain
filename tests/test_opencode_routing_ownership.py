@@ -188,6 +188,36 @@ class OpenCodeRoutingOwnershipTests(unittest.TestCase):
             self.assertEqual(repaired["model"], "openai/gpt-5.6-terra")
             self.assertEqual(repaired["user_note"], "preserve")
 
+    def test_existing_unowned_nonrouting_fields_keep_preexisting_safe_merge_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            destination = root / "opencode.jsonc"
+            existing = desired_config()
+            existing["model"] = "vendor/user-choice"
+            existing["autoupdate"] = True
+            existing["provider"]["routerai"]["name"] = "Old RouterAI label"
+            existing["provider"]["routerai"]["options"]["baseURL"] = "https://old.example.invalid/v1"
+            destination.write_bytes(render(existing))
+            manifest = {"managed_files": {}}
+
+            changed, reporter = self._apply(destination, manifest, desired_config(), root / "state")
+            self.assertTrue(changed, [row.detail for row in reporter.results])
+            updated = json.loads(destination.read_text(encoding="utf-8"))
+            self.assertEqual(updated["model"], "vendor/user-choice")
+            self.assertEqual(updated["autoupdate"], "notify")
+            self.assertEqual(updated["provider"]["routerai"]["name"], "RouterAI")
+            self.assertEqual(
+                updated["provider"]["routerai"]["options"]["baseURL"],
+                "https://routerai.ru/api/v1",
+            )
+
+            owner = manifest["managed_files"]["OpenCode config"]
+            self.assertEqual(owner["mode"], OPENCODE_SEMANTIC_MODE)
+            self.assertIn("/autoupdate", owner["managed_paths"])
+            self.assertIn("/provider/routerai/name", owner["managed_paths"])
+            self.assertIn("/provider/routerai/options/baseURL", owner["managed_paths"])
+            self.assertNotIn("/model", owner["managed_paths"])
+
     def test_existing_unowned_route_is_preserved_while_missing_routes_become_managed(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

@@ -270,7 +270,7 @@ def _ownership_plan(
         owned: set[str] = set()
         for pointer, (parts, desired_value) in targets.items():
             exists, current_value = _path_value(existing, parts)
-            target_exists, target_value = _path_value(target, parts)
+            target_exists, _target_value = _path_value(target, parts)
             if not target_exists:
                 continue
             if not exists:
@@ -280,10 +280,10 @@ def _ownership_plan(
                 if current_value != desired_value:
                     external_routes.append(pointer)
                 continue
-            if current_value != target_value:
-                return None, [], (
-                    f"unowned managed field {pointer} would be overwritten; existing value is preserved"
-                )
+            # Preserve the pre-#75 safe-merge contract for stable non-routing
+            # OpenCode fields (autoupdate and fixed RouterAI provider metadata).
+            # Routing is intentionally stricter: pre-existing model choices remain external.
+            owned.add(pointer)
         return owned, external_routes, None
 
     mode = previous.get("mode")
