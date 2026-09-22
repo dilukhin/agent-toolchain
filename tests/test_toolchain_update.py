@@ -128,8 +128,10 @@ class ToolchainUpdateTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertIsNotNone(target)
         assert target is not None
-        self.assertNotIn("model", target)
-        self.assertNotIn("small_model", target)
+        self.assertEqual(target["model"], "openai/gpt-5.6-terra")
+        self.assertEqual(target["small_model"], "openai/gpt-5.6-luna")
+        self.assertEqual(target["agent"]["general"]["model"], "openai/gpt-5.6-terra")
+        self.assertEqual(target["agent"]["explore"]["model"], "openai/gpt-5.6-luna")
 
     def test_failed_bootstrap_access_blocks_update_apply(self) -> None:
         with mock.patch.object(toolchainctl, "_owned_installed_core", return_value={"fingerprint": "a" * 64}), \
