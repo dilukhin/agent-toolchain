@@ -17,6 +17,7 @@ from typing import Any
 CONTRACT_RUN_NAME = "RouterAI catalog refresh contract-v1"
 STATUS_SCHEMA = 1
 STATUS_OWNER = "agent-toolchain:routerai-status:v1"
+STATUS_COMPLETION_CONTRACT = 1
 ISSUE_MARKER = "<!-- agent-toolchain:routerai-operational-alert:v1 -->"
 ISSUE_TITLE = "Operational: деградация обновления RouterAI"
 EXPECTED_ISSUE_AUTHOR = "github-actions[bot]"
@@ -85,6 +86,8 @@ def _valid_status(raw: Any) -> dict[str, Any] | None:
         return None
     if raw.get("schema") != STATUS_SCHEMA or raw.get("owner") != STATUS_OWNER:
         return None
+    if raw.get("completion_contract") != STATUS_COMPLETION_CONTRACT:
+        return None
     attempt = raw.get("last_attempt")
     if not isinstance(attempt, dict):
         return None
@@ -145,7 +148,7 @@ def evaluate(raw_runs: Any, raw_status: Any, *, now: datetime, stale_hours: int)
     if status is None:
         reasons.append({
             "code": "status-unavailable",
-            "summary": "Managed RouterAI status отсутствует или не соответствует ожидаемому ownership/schema.",
+            "summary": "Managed RouterAI status отсутствует или не соответствует ожидаемому ownership/schema/completion contract.",
         })
     elif latest is not None and _status_run_id(status) != latest.get("id"):
         reasons.append({
@@ -208,7 +211,7 @@ def issue_body(evaluation: dict[str, Any]) -> str:
     else:
         lines.append("- Полный успех по текущему контракту ещё не подтверждён.")
     lines += [
-        f"- Бюджет отсутствия полного успеха: `{evaluation.get('stale_hoursg)}` ч.",
+        f"- Бюджет отсутствия полного успеха: `{evaluation.get('stale_hours')}` ч.",
         "",
         "Полные технические журналы остаются в GitHub Actions; секреты и raw RouterAI payload сюда не копируются.",
         "Issue закрывается только после подтверждённого полного успеха и устранения всех активных причин.",

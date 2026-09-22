@@ -32,6 +32,7 @@ def status(run_id: int, state: str = "success"):
     return {
         "schema": watchdog.STATUS_SCHEMA,
         "owner": watchdog.STATUS_OWNER,
+        "completion_contract": watchdog.STATUS_COMPLETION_CONTRACT,
         "last_attempt": {"run_id": run_id, "status": state},
     }
 
@@ -74,6 +75,24 @@ class RouterAiOperationalWatchdogTests(unittest.TestCase):
         runs = {"workflow_runs": [run(12, conclusion="success", at="2026-09-22T11:00:00Z")]}
         result = watchdog.evaluate(runs, status(11), now=NOW, stale_hours=72)
         self.assertIn("status-out-of-sync", {item["code"] for item in result["reasons"]})
+
+    def test_pre_contract_status_is_not_accepted_as_operational_evidence(self):
+        runs = {"workflow_runs": [run(12, conclusion="success", at="2026-09-22T11:00:00Z")]}
+        old_status = status(12)
+        old_status.pop("completion_contract")
+        result = watchdog.evaluate(runs, old_status, now=NOW, stale_hours=72)
+        self.assertIn("status-unavailable", {item["code"] for item in result["reasons"]})
+
+    def test_issue_body_renders_stale_budget(self):
+        evaluation = {
+            "healthy": False,
+            "reasons": [{"code": "example", "summary": "пример"}],
+            "latest_run": None,
+            "last_full_success": None,
+            "stale_hours": 72,
+        }
+        body = watchdog.issue_body(evaluation)
+        self.assertIn("`72` ч.", body)
 
     def test_create_then_noop_is_idempotent(self):
         evaluation = watchdog.evaluate(
