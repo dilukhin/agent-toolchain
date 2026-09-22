@@ -188,6 +188,40 @@ class OpenCodeRoutingOwnershipTests(unittest.TestCase):
             self.assertEqual(repaired["model"], "openai/gpt-5.6-terra")
             self.assertEqual(repaired["user_note"], "preserve")
 
+    def test_matching_unowned_routes_are_adopted_only_by_explicit_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            destination = root / "opencode.jsonc"
+            existing = desired_config()
+            data = render(existing)
+            destination.write_bytes(data)
+            manifest = {"managed_files": {}}
+            stable_manifest = copy.deepcopy(manifest)
+
+            check_reporter = Reporter()
+            changed = reconcile_opencode_config(
+                destination=destination,
+                desired_data=render(desired_config()),
+                source_label=SOURCE,
+                manifest=manifest,
+                reporter=check_reporter,
+                check=True,
+                force=False,
+                state_dir=root / "state",
+            )
+            self.assertFalse(changed)
+            self.assertEqual(destination.read_bytes(), data)
+            self.assertEqual(manifest, stable_manifest)
+
+            changed, reporter = self._apply(destination, manifest, desired_config(), root / "state")
+            self.assertTrue(changed, [row.detail for row in reporter.results])
+            self.assertEqual(destination.read_bytes(), data)
+            owner = manifest["managed_files"]["OpenCode config"]
+            self.assertEqual(owner["mode"], OPENCODE_SEMANTIC_MODE)
+            self.assertIn("/model", owner["managed_paths"])
+            self.assertIn("/small_model", owner["managed_paths"])
+            self.assertIn("/agent/general/model", owner["managed_paths"])
+
     def test_existing_unowned_nonrouting_fields_keep_preexisting_safe_merge_contract(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

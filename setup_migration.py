@@ -279,6 +279,10 @@ def _ownership_plan(
             if pointer in routing:
                 if current_value != desired_value:
                     external_routes.append(pointer)
+                else:
+                    # Matching values may be adopted only by explicit apply; check
+                    # reports the pending metadata transition without writing.
+                    owned.add(pointer)
                 continue
             # Preserve the pre-#75 safe-merge contract for stable non-routing
             # OpenCode fields (autoupdate and fixed RouterAI provider metadata).
@@ -486,7 +490,10 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
         reporter.add(component, STATE_CONFLICT, str(exc))
         return False
 
-    metadata_change = isinstance(previous, dict) and _semantic_metadata_changed(previous, new_record)
+    metadata_change = (
+        (isinstance(previous, dict) and _semantic_metadata_changed(previous, new_record))
+        or (previous is None and bool(owned))
+    )
     legacy_migration = isinstance(previous, dict) and previous.get("mode") in _LEGACY_MANAGED_MODES
 
     if check:
@@ -502,13 +509,6 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
             if external_routes:
                 detail += f"; внешние routing override сохранены: {len(external_routes)}"
             reporter.add(component, STATE_OK, detail)
-        return False
-
-    if previous is None and not semantic_change:
-        detail = "совместимый внешний config уже удовлетворяет target; ownership автоматически не принимается"
-        if external_routes:
-            detail += f"; внешние routing override сохранены: {len(external_routes)}"
-        reporter.add(component, STATE_OK, detail)
         return False
 
     if not semantic_change and not metadata_change:
