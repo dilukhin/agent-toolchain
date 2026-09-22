@@ -14,7 +14,7 @@
 | 2 | [#53](https://github.com/dilukhin/agent-toolchain/issues/53) | Проверить доступность опубликованного core/marker/entrypoint обычному пользователю | Выполнено: [PR #64](https://github.com/dilukhin/agent-toolchain/pull/64); Windows/Linux CI и реальный standard-user regression прошли |
 | 3 | [#46](https://github.com/dilukhin/agent-toolchain/issues/46) | Завершить identity обычных команд, ранних ошибок и proxy-tools | Выполнено: [PR #65](https://github.com/dilukhin/agent-toolchain/pull/65), merge c068f057; Windows/Linux и обязательные проверки успешны |
 | 4 | [#45](https://github.com/dilukhin/agent-toolchain/issues/45) | Реестр доверенных рабочих каталогов и read-only provider | Реализовано: явные add/update/remove/list, точный поставщик данных, атомарная запись и регрессии; Windows/Linux — обязательное условие слияния |
-| 5 | [#75](https://github.com/dilukhin/agent-toolchain/issues/75) | Управляемая прямая маршрутизация OpenCode и semantic path ownership config | В работе: принятый план 2026-09-22; выполнить до #28/#29 |
+| 5 | [#75](https://github.com/dilukhin/agent-toolchain/issues/75) | Управляемая прямая маршрутизация OpenCode и semantic path ownership config | Выполнено: [PR #76](https://github.com/dilukhin/agent-toolchain/pull/76), merge d1bc6c831a5656ec31aa6d09a2188395a0f927f2; Windows/Linux, RouterAI ownership, MP-1/MP-2 — success |
 | 6 | [#28](https://github.com/dilukhin/agent-toolchain/issues/28) | Operational alerts/staleness и anomaly guard RouterAI | После #75; status/observability уже реализованы PR #31 |
 | 7 | [#29](https://github.com/dilukhin/agent-toolchain/issues/29) | Общая конфигурация, явные профили, локальные настройки и безопасная миграция | Дизайн и реализация после #28; routing policy #75 должна быть переносима в профиль |
 | Отдельно | [#61](https://github.com/dilukhin/agent-toolchain/issues/61) | Явный Linux opt-in CLI P0, status/metrics/disable поверх существующего reconciler | Добавлена параллельным диалогом 2026-09-19; реализацию CLI согласовать по времени с изменениями toolchainctl |
@@ -82,24 +82,27 @@ explicit update. Изменившаяся object identity не сохраняе�
 
 ## Этап 5: маршрутизация OpenCode (#75)
 
+Статус: выполнено в PR #76, merge `d1bc6c831a5656ec31aa6d09a2188395a0f927f2`.
+Финальный head PR `f44123b70fde812bb6db819d69d1dae5ef29a5d7` прошёл Windows/Linux validation,
+RouterAI generated ownership guard, MP-1 и MP-2. Issue #75 закрыта merge-операцией.
+
 Текущая managed policy переводит глобальный `model`, `small_model` и известные
 рабочие роли на прямой OpenAI/Codex provider. RouterAI provider/catalog/credential
 reference сохраняются для явного выбора, но не являются неявным маршрутом
 управляемых агентов.
 
-Реализация должна одновременно перейти от whole-file hash ownership OpenCode config
-к semantic path ownership: сохранять evidence только принадлежащих JSON-путей,
-разрешать пользовательский drift вне ownership и fail closed при изменении
-принадлежащего пути. Legacy `merged-json` и `merged-json-sibling-provider`
+Реализация заменила whole-file hash ownership OpenCode config на semantic path ownership:
+manifest хранит evidence только принадлежащих JSON-путей, пользовательский drift вне ownership
+не блокирует reconciliation, а изменение принадлежащего пути приводит к fail closed. Legacy `merged-json` и `merged-json-sibling-provider`
 мигрируют только при точном совпадении записанного SHA; `--force` не усыновляет
 неизвестный legacy drift.
 
-Routing policy хранится декларативно, чтобы #29 позднее мог перенести текущий набор
+Routing policy хранится декларативно, поэтому #29 позднее может перенести текущий набор
 `terra/luna/sol/astra` в явный профиль без переписывания merge/ownership слоя.
 Гарантия относится к глобальному config: project-local config и отдельные agent-файлы
 не сканируются и не переписываются.
 
-Приёмка: fresh install, exact legacy migration, legacy drift conflict даже с
+Проверено автоматическими regression/CI: fresh install, exact legacy migration, legacy drift conflict даже с
 `--force`, пользовательское изменение вне owned path, managed-path conflict/repair,
 сохранение неизвестных ролей и полей известных ролей, общий semantic target для
 `check/apply/diff`, RouterAI credentials без чтения, повторный apply no-op,
