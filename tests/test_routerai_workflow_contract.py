@@ -12,9 +12,11 @@ class RouterAiWorkflowContractTests(unittest.TestCase):
     def test_existing_candidate_resumes_pr_and_validation_without_new_push(self) -> None:
         text = CATALOG.read_text(encoding="utf-8")
         self.assertIn("run-name: RouterAI catalog refresh contract-v1", text)
-        self.assertGreaterEqual(text.count("if: steps.commit.outputs.candidate_required == '1'"), 2)
+        self.assertEqual(text.count("if: steps.commit.outputs.candidate_required == '1'"), 1)
         self.assertNotIn("if: steps.commit.outputs.push_required == '1'", text)
         self.assertIn("Published RouterAI candidate read-back mismatch", text)
+        self.assertIn("existing_run_id=", text)
+        self.assertIn(r'.status == \"completed\" and .conclusion == \"success\"', text)
         self.assertIn(".databaseId > $before_max", text)
 
     def test_full_success_requires_status_publication(self) -> None:

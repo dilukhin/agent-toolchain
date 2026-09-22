@@ -167,35 +167,54 @@ jobs:
           fi
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
-      - name: Dispatch and wait for full Windows/Linux validation
-        if: steps.commit.outputs.candidate_required == '1'
+      - name: Resolve and verify full Windows/Linux validation
         id: validation
         shell: bash
+        env:
+          CANDIDATE_REQUIRED: ${{ steps.commit.outputs.candidate_required }}
         run: |
           set -euo pipefail
-          candidate_sha="${{ steps.commit.outputs.local_sha }}"
+          target_ref="$BRANCH"
+          target_sha="${{ steps.commit.outputs.local_sha }}"
+          if [[ "$CANDIDATE_REQUIRED" != "1" ]]; then
+            target_ref="main"
+            target_sha="$(git rev-parse origin/main)"
+          fi
+
+          existing_run_id="$(
+            gh run list \
+              --workflow validate.yml \
+              --branch "$target_ref" \
+              --limit 100 \
+              --json databaseId,headSha,status,conclusion \
+              --jq "[.[] | select(.headSha == \"$target_sha\" and .status == \"completed\" and .conclusion == \"success\")][0].databaseId // empty"
+          )"
+          if [[ -n "$existing_run_id" ]]; then
+            echo "run_id=$existing_run_id" >> "$GITHUB_OUTPUT"
+            echo "reused=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           before_max="$(
             gh run list \
               --workflow validate.yml \
-              --branch "$BRANCH" \
-              --event workflow_dispatch \
-              --limit 50 \
+              --branch "$target_ref" \
+              --limit 100 \
               --json databaseId,headSha \
-              --jq "[.[] | select(.headSha == \"$candidate_sha\") | .databaseId] | max // 0"
+              --jq "[.[] | select(.headSha == \"$target_sha\") | .databaseId] | max // 0"
           )"
-
-          gh workflow run validate.yml --ref "$BRANCH"
+          gh workflow run validate.yml --ref "$target_ref"
 
           run_id=""
           for _ in $(seq 1 30); do
             run_id="$(
               gh run list \
                 --workflow validate.yml \
-                --branch "$BRANCH" \
+                --branch "$target_ref" \
                 --event workflow_dispatch \
                 --limit 20 \
                 --json databaseId,headSha \
-                --jq "[.[] | select(.headSha == \"$candidate_sha\" and .databaseId > $before_max)][0].databaseId // empty"
+                --jq "[.[] | select(.headSha == \"$target_sha\" and .databaseId > $before_max)][0].databaseId // empty"
             )"
             if [[ -n "$run_id" ]]; then
               break
@@ -203,10 +222,11 @@ jobs:
             sleep 2
           done
           if [[ -z "$run_id" ]]; then
-            echo "Could not locate newly dispatched validate.yml run for $candidate_sha" >&2
+            echo "Could not locate newly dispatched validate.yml run for $target_sha" >&2
             exit 3
           fi
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "reused=0" >> "$GITHUB_OUTPUT"
           gh run watch "$run_id" --exit-status
 
       - name: Summarize refresh attempt
@@ -256,11 +276,11 @@ jobs:
             phase="pull-request"
             code="pull-request"
             summary="Не удалось создать, переиспользовать или подтвердить pull request обновления RouterAI."
-          elif [[ "$CANDIDATE_REQUIRED" == "1" && "$VALIDATION_OUTCOME" != "success" ]]; then
+          elif [[ "$VALIDATION_OUTCOME" != "success" ]]; then
             status="failed"
             phase="full-validation"
             code="full-validation"
-            summary="Кандидат RouterAI не прошёл новую полную Windows/Linux проверку."
+            summary="Точное состояние RouterAI не имеет подтверждённой успешной Windows/Linux проверки."
           fi
 
           validation="unchanged"
