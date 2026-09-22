@@ -91,10 +91,9 @@ RouterAI generated ownership guard, MP-1 и MP-2. Issue #75 закрыта merge
 reference сохраняются для явного выбора, но не являются неявным маршрутом
 управляемых агентов.
 
-Реализация перевела whole-file hash ownership OpenCode config
-к semantic path ownership: сохранять evidence только принадлежащих JSON-путей,
-разрешать пользовательский drift вне ownership и fail closed при изменении
-принадлежащего пути. Legacy `merged-json` и `merged-json-sibling-provider`
+Реализация заменила whole-file hash ownership OpenCode config на semantic path ownership:
+manifest хранит evidence только принадлежащих JSON-путей, пользовательский drift вне ownership
+не блокирует reconciliation, а изменение принадлежащего пути приводит к fail closed. Legacy `merged-json` и `merged-json-sibling-provider`
 мигрируют только при точном совпадении записанного SHA; `--force` не усыновляет
 неизвестный legacy drift.
 
