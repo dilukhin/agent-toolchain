@@ -111,6 +111,47 @@ class OpenCodeRoutingOwnershipTests(unittest.TestCase):
             self.assertNotIn("/agent/general/permission", owner["managed_paths"])
             self.assertNotIn("/agent/custom-role/model", owner["managed_paths"])
 
+    def test_mode_less_exact_legacy_record_is_migrated(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            destination = root / "opencode.jsonc"
+            existing = desired_config()
+            existing["model"] = "routerai/qwen/qwen3.6-plus"
+            original = render(existing)
+            destination.write_bytes(original)
+            manifest = {
+                "managed_files": {
+                    "OpenCode config": {
+                        "path": str(destination),
+                        "sha256": sha256_bytes(original),
+                        "source": SOURCE,
+                    }
+                }
+            }
+
+            changed, reporter = self._apply(destination, manifest, desired_config(), root / "state")
+            self.assertTrue(changed, [row.detail for row in reporter.results])
+            owner = manifest["managed_files"]["OpenCode config"]
+            self.assertEqual(owner["mode"], OPENCODE_SEMANTIC_MODE)
+            self.assertEqual(
+                json.loads(destination.read_text(encoding="utf-8"))["model"],
+                "openai/gpt-5.6-terra",
+            )
+
+    def test_invalid_fresh_routing_policy_fails_before_creating_config(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            destination = root / "opencode.jsonc"
+            invalid = desired_config()
+            invalid["agent"] = "not-an-object"
+            manifest = {"managed_files": {}}
+
+            changed, reporter = self._apply(destination, manifest, invalid, root / "state")
+            self.assertFalse(changed)
+            self.assertFalse(destination.exists())
+            self.assertEqual(manifest, {"managed_files": {}})
+            self.assertTrue(any(row.state == STATE_CONFLICT for row in reporter.results))
+
     def test_legacy_whole_file_drift_is_blocked_even_with_force(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

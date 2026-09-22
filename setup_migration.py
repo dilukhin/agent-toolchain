@@ -53,7 +53,7 @@ def _preserve_exact_external_reference(destination: Path, desired_data: bytes) -
 
 
 OPENCODE_SEMANTIC_MODE = "semantic-paths-v1"
-_LEGACY_MANAGED_MODES = frozenset({"merged-json", _SIBLING_MODE})
+_LEGACY_MANAGED_MODES = frozenset({None, "merged-json", _SIBLING_MODE})
 _MANAGED_PATHS_FIELD = "managed_paths"
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
 
@@ -334,11 +334,14 @@ def _ownership_plan(
         if pointer in routing:
             if current_value != desired_value:
                 external_routes.append(pointer)
+            else:
+                owned.add(pointer)
             continue
         if current_value != target_value:
             return None, [], (
                 f"unowned managed field {pointer} would be overwritten; existing value is preserved"
             )
+        owned.add(pointer)
     return owned, external_routes, None
 
 
@@ -400,6 +403,10 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
     if desired_error or desired is None:
         reporter.add(component, STATE_CONFLICT, desired_error or "template cannot be parsed")
         return False
+    desired_targets, target_schema_error = _managed_target_items(desired)
+    if target_schema_error:
+        reporter.add(component, STATE_CONFLICT, target_schema_error)
+        return False
 
     if not destination.exists():
         if check:
@@ -409,22 +416,24 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
                 "global OpenCode config отсутствует; обычный apply создаст managed routing и RouterAI provider",
             )
             return False
+        target = desired
+        payload = (json.dumps(target, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
         try:
-            target = desired
-            payload = (json.dumps(target, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-            atomic_write(destination, payload)
-            targets, target_error = _managed_target_items(desired)
-            if target_error:
-                raise ValueError(target_error)
-            managed[component] = _semantic_record(
+            record = _semantic_record(
                 destination=destination,
                 source_label=source_label,
                 data=payload,
                 target=target,
                 desired=desired,
-                owned=set(targets),
+                owned=set(desired_targets),
             )
-        except (OSError, ValueError) as exc:
+        except ValueError as exc:
+            reporter.add(component, STATE_CONFLICT, str(exc))
+            return False
+        try:
+            atomic_write(destination, payload)
+            managed[component] = record
+        except OSError as exc:
             reporter.add(component, STATE_FAILED, f"не удалось создать managed OpenCode config: {exc}")
             return False
         reporter.add(component, STATE_CONFIGURED, f"создан managed config: {destination}")

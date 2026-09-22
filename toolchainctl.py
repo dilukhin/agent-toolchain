@@ -337,6 +337,10 @@ def _run_diff(args: argparse.Namespace) -> int:
     current_hash = sha256_bytes(current_data)
     recorded_hash = record.get("sha256") if isinstance(record, dict) else None
     record_mode = record.get("mode") if isinstance(record, dict) else None
+    legacy_whole_file = (
+        isinstance(record, dict)
+        and record_mode in {None, "merged-json", "merged-json-sibling-provider"}
+    )
     existing, parse_error, _features = parse_jsonc_object(current_data)
     if parse_error or existing is None:
         print(f"OpenCode config: {destination}", file=sys.stderr)
@@ -364,6 +368,9 @@ def _run_diff(args: argparse.Namespace) -> int:
             print("ownership: whole-file hash differs, but managed semantic paths are intact; user fields outside ownership are allowed")
         else:
             print("ownership: managed semantic paths are intact")
+    elif isinstance(record, dict) and not legacy_whole_file:
+        print(f"ownership: unsupported OpenCode ownership mode: {record_mode!r}")
+        return 2
     elif recorded_hash and recorded_hash != current_hash:
         print("ownership: legacy whole-file hash differs; automatic path-level migration is blocked")
         print("исторический diff недоступен: agent-toolchain хранит hash, а не копию config, чтобы не дублировать возможные секреты")
@@ -383,7 +390,7 @@ def _run_diff(args: argparse.Namespace) -> int:
     redacted_target = _redact_sensitive_config(target)
     if not changed_paths:
         print("managed target: управляемые поля уже совпадают; semantic diff отсутствует")
-        if record_mode in {"merged-json", "merged-json-sibling-provider"} and recorded_hash and recorded_hash != current_hash:
+        if legacy_whole_file and recorded_hash and recorded_hash != current_hash:
             print("вывод: legacy ownership drift блокирует автоматическую миграцию; --force не усыновляет неизвестные изменения")
         elif record_mode == OPENCODE_SEMANTIC_MODE and managed_drift:
             print("вывод: изменены уже принадлежащие semantic paths; требуется review перед явным repair")
@@ -403,7 +410,7 @@ def _run_diff(args: argparse.Namespace) -> int:
             tofile="agent-toolchain managed target (redacted)",
         )
     )
-    if record_mode in {"merged-json", "merged-json-sibling-provider"} and recorded_hash and recorded_hash != current_hash:
+    if legacy_whole_file and recorded_hash and recorded_hash != current_hash:
         print("после проверки: устраните legacy ownership drift вручную; --force не усыновляет неизвестные изменения")
     elif record_mode == OPENCODE_SEMANTIC_MODE and managed_drift:
         print("после проверки: toolchainctl apply --force восстановит только уже доказанно принадлежащие semantic paths")
