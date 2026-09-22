@@ -1,0 +1,137 @@
+name: Watch RouterAI catalog refresh
+
+on:
+  workflow_run:
+    workflows:
+      - Refresh RouterAI catalog
+    types:
+      - completed
+  schedule:
+    - cron: "43 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: routerai-operational-watchdog
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      STALE_HOURS: "72"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Collect bounded operational evidence
+        id: evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          since="$(python3 - <<'PY'
+          from datetime import datetime, timedelta, timezone
+          print((datetime.now(timezone.utc) - timedelta(days=14)).date().isoformat())
+          PY
+          )"
+
+          gh api --method GET --paginate --slurp \
+            -f status=completed \
+            -f created=">=$since" \
+            -f per_page=100 \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/routerai_catalog.yml/runs" \
+            > "$RUNNER_TEMP/routerai-runs.json"
+
+          if gh api \
+            -H "Accept: application/vnd.github+json" \
+            "repos/$GITHUB_REPOSITORY/contents/routerai-refresh-status.json?ref=automation/routerai-status" \
+            --jq '.content' > "$RUNNER_TEMP/routerai-status.b64" 2>/dev/null; then
+            base64 --decode "$RUNNER_TEMP/routerai-status.b64" > "$RUNNER_TEMP/routerai-status.json"
+          else
+            printf 'null\n' > "$RUNNER_TEMP/routerai-status.json"
+          fi
+
+          gh api --method GET --paginate --slurp \
+            -f state=all \
+            -f per_page=100 \
+            "repos/$GITHUB_REPOSITORY/issues" \
+            > "$RUNNER_TEMP/routerai-issues.json"
+
+          now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "now=$now" >> "$GITHUB_OUTPUT"
+
+      - name: Evaluate operational state
+        id: decision
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/routerai_operational_watchdog.py \
+            --runs "$RUNNER_TEMP/routerai-runs.json" \
+            --status "$RUNNER_TEMP/routerai-status.json" \
+            --issues "$RUNNER_TEMP/routerai-issues.json" \
+            --now "${{ steps.evidence.outputs.now }}" \
+            --stale-hours "$STALE_HOURS" \
+            --decision-output "$RUNNER_TEMP/routerai-decision.json" \
+            --body-output "$RUNNER_TEMP/routerai-issue-body.md"
+          cat "$RUNNER_TEMP/routerai-decision.json" >> "$GITHUB_STEP_SUMMARY"
+          echo "action=$(jq -r '.action' "$RUNNER_TEMP/routerai-decision.json")" >> "$GITHUB_OUTPUT"
+
+      - name: Reconcile owned operational issue
+        if: steps.decision.outputs.action != 'noop'
+        shell: bash
+        run: |
+          set -euo pipefail
+          action="${{ steps.decision.outputs.action }}"
+          number="$(jq -r '.number // empty' "$RUNNER_TEMP/routerai-decision.json")"
+          title="$(jq -r '.title // empty' "$RUNNER_TEMP/routerai-decision.json")"
+
+          case "$action" in
+            create)
+              gh issue create --title "$title" --body-file "$RUNNER_TEMP/routerai-issue-body.md" >/dev/null
+              ;;
+            update)
+              gh issue edit "$number" --title "$title" --body-file "$RUNNER_TEMP/routerai-issue-body.md"
+              ;;
+            reopen)
+              gh issue edit "$number" --title "$title" --body-file "$RUNNER_TEMP/routerai-issue-body.md"
+              gh issue reopen "$number"
+              ;;
+            close)
+              gh issue close "$number" --reason completed
+              ;;
+            *)
+              echo "Unsupported RouterAI watchdog mutation: $action" >&2
+              exit 2
+              ;;
+          esac
+
+      - name: Verify issue reconciliation by read-back
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method GET --paginate --slurp \
+            -f state=all \
+            -f per_page=100 \
+            "repos/$GITHUB_REPOSITORY/issues" \
+            > "$RUNNER_TEMP/routerai-issues-after.json"
+
+          python3 scripts/routerai_operational_watchdog.py \
+            --runs "$RUNNER_TEMP/routerai-runs.json" \
+            --status "$RUNNER_TEMP/routerai-status.json" \
+            --issues "$RUNNER_TEMP/routerai-issues-after.json" \
+            --now "${{ steps.evidence.outputs.now }}" \
+            --stale-hours "$STALE_HOURS" \
+            --decision-output "$RUNNER_TEMP/routerai-decision-after.json"
+
+          action="$(jq -r '.action' "$RUNNER_TEMP/routerai-decision-after.json")"
+          if [[ "$action" != "noop" ]]; then
+            echo "RouterAI operational issue read-back is not converged: $action" >&2
+            cat "$RUNNER_TEMP/routerai-decision-after.json" >&2
+            exit 3
+          fi

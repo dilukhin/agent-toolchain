@@ -43,6 +43,9 @@ class RouterAiRefreshStatusTests(unittest.TestCase):
             previous=self._previous(),
             attempt_at="2026-08-30T03:00:00Z",
             trigger="schedule",
+            run_id=12345,
+            run_attempt=2,
+            completion_contract=status_mod.COMPLETION_CONTRACT,
             attempt_status="success",
             phase="complete",
             error_code=None,
@@ -113,12 +116,22 @@ class RouterAiRefreshStatusTests(unittest.TestCase):
         self.assertIn(status_mod.DOC, result["_managed_notice"])
         self.assertIn(status_mod.MANUAL_REFRESH_COMMAND, result["_managed_notice"])
 
-    def test_existing_managed_status_is_accepted(self) -> None:
+    def test_status_records_workflow_evidence_without_breaking_schema(self) -> None:
+        result = self._build(run_id=998877, run_attempt=3)
+        self.assertEqual(result["schema"], 1)
+        self.assertEqual(result["completion_contract"], status_mod.COMPLETION_CONTRACT)
+        self.assertEqual(result["last_attempt"]["run_id"], 998877)
+        self.assertEqual(result["last_attempt"]["run_attempt"], 3)
+        body = status_mod.pr_body(result)
+        self.assertIn("998877/3", body)
+
+    def test_existing_pre_contract_managed_status_is_accepted(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "status.json"
             path.write_text(json.dumps(self._previous(), ensure_ascii=False), encoding="utf-8")
             loaded = status_mod.load_previous_status(path)
         self.assertEqual(loaded["owner"], status_mod.OWNER)
+        self.assertNotIn("completion_contract", loaded)
 
     def test_unknown_or_modified_status_fails_closed(self) -> None:
         variants = [
