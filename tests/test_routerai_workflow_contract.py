@@ -37,6 +37,7 @@ class RouterAiWorkflowContractTests(unittest.TestCase):
         self.assertIn("--paginate --slurp", text)
         self.assertIn("routerai_operational_watchdog.py", text)
         self.assertIn("Verify issue reconciliation by read-back", text)
+        self.assertIn("verifying actual state by read-back", text)
 
 
 if __name__ == "__main__":

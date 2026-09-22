@@ -93,17 +93,22 @@ jobs:
 
           case "$action" in
             create)
-              gh issue create --title "$title" --body-file "$RUNNER_TEMP/routerai-issue-body.md" >/dev/null
+              gh issue create --title "$title" --body-file "$RUNNER_TEMP/routerai-issue-body.md" >/dev/null || \
+                echo "RouterAI issue create returned non-zero; verifying actual state by read-back." >&2
               ;;
             update)
-              gh issue edit "$number" --title "$title" --body-file "$RUNNER_TEMP/routerai-issue-body.md"
+              gh issue edit "$number" --title "$title" --body-file "$RUNNER_TEMP/routerai-issue-body.md" || \
+                echo "RouterAI issue update returned non-zero; verifying actual state by read-back." >&2
               ;;
             reopen)
-              gh issue edit "$number" --title "$title" --body-file "$RUNNER_TEMP/routerai-issue-body.md"
-              gh issue reopen "$number"
+              gh issue edit "$number" --title "$title" --body-file "$RUNNER_TEMP/routerai-issue-body.md" || \
+                echo "RouterAI issue edit-before-reopen returned non-zero; verifying actual state by read-back." >&2
+              gh issue reopen "$number" || \
+                echo "RouterAI issue reopen returned non-zero; verifying actual state by read-back." >&2
               ;;
             close)
-              gh issue close "$number" --reason completed
+              gh issue close "$number" --reason completed || \
+                echo "RouterAI issue close returned non-zero; verifying actual state by read-back." >&2
               ;;
             *)
               echo "Unsupported RouterAI watchdog mutation: $action" >&2
