@@ -36,6 +36,7 @@ LEGACY_REQUIRED_FILES_V1 = (
     "setup_tool_skills_impl.py",
     "setup_path.py",
     "setup_inventory.py",
+    "setup_agent_inventory.py",
     "setup_tools.py",
     "config_data.json",
 )

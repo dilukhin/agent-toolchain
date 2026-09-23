@@ -50,7 +50,7 @@ toolchainctl --version       показать версию и build identity з�
 toolchainctl check           read-only диагностика target state
 toolchainctl apply           привести управляемое состояние к target state
 toolchainctl diff opencode-config  показать read-only managed-target diff OpenCode config с редактированием чувствительных значений
-toolchainctl adopt opencode-config --expected-sha <sha256>  явно принять проверенный legacy-drift payload как базу semantic ownership
+toolchainctl agents inspect    показать read-only inventory источников определений OpenCode agents без вывода prompt/description/permission patterns\ntoolchainctl adopt opencode-config --expected-sha <sha256>  явно принять проверенный legacy-drift payload как базу semantic ownership
 toolchainctl update          обновить установленный управляющий core из актуального main
 toolchainctl update --apply  обновить core и затем применить новый target state
 ```
@@ -60,6 +60,8 @@ toolchainctl update --apply  обновить core и затем примени�
 Обычные `check`/`apply`/`updates`/`update` и ранние ошибки оставляют identity один раз в stderr. Для `opencode-proxied` и `codex-proxied` собственная версия доступна через `--wrapper-version`, структурированные метаданные — через `--health-json`; `--version` по-прежнему передаётся дочернему CLI. [Контракт диагностической identity и provenance](docs/diagnostic_identity_ru.md).
 
 `check` не создаёт state/runtime/skills, не выполняет package install, clone/pull, chmod или backup. `apply` меняет только доказанно управляемые ресурсы. Неизвестное содержимое не усыновляется автоматически.
+
+`toolchainctl agents inspect [--project PATH] [--json]` также строго read-only и не обращается к сети: он перечисляет известные global/custom/project/inline/system-managed config layers и Markdown-agent sources, показывает только безопасные metadata (`model`, `mode`, наличие `description`/prompt/permission/tools`, path/hash) и отмечает коллизии имён. Содержимое prompt/description, permission patterns и inline config не выводятся; remote organizational config и фактический runtime merge остаются отдельными источниками evidence.
 
 При конфликте локально изменённого `OpenCode config` итоговая рекомендация указывает точный путь и предлагает `toolchainctl diff opencode-config`. Команда ничего не меняет: показывает записанный и текущий SHA-256, JSON-пути управляемых различий и unified diff текущего config с target, который был бы получен безопасным merge. Значения ключей, похожих на credentials/tokens/passwords/secrets, редактируются. Историческое содержимое предыдущего config намеренно не сохраняется, поэтому точный diff «с прошлого apply» по одному hash восстановить нельзя. Если managed-target semantic diff пуст, конфликт означает только drift ownership/hash; после проверки `toolchainctl apply --force` сначала создаст backup и примет совместимый config без изменения пользовательских полей.
 
