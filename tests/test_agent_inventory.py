@@ -70,6 +70,41 @@ class AgentInventoryTests(unittest.TestCase):
             self.assertEqual(agent["permission_keys"], ["bash", "edit"])
             self.assertEqual(agent["tool_keys"], ["mcp_secret_tool", "write"])
 
+    def test_malformed_model_and_mode_values_are_not_printed(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config_dir = root / "config"
+            config_dir.mkdir()
+            project = root / "project"
+            (project / ".git").mkdir(parents=True)
+            config = {
+                "agent": {
+                    "bad": {
+                        "model": "SECRET VALUE WITH SPACES",
+                        "mode": "PRIVATE MODE VALUE",
+                    }
+                }
+            }
+            (config_dir / "opencode.jsonc").write_text(json.dumps(config), encoding="utf-8")
+
+            inventory = setup_agent_inventory.collect_agent_inventory(
+                project=project,
+                config_dir=config_dir,
+                environ={},
+            )
+            serialized = json.dumps(inventory, ensure_ascii=False)
+
+            self.assertNotIn("SECRET VALUE WITH SPACES", serialized)
+            self.assertNotIn("PRIVATE MODE VALUE", serialized)
+            agent = next(
+                item
+                for source in inventory["sources"]
+                for item in source.get("agents", [])
+                if item.get("name") == "bad"
+            )
+            self.assertNotIn("model", agent)
+            self.assertNotIn("mode", agent)
+
     def test_markdown_summary_never_emits_description_or_prompt_body(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
