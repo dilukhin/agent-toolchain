@@ -69,6 +69,18 @@ def _trim_action(text: str, limit: int = 220) -> str:
     normalized = " ".join(text.split())
     if len(normalized) <= limit:
         return normalized
+    command_spans = list(re.finditer(r"`[^`]+`", normalized))
+    for span in command_spans:
+        if span.start() < limit <= span.end():
+            suffix = "…" if span.end() < len(normalized) else ""
+            return normalized[: span.end()].rstrip() + suffix
+    if command_spans:
+        span = command_spans[-1]
+        command = span.group(0)
+        if len(command) + 2 < limit:
+            prefix_budget = limit - len(command) - 2
+            prefix = normalized[:prefix_budget].rstrip()
+            return prefix + "… " + command
     return normalized[: limit - 1].rstrip() + "…"
 
 
