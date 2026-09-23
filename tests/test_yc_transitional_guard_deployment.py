@@ -268,6 +268,73 @@ class YcTransitionalDeploymentTests(unittest.TestCase):
             self.assertEqual(result["effective_readback"], "PASS")
             promote.assert_called_once_with(path_manifest, (legacy / "bin").resolve())
 
+    def test_active_apply_reports_path_promotion_as_change_then_repeats_noop(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            artifact, legacy, _downstream = self.fixture(root)
+            data = root / "data"
+            public_bin = root / "managed-bin"
+            state = root / "state"
+            path_manifest = {
+                "managed_path_entries": {
+                    "agent-toolchain-bin": {
+                        "owner": "agent-toolchain",
+                        "scope": "user",
+                        "path": str(public_bin),
+                    }
+                }
+            }
+            ycsetup.apply_guard(
+                artifact_dir=artifact,
+                legacy_guard_root=legacy,
+                entry_script_source=ROOT / "yc_transitional_entry.py",
+                data_dir=data,
+                bin_dir=public_bin,
+                state_dir=state,
+                require_effective_path=False,
+            )
+            legacy_yc = legacy / "bin" / "yc.cmd"
+            legacy_yc.parent.mkdir()
+            managed_yc = public_bin / "yc.cmd"
+            shadow = ycsetup.YcGuardDeploymentError("YC_PATH_SHADOW_CONFLICT", str(legacy_yc.parent))
+
+            with mock.patch.object(ycsetup, "preflight_effective_path", side_effect=[shadow, {"ok": True}]), \
+                    mock.patch.object(ycsetup.shutil, "which", side_effect=[str(legacy_yc), str(legacy_yc), str(managed_yc)]), \
+                    mock.patch.object(ycsetup.setup_path, "promote_owned_public_bin_before", return_value=True):
+                promoted = ycsetup.apply_guard(
+                    artifact_dir=artifact,
+                    legacy_guard_root=legacy,
+                    entry_script_source=ROOT / "yc_transitional_entry.py",
+                    data_dir=data,
+                    bin_dir=public_bin,
+                    state_dir=state,
+                    require_effective_path=True,
+                    path_manifest=path_manifest,
+                )
+
+            self.assertTrue(promoted["changed"])
+            self.assertTrue(promoted["path_promoted"])
+            self.assertEqual(promoted["effective_readback"], "PASS")
+
+            with mock.patch.object(ycsetup, "preflight_effective_path", return_value={"ok": True}), \
+                    mock.patch.object(ycsetup.shutil, "which", return_value=str(managed_yc)), \
+                    mock.patch.object(ycsetup.setup_path, "promote_owned_public_bin_before") as promote:
+                repeated = ycsetup.apply_guard(
+                    artifact_dir=artifact,
+                    legacy_guard_root=legacy,
+                    entry_script_source=ROOT / "yc_transitional_entry.py",
+                    data_dir=data,
+                    bin_dir=public_bin,
+                    state_dir=state,
+                    require_effective_path=True,
+                    path_manifest=path_manifest,
+                )
+
+            self.assertFalse(repeated["changed"])
+            self.assertFalse(repeated["path_promoted"])
+            self.assertEqual(repeated["effective_readback"], "PASS")
+            promote.assert_not_called()
+
     def test_apply_does_not_promote_unrelated_shadow(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

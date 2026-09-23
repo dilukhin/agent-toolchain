@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -32,10 +34,18 @@ from setup_lib import (
     atomic_write,
     backup_file,
     parse_jsonc_object,
+    resolve_credential_path,
+    routerai_file_credential,
     sha256_bytes,
 )
 from setup_managed_tools import reconcile_tool_specs
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
+from setup_migration import (
+    OPENCODE_SEMANTIC_MODE,
+    adopt_legacy_opencode_config,
+    inspect_managed_opencode_paths,
+    preview_opencode_config_target,
+)
 from setup_path import reconcile_public_bin_path
 from setup_tool_skills import reconcile_pinned_tool_skills
 from setup_tools import parse_tool_specs, resolve_tool_specs
@@ -200,6 +210,11 @@ def build_parser() -> argparse.ArgumentParser:
     update_sub.add_parser("show", help="show cached advisories without network access")
     update = sub.add_parser("update", help="update the installed agent-toolchain core from GitHub main")
     update.add_argument("--apply", action="store_true", help="run the freshly installed toolchainctl apply after update")
+    diff_cmd = sub.add_parser("diff", help="show a read-only diagnostic diff for a managed component")
+    diff_cmd.add_argument("component", choices=("opencode-config",), help="managed component to inspect")
+    adopt_cmd = sub.add_parser("adopt", help="explicitly adopt a reviewed legacy-drift payload into semantic ownership")
+    adopt_cmd.add_argument("component", choices=("opencode-config",), help="managed component to adopt")
+    adopt_cmd.add_argument("--expected-sha", required=True, help="exact sha256 of the reviewed current payload")
     setup_yc_transitional_guard.add_cli_parser(sub)
     setup_workspace_trust.add_cli_parser(sub)
     return parser
@@ -224,6 +239,270 @@ def _updates_phase(args: argparse.Namespace) -> int:
               f"latest={record.get('latest_version', 'unknown')} status={record.get('status', 'missing')}")
     return 0
 
+
+
+_SENSITIVE_CONFIG_KEY_RE = re.compile(
+    r"(?:api[_-]?key|token|secret|password|credential|authorization)",
+    re.IGNORECASE,
+)
+
+
+def _redact_sensitive_config(value: object) -> object:
+    if isinstance(value, dict):
+        redacted: dict[str, object] = {}
+        for key, item in value.items():
+            redacted[key] = "<redacted>" if _SENSITIVE_CONFIG_KEY_RE.search(str(key)) else _redact_sensitive_config(item)
+        return redacted
+    if isinstance(value, list):
+        return [_redact_sensitive_config(item) for item in value]
+    return value
+
+
+def _changed_json_paths(before: object, after: object, path: str = "$") -> list[str]:
+    if isinstance(before, dict) and isinstance(after, dict):
+        changes: list[str] = []
+        for key in sorted(set(before) | set(after)):
+            child = f"{path}.{key}"
+            if key not in before or key not in after:
+                changes.append(child)
+            else:
+                changes.extend(_changed_json_paths(before[key], after[key], child))
+        return changes
+    if isinstance(before, list) and isinstance(after, list):
+        return [] if before == after else [path]
+    return [] if before == after else [path]
+
+
+def _opencode_diff_target(
+    existing: dict[str, object],
+    manifest: dict[str, object],
+    config_dir: Path,
+    destination: Path,
+) -> tuple[dict[str, object] | None, str | None]:
+    credential_ref = routerai_file_credential(existing)
+    credential_path: Path | None = None
+    if credential_ref:
+        credential_path = resolve_credential_path(credential_ref, config_dir)
+    else:
+        credentials = manifest.get("credentials")
+        if isinstance(credentials, dict):
+            routerai = credentials.get("routerai")
+            if isinstance(routerai, dict):
+                path = routerai.get("path")
+                if isinstance(path, str) and path:
+                    credential_path = resolve_credential_path(path, config_dir)
+    if credential_path is None:
+        return None, "не удалось определить путь RouterAI credential; безопасный target diff построить нельзя"
+
+    desired_data = setup_core.render_config(
+        Path(__file__).resolve().parent / "templates" / "opencode.jsonc",
+        credential_path,
+    )
+    record = manifest.get("managed_files", {}).get("OpenCode config")
+    previous = record if isinstance(record, dict) else None
+    target, target_error = preview_opencode_config_target(
+        destination=destination,
+        desired_data=desired_data,
+        previous=previous,
+    )
+    if target_error or target is None:
+        return None, f"не удалось построить фактический managed target: {target_error or 'unknown target error'}"
+    return target, None
+
+
+def _run_diff(args: argparse.Namespace) -> int:
+    if args.component != "opencode-config":
+        print(f"unsupported diff component: {args.component}", file=sys.stderr)
+        return 2
+    try:
+        state_dir, _migration_state, _migration_detail = prepare_state(check=True)
+    except StateMigrationError as exc:
+        print(f"не удалось определить state для diff: {exc}", file=sys.stderr)
+        return 2
+
+    manifest, manifest_error, _pending = load_manifest(state_dir / "manifest.json")
+    if manifest_error:
+        print(f"не удалось прочитать ownership manifest: {manifest_error}", file=sys.stderr)
+        return 2
+
+    config_dir = _default_paths()["config"]
+    record = manifest.get("managed_files", {}).get("OpenCode config")
+    recorded_path = record.get("path") if isinstance(record, dict) else None
+    destination = (
+        Path(recorded_path).expanduser().resolve()
+        if isinstance(recorded_path, str)
+        else (config_dir / "opencode.jsonc")
+    )
+    if not destination.is_file():
+        print(f"OpenCode config не является обычным файлом: {destination}", file=sys.stderr)
+        return 2
+
+    current_data = destination.read_bytes()
+    current_hash = sha256_bytes(current_data)
+    recorded_hash = record.get("sha256") if isinstance(record, dict) else None
+    record_mode = record.get("mode") if isinstance(record, dict) else None
+    legacy_whole_file = (
+        isinstance(record, dict)
+        and record_mode in {None, "merged-json", "merged-json-sibling-provider"}
+    )
+    existing, parse_error, _features = parse_jsonc_object(current_data)
+    if parse_error or existing is None:
+        print(f"OpenCode config: {destination}", file=sys.stderr)
+        print(f"не удалось разобрать текущий JSONC: {parse_error or 'unknown parse error'}", file=sys.stderr)
+        return 2
+
+    target, target_error = _opencode_diff_target(existing, manifest, config_dir, destination)
+    print(f"OpenCode config: {destination}")
+    print(f"recorded sha256: {recorded_hash or 'нет записи'}")
+    print(f"current  sha256: {current_hash}")
+    managed_drift: list[str] = []
+    drift_error: str | None = None
+    if isinstance(record, dict) and record_mode == OPENCODE_SEMANTIC_MODE:
+        managed_drift, drift_error = inspect_managed_opencode_paths(existing, record)
+        managed_paths = record.get("managed_paths")
+        managed_count = len(managed_paths) if isinstance(managed_paths, dict) else 0
+        print(f"ownership: semantic managed paths: {managed_count}")
+        if drift_error:
+            print(f"ownership: semantic evidence invalid: {drift_error}")
+        elif managed_drift:
+            print("ownership: изменены принадлежащие agent-toolchain JSON-пути:")
+            for path in managed_drift:
+                print(f"  - {path}")
+        elif recorded_hash and recorded_hash != current_hash:
+            print("ownership: whole-file hash differs, but managed semantic paths are intact; user fields outside ownership are allowed")
+        else:
+            print("ownership: managed semantic paths are intact")
+    elif isinstance(record, dict) and not legacy_whole_file:
+        print(f"ownership: unsupported OpenCode ownership mode: {record_mode!r}")
+        return 2
+    elif recorded_hash and recorded_hash != current_hash:
+        print("ownership: legacy whole-file hash differs; automatic path-level migration is blocked")
+        print("исторический diff недоступен: agent-toolchain хранит hash, а не копию config, чтобы не дублировать возможные секреты")
+    elif recorded_hash:
+        print("ownership: legacy whole-file hash совпадает; обычный apply может мигрировать ownership в semantic paths")
+    else:
+        print("ownership: для OpenCode config нет записанного managed ownership")
+
+    if drift_error:
+        return 2
+    if target_error or target is None:
+        print(f"managed target: {target_error}", file=sys.stderr)
+        return 2
+
+    changed_paths = _changed_json_paths(existing, target)
+    redacted_current = _redact_sensitive_config(existing)
+    redacted_target = _redact_sensitive_config(target)
+    if not changed_paths:
+        print("managed target: управляемые поля уже совпадают; semantic diff отсутствует")
+        if legacy_whole_file and recorded_hash and recorded_hash != current_hash:
+            print("вывод: legacy ownership drift блокирует автоматическую миграцию; --force не усыновляет неизвестные изменения")
+            print(f"явное принятие проверенного текущего payload: toolchainctl adopt opencode-config --expected-sha {current_hash}")
+        elif record_mode == OPENCODE_SEMANTIC_MODE and managed_drift:
+            print("вывод: изменены уже принадлежащие semantic paths; требуется review перед явным repair")
+        return 0
+
+    print("managed target: изменятся JSON-пути:")
+    for path in changed_paths:
+        print(f"  - {path}")
+    print("sensitive values: redacted")
+    before = json.dumps(redacted_current, ensure_ascii=False, indent=2).splitlines(keepends=True)
+    after = json.dumps(redacted_target, ensure_ascii=False, indent=2).splitlines(keepends=True)
+    sys.stdout.writelines(
+        difflib.unified_diff(
+            before,
+            after,
+            fromfile=f"{destination} (current, redacted)",
+            tofile="agent-toolchain managed target (redacted)",
+        )
+    )
+    if legacy_whole_file and recorded_hash and recorded_hash != current_hash:
+        print("после проверки: --force не усыновляет legacy drift")
+        print(f"если текущий config проверен и должен стать базой semantic ownership: toolchainctl adopt opencode-config --expected-sha {current_hash}")
+    elif record_mode == OPENCODE_SEMANTIC_MODE and managed_drift:
+        print("после проверки: toolchainctl apply --force восстановит только уже доказанно принадлежащие semantic paths")
+    else:
+        print("после проверки: toolchainctl apply выполнит безопасный semantic merge управляемых полей")
+    return 0
+
+
+def _run_adopt(args: argparse.Namespace) -> int:
+    if args.component != "opencode-config":
+        print(f"unsupported adopt component: {args.component}", file=sys.stderr)
+        return 2
+    if re.fullmatch(r"[0-9a-f]{64}", args.expected_sha or "") is None:
+        print("--expected-sha must be exactly 64 lowercase hex characters", file=sys.stderr)
+        return 2
+    try:
+        state_dir, migration_state, migration_detail = prepare_state(check=False)
+    except StateMigrationError as exc:
+        print(f"modified/conflict  agent-toolchain state migration  {exc}", file=sys.stderr)
+        return 2
+    if migration_detail and migration_state:
+        print(f"{migration_state:<18}agent-toolchain state migration  {migration_detail}")
+
+    manifest_path = state_dir / "manifest.json"
+    manifest, manifest_error, migration_pending = load_manifest(manifest_path)
+    if manifest_error:
+        print(f"modified/conflict  ownership manifest  {manifest_error}", file=sys.stderr)
+        return 2
+
+    config_dir = _default_paths()["config"]
+    record = manifest.get("managed_files", {}).get("OpenCode config")
+    recorded_path = record.get("path") if isinstance(record, dict) else None
+    destination = (
+        Path(recorded_path).expanduser().resolve()
+        if isinstance(recorded_path, str)
+        else (config_dir / "opencode.jsonc")
+    )
+    if not destination.is_file():
+        print(f"modified/conflict  OpenCode config  destination is not a regular file: {destination}", file=sys.stderr)
+        return 2
+
+    current_data = destination.read_bytes()
+    existing, parse_error, _features = parse_jsonc_object(current_data)
+    if parse_error or existing is None:
+        print(f"modified/conflict  OpenCode config  {parse_error or 'current config cannot be parsed'}", file=sys.stderr)
+        return 2
+
+    credential_ref = routerai_file_credential(existing)
+    credential_path: Path | None = None
+    if credential_ref:
+        credential_path = resolve_credential_path(credential_ref, config_dir)
+    else:
+        credentials = manifest.get("credentials")
+        if isinstance(credentials, dict):
+            routerai = credentials.get("routerai")
+            if isinstance(routerai, dict):
+                path = routerai.get("path")
+                if isinstance(path, str) and path:
+                    credential_path = resolve_credential_path(path, config_dir)
+    if credential_path is None:
+        print("modified/conflict  OpenCode config  cannot resolve RouterAI credential path for safe adoption", file=sys.stderr)
+        return 2
+
+    desired_data = setup_core.render_config(
+        Path(__file__).resolve().parent / "templates" / "opencode.jsonc",
+        credential_path,
+    )
+    reporter = Reporter()
+    changed = adopt_legacy_opencode_config(
+        destination=destination,
+        desired_data=desired_data,
+        source_label="opencode_setup:managed-merge:templates/opencode.jsonc",
+        manifest=manifest,
+        reporter=reporter,
+        expected_current_sha=args.expected_sha,
+        state_dir=state_dir,
+    )
+    if changed or migration_pending:
+        try:
+            save_manifest(manifest_path, manifest)
+        except (OSError, ValueError) as exc:
+            reporter.add("ownership manifest", STATE_FAILED, f"cannot save {manifest_path}: {exc}")
+        else:
+            reporter.add("ownership manifest", STATE_CONFIGURED, f"semantic ownership recorded: {manifest_path}")
+    reporter.render()
+    return 2 if reporter.has_conflict else 0
 
 def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
     paths = _default_paths()
@@ -382,17 +661,32 @@ def _reconcile_routerai_model_labels(state_dir: Path, *, check: bool) -> int:
         current_data = config_path.read_bytes()
         if previous.get("path") != str(config_path):
             return 0
-        if previous.get("sha256") != sha256_bytes(current_data):
-            return 0
         existing, parse_error, has_jsonc_features = parse_jsonc_object(current_data)
+        if parse_error or existing is None:
+            return 0
+        if previous.get("mode") == OPENCODE_SEMANTIC_MODE:
+            managed_drift, drift_error = inspect_managed_opencode_paths(existing, previous)
+            if drift_error:
+                reporter.add("RouterAI model labels", STATE_CONFLICT, f"cannot validate semantic ownership: {drift_error}")
+                reporter.render()
+                return 2
+            if managed_drift:
+                reporter.add(
+                    "RouterAI model labels",
+                    STATE_CONFLICT,
+                    "managed OpenCode paths were modified; model labels preserved until routing/config ownership is resolved: "
+                    + ", ".join(managed_drift),
+                )
+                reporter.render()
+                return 2
+        elif previous.get("sha256") != sha256_bytes(current_data):
+            return 0
         desired_config = json.loads((repo_root / "config_data.json").read_text(encoding="utf-8"))
         aliases = _managed_model_aliases(repo_root, desired_config)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         reporter.add("RouterAI model labels", STATE_CONFLICT, f"cannot load managed model policy: {exc}")
         reporter.render()
         return 2
-    if parse_error or existing is None:
-        return 0
 
     providers = existing.get("provider")
     if not isinstance(providers, dict):
@@ -475,28 +769,33 @@ def _reconcile_routerai_model_labels(state_dir: Path, *, check: bool) -> int:
 
 
 def _urlopen_bytes(url: str, *, max_bytes: int) -> bytes:
-    request = urllib.request.Request(
-        url,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "agent-toolchain-self-update/1",
-        },
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            length = response.headers.get("Content-Length")
-            if length is not None:
-                try:
-                    if int(length) > max_bytes:
-                        raise SelfUpdateError(f"remote payload is too large: {length} bytes")
-                except ValueError:
-                    pass
-            data = response.read(max_bytes + 1)
-    except (urllib.error.URLError, TimeoutError, OSError) as exc:
-        raise SelfUpdateError(f"download failed for {url}: {exc}") from exc
-    if len(data) > max_bytes:
-        raise SelfUpdateError(f"remote payload exceeds safety limit: {max_bytes} bytes")
-    return data
+    last_error: BaseException | None = None
+    for _attempt in range(2):
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "agent-toolchain-self-update/1",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                length = response.headers.get("Content-Length")
+                if length is not None:
+                    try:
+                        if int(length) > max_bytes:
+                            raise SelfUpdateError(f"remote payload is too large: {length} bytes")
+                    except ValueError:
+                        pass
+                data = response.read(max_bytes + 1)
+        except (urllib.error.URLError, TimeoutError, OSError, http.client.IncompleteRead) as exc:
+            last_error = exc
+            continue
+        if len(data) > max_bytes:
+            raise SelfUpdateError(f"remote payload exceeds safety limit: {max_bytes} bytes")
+        return data
+    assert last_error is not None
+    raise SelfUpdateError(f"download failed for {url} after 2 attempts: {last_error}") from last_error
 
 
 def _resolve_update_sha() -> str:
@@ -734,6 +1033,10 @@ def main(argv: list[str] | None = None) -> int:
         return _updates_phase(args)
     if args.command == "update":
         return _run_self_update(apply_after=bool(args.apply))
+    if args.command == "diff":
+        return _run_diff(args)
+    if args.command == "adopt":
+        return _run_adopt(args)
     if args.command == "yc-guard":
         return setup_yc_transitional_guard.run_cli(args)
 
@@ -751,10 +1054,6 @@ def main(argv: list[str] | None = None) -> int:
     if managed_rc != 0 and not check:
         return managed_rc
 
-    labels_rc = _reconcile_routerai_model_labels(state_dir, check=check)
-    if labels_rc != 0 and not check:
-        return labels_rc
-
     previous = os.environ.get("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED")
     os.environ["AGENT_TOOLCHAIN_RUNTIME_PRECONCILED"] = "1"
     try:
@@ -764,6 +1063,10 @@ def main(argv: list[str] | None = None) -> int:
             os.environ.pop("AGENT_TOOLCHAIN_RUNTIME_PRECONCILED", None)
         else:
             os.environ["AGENT_TOOLCHAIN_RUNTIME_PRECONCILED"] = previous
+    if core_rc != 0 and not check:
+        return core_rc
+
+    labels_rc = _reconcile_routerai_model_labels(state_dir, check=check)
     return 2 if managed_rc != 0 or labels_rc != 0 or core_rc != 0 else 0
 
 

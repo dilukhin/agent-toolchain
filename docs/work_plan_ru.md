@@ -1,6 +1,6 @@
 # План работ agent-toolchain
 
-Дата: 2026-09-19. План принят пользователем после инвентаризации issues.
+Дата: 2026-09-22. План актуализирован после принятия issue #75; исходная очередь принята пользователем после инвентаризации issues.
 Фактическое выполнение определяется по актуальным main, коду, tests/validators и CI.
 Открытый PR не считается реализацией main. Перед каждым этапом перечитать его issue
 и проверить относящиеся PR: параллельные диалоги могут изменить состояние.
@@ -14,10 +14,11 @@
 | 2 | [#53](https://github.com/dilukhin/agent-toolchain/issues/53) | Проверить доступность опубликованного core/marker/entrypoint обычному пользователю | Выполнено: [PR #64](https://github.com/dilukhin/agent-toolchain/pull/64); Windows/Linux CI и реальный standard-user regression прошли |
 | 3 | [#46](https://github.com/dilukhin/agent-toolchain/issues/46) | Завершить identity обычных команд, ранних ошибок и proxy-tools | Выполнено: [PR #65](https://github.com/dilukhin/agent-toolchain/pull/65), merge c068f057; Windows/Linux и обязательные проверки успешны |
 | 4 | [#45](https://github.com/dilukhin/agent-toolchain/issues/45) | Реестр доверенных рабочих каталогов и read-only provider | Реализовано: явные add/update/remove/list, точный поставщик данных, атомарная запись и регрессии; Windows/Linux — обязательное условие слияния |
-| 5 | [#28](https://github.com/dilukhin/agent-toolchain/issues/28) | Operational alerts/staleness и anomaly guard RouterAI | Следующий после приёмки #45; status/observability уже реализованы PR #31 |
-| 6 | [#29](https://github.com/dilukhin/agent-toolchain/issues/29) | Общая конфигурация, явные профили, локальные настройки и безопасная миграция | Дизайн и реализация после #28 |
-| Отдельно | [#61](https://github.com/dilukhin/agent-toolchain/issues/61) | Явный Linux opt-in CLI P0, status/metrics/disable поверх существующего reconciler | Добавлена параллельным диалогом 2026-09-19; реализацию CLI согласовать по времени с #46/#45 |
-| 7 | [#60](https://github.com/dilukhin/agent-toolchain/issues/60) | Готовность ScopedKB, затем добровольное подключение через ToolSpec | Readiness можно проверять независимо; установка отложена до доказанного контракта |
+| 5 | [#75](https://github.com/dilukhin/agent-toolchain/issues/75) | Управляемая прямая маршрутизация OpenCode и semantic path ownership config | Выполнено: [PR #76](https://github.com/dilukhin/agent-toolchain/pull/76), merge d1bc6c831a5656ec31aa6d09a2188395a0f927f2; Windows/Linux, RouterAI ownership, MP-1/MP-2 — success |
+| 6 | [#28](https://github.com/dilukhin/agent-toolchain/issues/28) | Operational alerts/staleness и anomaly guard RouterAI | После #75; status/observability уже реализованы PR #31 |
+| 7 | [#29](https://github.com/dilukhin/agent-toolchain/issues/29) | Общая конфигурация, явные профили, локальные настройки и безопасная миграция | Дизайн и реализация после #28; routing policy #75 должна быть переносима в профиль |
+| Отдельно | [#61](https://github.com/dilukhin/agent-toolchain/issues/61) | Явный Linux opt-in CLI P0, status/metrics/disable поверх существующего reconciler | Добавлена параллельным диалогом 2026-09-19; реализацию CLI согласовать по времени с изменениями toolchainctl |
+| 8 | [#60](https://github.com/dilukhin/agent-toolchain/issues/60) | Готовность ScopedKB, затем добровольное подключение через ToolSpec | Readiness можно проверять независимо; установка отложена до доказанного контракта |
 
 Это рабочая последовательность, не утверждение, что каждая предыдущая функция
 технически необходима каждой следующей. Она сокращает пересечение изменений в
@@ -79,7 +80,35 @@ explicit update. Изменившаяся object identity не сохраняе�
 Первый trust-conditioned ALLOW — отдельный этап opencode_permissions после
 приёмки producer, без скрытого расширения разрешений в этой задаче.
 
-## Этап 5: RouterAI (#28)
+## Этап 5: маршрутизация OpenCode (#75)
+
+Статус: выполнено в PR #76, merge `d1bc6c831a5656ec31aa6d09a2188395a0f927f2`.
+Финальный head PR `f44123b70fde812bb6db819d69d1dae5ef29a5d7` прошёл Windows/Linux validation,
+RouterAI generated ownership guard, MP-1 и MP-2. Issue #75 закрыта merge-операцией.
+
+Текущая managed policy переводит глобальный `model`, `small_model` и известные
+рабочие роли на прямой OpenAI/Codex provider. RouterAI provider/catalog/credential
+reference сохраняются для явного выбора, но не являются неявным маршрутом
+управляемых агентов.
+
+Реализация заменила whole-file hash ownership OpenCode config на semantic path ownership:
+manifest хранит evidence только принадлежащих JSON-путей, пользовательский drift вне ownership
+не блокирует reconciliation, а изменение принадлежащего пути приводит к fail closed. Legacy `merged-json` и `merged-json-sibling-provider`
+мигрируют только при точном совпадении записанного SHA; `--force` не усыновляет
+неизвестный legacy drift.
+
+Routing policy хранится декларативно, поэтому #29 позднее может перенести текущий набор
+`terra/luna/sol/astra` в явный профиль без переписывания merge/ownership слоя.
+Гарантия относится к глобальному config: project-local config и отдельные agent-файлы
+не сканируются и не переписываются.
+
+Проверено автоматическими regression/CI: fresh install, exact legacy migration, legacy drift conflict даже с
+`--force`, пользовательское изменение вне owned path, managed-path conflict/repair,
+сохранение неизвестных ролей и полей известных ролей, общий semantic target для
+`check/apply/diff`, RouterAI credentials без чтения, повторный apply no-op,
+Windows/Linux validation.
+
+## Этап 6: RouterAI (#28)
 
 Два последовательных PR:
 1. Единое идемпотентное operational уведомление failure/recovery и независимое
@@ -92,7 +121,7 @@ explicit update. Изменившаяся object identity не сохраняе�
 удаление недоступных цен и cache-read semantics. Ограничение watchdog внутри
 GitHub Actions при глобальной недоступности Actions документировать явно.
 
-## Этап 6: профили (#29)
+## Этап 7: профили (#29)
 
 Сначала документ решений о слоях product/profile/local override, precedence,
 ownership и миграции. Затем реализация на актуальном main.
@@ -106,7 +135,7 @@ ownership и миграции. Затем реализация на актуал
 локальный proxy endpoint, миграция доказанно managed состояния, сохранность
 пользовательских настроек, check read-only и повторный apply no-op.
 
-## Этап 7: ScopedKB (#60)
+## Этап 8: ScopedKB (#60)
 
 Readiness — самостоятельный результат: полезная возможность, packaging/data,
 Python version, доступный источник, provenance, health и ownership.

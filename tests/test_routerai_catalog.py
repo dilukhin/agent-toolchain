@@ -46,6 +46,25 @@ class RouterAiCatalogTests(unittest.TestCase):
     def _template(self) -> dict:
         return {"provider": {"routerai": {"models": {}}}}
 
+    def test_repository_routing_policy_matches_template_and_avoids_implicit_routerai(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        config = json.loads((root / "config_data.json").read_text(encoding="utf-8"))
+        template = json.loads((root / "templates" / "opencode.jsonc").read_text(encoding="utf-8"))
+
+        defaults = config["config_defaults"]
+        self.assertEqual(defaults["model"], "openai/gpt-5.6-terra")
+        self.assertEqual(defaults["small_model"], "openai/gpt-5.6-luna")
+        self.assertEqual(template["model"], defaults["model"])
+        self.assertEqual(template["small_model"], defaults["small_model"])
+
+        template_agents = {
+            name: spec["model"]
+            for name, spec in template["agent"].items()
+        }
+        self.assertEqual(template_agents, defaults["agent_models"])
+        routes = [defaults["model"], defaults["small_model"], *defaults["agent_models"].values()]
+        self.assertTrue(all(isinstance(route, str) and not route.startswith("routerai/") for route in routes))
+
     def test_normalize_and_generate_price_label(self) -> None:
         payload = self._payload()
         payload["data"].append({

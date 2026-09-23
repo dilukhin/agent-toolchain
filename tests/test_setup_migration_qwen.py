@@ -70,7 +70,7 @@ class ExistingQwenConfigTests(unittest.TestCase):
             check = self._run_core(home, check=True)
             self.assertEqual(check.returncode, 2, check.stdout + check.stderr)
             self.assertNotIn("existing config is not safely adoptable for RouterAI", check.stdout)
-            self.assertIn("соседним provider", check.stdout)
+            self.assertIn("semantic merge", check.stdout)
             self.assertFalse((config_dir / "credentials" / "routerai-api-key.txt").exists())
 
             first = self._run_core(home)
@@ -81,8 +81,10 @@ class ExistingQwenConfigTests(unittest.TestCase):
             self.assertEqual(merged["permission"], original_permission)
             self.assertEqual(merged["plugin"], original_plugin)
             self.assertIn("routerai", merged["provider"])
-            self.assertNotIn("model", merged)
-            self.assertNotIn("small_model", merged)
+            self.assertEqual(merged["model"], "openai/gpt-5.6-terra")
+            self.assertEqual(merged["small_model"], "openai/gpt-5.6-luna")
+            self.assertEqual(merged["agent"]["general"]["model"], "openai/gpt-5.6-terra")
+            self.assertEqual(merged["agent"]["luna-safe-worker"]["model"], "openai/gpt-5.6-luna")
             self.assertEqual(merged["autoupdate"], "notify")
 
             canonical = config_dir / "credentials" / "routerai-api-key.txt"
@@ -94,27 +96,27 @@ class ExistingQwenConfigTests(unittest.TestCase):
             )
 
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(
-                manifest["managed_files"]["OpenCode config"]["mode"],
-                "merged-json-sibling-provider",
-            )
+            owner = manifest["managed_files"]["OpenCode config"]
+            self.assertEqual(owner["mode"], "semantic-paths-v1")
+            self.assertIn("/model", owner["managed_paths"])
+            self.assertIn("/small_model", owner["managed_paths"])
+            self.assertIn("/agent/general/model", owner["managed_paths"])
             stable_config = config_path.read_bytes()
             stable_manifest = manifest_path.read_bytes()
 
-            # Второй apply раньше не менял config, но деградировал manifest mode.
+            # После one-way migration повторный apply должен быть полностью идемпотентным.
             second = self._run_core(home)
             self.assertEqual(second.returncode, 2, second.stdout + second.stderr)
             self.assertEqual(config_path.read_bytes(), stable_config)
             self.assertEqual(manifest_path.read_bytes(), stable_manifest)
 
-            # Третий apply проявлял latent bug и добавлял model/small_model.
             third = self._run_core(home)
             self.assertEqual(third.returncode, 2, third.stdout + third.stderr)
             self.assertEqual(config_path.read_bytes(), stable_config)
             self.assertEqual(manifest_path.read_bytes(), stable_manifest)
             final = json.loads(config_path.read_text(encoding="utf-8"))
-            self.assertNotIn("model", final)
-            self.assertNotIn("small_model", final)
+            self.assertEqual(final["model"], "openai/gpt-5.6-terra")
+            self.assertEqual(final["small_model"], "openai/gpt-5.6-luna")
             self.assertEqual(final["autoupdate"], "notify")
 
 
@@ -143,6 +145,8 @@ class ExistingQwenConfigTests(unittest.TestCase):
             merged = json.loads(config_path.read_text(encoding="utf-8"))
             self.assertEqual(merged["permission"], existing["permission"])
             self.assertEqual(merged["model"], existing["model"])
+            self.assertEqual(merged["small_model"], "openai/gpt-5.6-luna")
+            self.assertEqual(merged["agent"]["general"]["model"], "openai/gpt-5.6-terra")
             self.assertIn("routerai", merged["provider"])
             canonical = config_dir / "credentials" / "routerai-api-key.txt"
             self.assertFalse(canonical.exists())

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -22,6 +23,121 @@ class ToolchainUpdateTests(unittest.TestCase):
         args = toolchainctl.build_parser().parse_args(["update", "--apply"])
         self.assertEqual(args.command, "update")
         self.assertTrue(args.apply)
+
+    def test_urlopen_retries_incomplete_read_and_returns_complete_payload(self) -> None:
+        incomplete = mock.Mock()
+        incomplete.headers.get.return_value = None
+        incomplete.read.side_effect = http.client.IncompleteRead(b"partial", 2)
+        complete = mock.Mock()
+        complete.headers.get.return_value = None
+        complete.read.return_value = b"complete"
+
+        with mock.patch.object(
+            toolchainctl.urllib.request,
+            "urlopen",
+            side_effect=[contextlib.nullcontext(incomplete), contextlib.nullcontext(complete)],
+        ) as urlopen:
+            self.assertEqual(toolchainctl._urlopen_bytes("https://example.invalid/archive", max_bytes=1024), b"complete")
+        self.assertEqual(urlopen.call_count, 2)
+
+    def test_urlopen_reports_repeated_incomplete_read_without_traceback_leak(self) -> None:
+        first = mock.Mock()
+        first.headers.get.return_value = None
+        first.read.side_effect = http.client.IncompleteRead(b"partial-one", 2)
+        second = mock.Mock()
+        second.headers.get.return_value = None
+        second.read.side_effect = http.client.IncompleteRead(b"partial-two", 2)
+
+        with mock.patch.object(
+            toolchainctl.urllib.request,
+            "urlopen",
+            side_effect=[contextlib.nullcontext(first), contextlib.nullcontext(second)],
+        ) as urlopen:
+            with self.assertRaisesRegex(toolchainctl.SelfUpdateError, "after 2 attempts"):
+                toolchainctl._urlopen_bytes("https://example.invalid/archive", max_bytes=1024)
+        self.assertEqual(urlopen.call_count, 2)
+
+    def test_diff_command_parses_opencode_config(self) -> None:
+        args = toolchainctl.build_parser().parse_args(["diff", "opencode-config"])
+        self.assertEqual(args.command, "diff")
+        self.assertEqual(args.component, "opencode-config")
+
+    def test_adopt_command_requires_exact_sha_argument(self) -> None:
+        sha = "a" * 64
+        args = toolchainctl.build_parser().parse_args(["adopt", "opencode-config", "--expected-sha", sha])
+        self.assertEqual(args.command, "adopt")
+        self.assertEqual(args.component, "opencode-config")
+        self.assertEqual(args.expected_sha, sha)
+    def test_opencode_diff_redacts_sensitive_values_and_reports_paths(self) -> None:
+        before = {
+            "provider": {
+                "routerai": {
+                    "options": {"apiKey": "super-secret", "baseURL": "https://old.invalid"},
+                }
+            }
+        }
+        after = {
+            "provider": {
+                "routerai": {
+                    "options": {"apiKey": "another-secret", "baseURL": "https://new.invalid"},
+                }
+            }
+        }
+        redacted_before = toolchainctl._redact_sensitive_config(before)
+        redacted_after = toolchainctl._redact_sensitive_config(after)
+        self.assertEqual(redacted_before["provider"]["routerai"]["options"]["apiKey"], "<redacted>")
+        self.assertEqual(redacted_after["provider"]["routerai"]["options"]["apiKey"], "<redacted>")
+        changes = toolchainctl._changed_json_paths(before, after)
+        self.assertEqual(
+            changes,
+            ["$.provider.routerai.options.apiKey", "$.provider.routerai.options.baseURL"],
+        )
+
+    def test_opencode_diff_uses_sibling_provider_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary).resolve()
+            config_dir = (base / "config").resolve()
+            config_dir.mkdir()
+            credential = config_dir / "routerai-api-key.txt"
+            credential.write_text("secret\n", encoding="utf-8")
+            config_path = config_dir / "opencode.jsonc"
+            existing = {
+                "provider": {
+                    "routerai": {
+                        "npm": "@ai-sdk/openai-compatible",
+                        "name": "RouterAI",
+                        "options": {
+                            "baseURL": "https://routerai.ru/api/v1",
+                            "apiKey": "{file:" + str(credential) + "}",
+                        },
+                        "models": {},
+                    }
+                },
+                "autoupdate": "notify",
+            }
+            config_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            manifest = empty_manifest()
+            manifest["managed_files"]["OpenCode config"] = {
+                "path": str(config_path),
+                "sha256": sha256_bytes(config_path.read_bytes()),
+                "source": "test",
+                "mode": "merged-json-sibling-provider",
+            }
+
+            target, error = toolchainctl._opencode_diff_target(
+                existing,
+                manifest,
+                config_dir,
+                config_path,
+            )
+
+        self.assertIsNone(error)
+        self.assertIsNotNone(target)
+        assert target is not None
+        self.assertEqual(target["model"], "openai/gpt-5.6-terra")
+        self.assertEqual(target["small_model"], "openai/gpt-5.6-luna")
+        self.assertEqual(target["agent"]["general"]["model"], "openai/gpt-5.6-terra")
+        self.assertEqual(target["agent"]["explore"]["model"], "openai/gpt-5.6-luna")
 
     def test_failed_bootstrap_access_blocks_update_apply(self) -> None:
         with mock.patch.object(toolchainctl, "_owned_installed_core", return_value={"fingerprint": "a" * 64}), \
