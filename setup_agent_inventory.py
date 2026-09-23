@@ -18,7 +18,8 @@ from setup_lib import parse_jsonc_object
 INVENTORY_SCHEMA = 1
 MAX_PARSE_BYTES = 512 * 1024
 _CONFIG_NAMES = ("opencode.json", "opencode.jsonc")
-_SAFE_SCALARS = ("model", "mode")
+_SAFE_MODEL_RE = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._:@/+\\-]+$")
+_SAFE_MODES = {"primary", "subagent", "all"}
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -36,13 +37,20 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _safe_scalar(value: object) -> str | None:
+def _safe_model(value: object) -> str | None:
     if not isinstance(value, str):
         return None
     value = value.strip()
-    if not value or len(value) > 256:
+    if len(value) > 160 or _SAFE_MODEL_RE.fullmatch(value) is None:
         return None
     return value
+
+
+def _safe_mode(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    value = value.strip().lower()
+    return value if value in _SAFE_MODES else None
 
 
 def _agent_mapping(data: dict[str, Any]) -> dict[str, Any]:
@@ -61,10 +69,12 @@ def _summarize_agent_spec(name: str, spec: object) -> dict[str, Any]:
         record["status"] = "non-object"
         return record
     record["status"] = "ok"
-    for field in _SAFE_SCALARS:
-        value = _safe_scalar(spec.get(field))
-        if value is not None:
-            record[field] = value
+    model = _safe_model(spec.get("model"))
+    if model is not None:
+        record["model"] = model
+    mode = _safe_mode(spec.get("mode"))
+    if mode is not None:
+        record["mode"] = mode
     if isinstance(spec.get("hidden"), bool):
         record["hidden"] = bool(spec["hidden"])
     record["description_present"] = "description" in spec
@@ -191,10 +201,12 @@ def _markdown_metadata(payload: bytes) -> dict[str, Any]:
         "tools_present": "tools" in keys,
         "prompt_present": body_present or "prompt" in keys or "system" in keys,
     }
-    for field in _SAFE_SCALARS:
-        value = _strip_yaml_scalar(keys.get(field))
-        if value is not None:
-            record[field] = value
+    model = _safe_model(_strip_yaml_scalar(keys.get("model")))
+    if model is not None:
+        record["model"] = model
+    mode = _safe_mode(_strip_yaml_scalar(keys.get("mode")))
+    if mode is not None:
+        record["mode"] = mode
     hidden = _strip_yaml_scalar(keys.get("hidden"))
     if hidden in {"true", "false"}:
         record["hidden"] = hidden == "true"
