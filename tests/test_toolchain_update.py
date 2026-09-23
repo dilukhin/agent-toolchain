@@ -62,6 +62,12 @@ class ToolchainUpdateTests(unittest.TestCase):
         self.assertEqual(args.command, "diff")
         self.assertEqual(args.component, "opencode-config")
 
+    def test_adopt_command_requires_exact_sha_argument(self) -> None:
+        sha = "a" * 64
+        args = toolchainctl.build_parser().parse_args(["adopt", "opencode-config", "--expected-sha", sha])
+        self.assertEqual(args.command, "adopt")
+        self.assertEqual(args.component, "opencode-config")
+        self.assertEqual(args.expected_sha, sha)
     def test_opencode_diff_redacts_sensitive_values_and_reports_paths(self) -> None:
         before = {
             "provider": {

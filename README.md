@@ -50,6 +50,7 @@ toolchainctl --version       показать версию и build identity з�
 toolchainctl check           read-only диагностика target state
 toolchainctl apply           привести управляемое состояние к target state
 toolchainctl diff opencode-config  показать read-only managed-target diff OpenCode config с редактированием чувствительных значений
+toolchainctl adopt opencode-config --expected-sha <sha256>  явно принять проверенный legacy-drift payload как базу semantic ownership
 toolchainctl update          обновить установленный управляющий core из актуального main
 toolchainctl update --apply  обновить core и затем применить новый target state
 ```
@@ -165,6 +166,7 @@ Manifest schema 2 содержит:
 - RouterAI provider, каталог и ссылка на credential сохраняются для явного выбора, но не используются ни одним управляемым глобальным маршрутом или управляемой рабочей ролью;
 - `~/.config/opencode/opencode.jsonc` изменяется семантическим merge только когда это безопасно; для routing и других стабильных managed fields manifest хранит evidence конкретных JSON-путей, поэтому изменение пользовательского поля вне ownership не делает весь config конфликтным;
 - прежний whole-file `merged-json` ownership мигрирует в semantic paths только при точном совпадении записанного SHA; неизвестный drift не усыновляется даже через `--force`;
+- если legacy whole-file SHA уже разошёлся, автоматическая миграция остаётся fail-closed; после `toolchainctl diff opencode-config` пользователь может явно подтвердить конкретный текущий payload командой `toolchainctl adopt opencode-config --expected-sha <current-sha256>`. Команда проверяет exact SHA, делает backup, сохраняет неизвестные поля и отличающиеся routing overrides, а ownership записывает только для известных semantic paths;
 - пользовательские неизвестные поля/models и неизвестные роли сохраняются; в известных ролях toolchain меняет только доказанно принадлежащий `model`, не забирая `permission`, `prompt`, `tools`, `description` и другие пользовательские поля;
 - project-local OpenCode config и отдельные пользовательские agent-файлы могут иметь более высокий приоритет; agent-toolchain не сканирует и не переписывает произвольные проекты;
 - JSONC с форматированием, которое нельзя сохранить безопасно, даёт conflict;

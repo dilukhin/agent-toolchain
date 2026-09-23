@@ -11,7 +11,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from setup_lib import Reporter, STATE_CONFLICT, sha256_bytes  # noqa: E402
-from setup_migration import OPENCODE_SEMANTIC_MODE, reconcile_opencode_config  # noqa: E402
+from setup_migration import (  # noqa: E402
+    OPENCODE_SEMANTIC_MODE,
+    adopt_legacy_opencode_config,
+    reconcile_opencode_config,
+)
 
 
 SOURCE = "opencode_setup:managed-merge:templates/opencode.jsonc"
@@ -177,6 +181,101 @@ class OpenCodeRoutingOwnershipTests(unittest.TestCase):
             self.assertTrue(any(row.state == STATE_CONFLICT for row in reporter.results))
             self.assertTrue(any("--force" in row.detail for row in reporter.results))
 
+    def test_explicit_adoption_requires_exact_current_hash_and_preserves_external_route(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state_dir = root / "state"
+            destination = root / "opencode.jsonc"
+            original = desired_config()
+            original_data = render(original)
+            destination.write_bytes(original_data)
+            manifest = self._legacy_manifest(destination, original_data)
+
+            current = copy.deepcopy(original)
+            current["model"] = "vendor/user-choice"
+            current["user_setting"] = {"keep": True}
+            current["agent"].pop("explore")
+            current_data = render(current)
+            destination.write_bytes(current_data)
+            expected = sha256_bytes(current_data)
+
+            mismatch_manifest = copy.deepcopy(manifest)
+            reporter = Reporter()
+            changed = adopt_legacy_opencode_config(
+                destination=destination,
+                desired_data=render(desired_config()),
+                source_label=SOURCE,
+                manifest=mismatch_manifest,
+                reporter=reporter,
+                expected_current_sha="0" * 64,
+                state_dir=state_dir,
+            )
+            self.assertFalse(changed)
+            self.assertEqual(destination.read_bytes(), current_data)
+            self.assertEqual(mismatch_manifest, manifest)
+            self.assertTrue(any("hash mismatch" in row.detail for row in reporter.results))
+
+            reporter = Reporter()
+            changed = adopt_legacy_opencode_config(
+                destination=destination,
+                desired_data=render(desired_config()),
+                source_label=SOURCE,
+                manifest=manifest,
+                reporter=reporter,
+                expected_current_sha=expected,
+                state_dir=state_dir,
+            )
+            self.assertTrue(changed, [row.detail for row in reporter.results])
+            updated = json.loads(destination.read_text(encoding="utf-8"))
+            self.assertEqual(updated["model"], "vendor/user-choice")
+            self.assertTrue(updated["user_setting"]["keep"])
+            self.assertEqual(updated["agent"]["explore"]["model"], "openai/gpt-5.6-luna")
+
+            owner = manifest["managed_files"]["OpenCode config"]
+            self.assertEqual(owner["mode"], OPENCODE_SEMANTIC_MODE)
+            self.assertNotIn("/model", owner["managed_paths"])
+            self.assertIn("/small_model", owner["managed_paths"])
+            self.assertIn("/agent/general/model", owner["managed_paths"])
+            self.assertIn("/agent/explore/model", owner["managed_paths"])
+            backups = list((state_dir / "backups").glob("*/OpenCode_config/opencode.jsonc"))
+            self.assertEqual(len(backups), 1)
+            self.assertEqual(backups[0].read_bytes(), current_data)
+
+    def test_explicit_adoption_of_partial_matching_routes_adds_missing_managed_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state_dir = root / "state"
+            destination = root / "opencode.jsonc"
+            original = desired_config()
+            original_data = render(original)
+            destination.write_bytes(original_data)
+            manifest = self._legacy_manifest(destination, original_data)
+
+            current = copy.deepcopy(original)
+            current.pop("model")
+            current["agent"].pop("explore")
+            current["user_note"] = "preserve"
+            current_data = render(current)
+            destination.write_bytes(current_data)
+
+            reporter = Reporter()
+            changed = adopt_legacy_opencode_config(
+                destination=destination,
+                desired_data=render(desired_config()),
+                source_label=SOURCE,
+                manifest=manifest,
+                reporter=reporter,
+                expected_current_sha=sha256_bytes(current_data),
+                state_dir=state_dir,
+            )
+            self.assertTrue(changed, [row.detail for row in reporter.results])
+            updated = json.loads(destination.read_text(encoding="utf-8"))
+            self.assertEqual(updated["model"], "openai/gpt-5.6-terra")
+            self.assertEqual(updated["agent"]["explore"]["model"], "openai/gpt-5.6-luna")
+            self.assertEqual(updated["user_note"], "preserve")
+            owner = manifest["managed_files"]["OpenCode config"]
+            self.assertIn("/model", owner["managed_paths"])
+            self.assertIn("/agent/explore/model", owner["managed_paths"])
     def test_unmanaged_user_drift_does_not_block_later_managed_route_update(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

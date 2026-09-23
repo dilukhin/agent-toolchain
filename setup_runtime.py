@@ -155,6 +155,22 @@ def _localize_actionable_detail(result) -> None:
 
     if result.component == "OpenCode config":
         match = re.fullmatch(
+            r"legacy whole-file ownership hash mismatch: recorded_sha256=([0-9a-f]+|missing); current_sha256=([0-9a-f]+); automatic path-level migration is blocked and --force does not adopt unknown drift",
+            detail,
+        )
+        if match is not None:
+            recorded, current = match.groups()
+            result.detail = (
+                f"legacy whole-file ownership не совпадает с текущим OpenCode config; "
+                f"recorded sha256={recorded}; current sha256={current}; "
+                "посмотреть безопасный diff: `toolchainctl diff opencode-config`; "
+                f"если текущий payload проверен и должен стать базой semantic ownership: "
+                f"`toolchainctl adopt opencode-config --expected-sha {current}`; "
+                "`--force` неизвестный legacy drift не усыновляет"
+            )
+            return
+    if result.component == "OpenCode config":
+        match = re.fullmatch(
             r"managed config was modified locally; preserved: (.+); recorded_sha256=([0-9a-f]+|None); current_sha256=([0-9a-f]+)",
             detail,
         )
@@ -228,6 +244,14 @@ def _opencode_update_action(result) -> str | None:
 def _managed_file_conflict_action(result) -> str | None:
     if result.state != STATE_CONFLICT:
         return None
+    if result.component == "OpenCode config" and "legacy whole-file ownership не совпадает" in result.detail:
+        match = re.search(r"current sha256=([0-9a-f]{64})", result.detail)
+        if match is not None:
+            current = match.group(1)
+            return (
+                "OpenCode config: сначала проверить `toolchainctl diff opencode-config`; "
+                f"если текущий payload намеренно сохраняется — `toolchainctl adopt opencode-config --expected-sha {current}`"
+            )
     if result.component == "OpenCode config" and "OpenCode config изменён" in result.detail:
         return (
             "OpenCode config: посмотреть управляемые различия: `toolchainctl diff opencode-config`; "

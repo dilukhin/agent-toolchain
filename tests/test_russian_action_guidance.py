@@ -55,6 +55,27 @@ class RussianActionGuidanceTests(unittest.TestCase):
         self.assertNotIn("apply --force", summary)
         self.assertNotIn("исправить «global AGENTS.md»", summary)
 
+    def test_legacy_opencode_drift_recommends_exact_adoption_command(self) -> None:
+        current = "b" * 64
+        reporter = runtime.Reporter()
+        reporter.add(
+            "OpenCode config",
+            runtime.STATE_CONFLICT,
+            "legacy whole-file ownership hash mismatch: recorded_sha256=" + "a" * 64
+            + "; current_sha256=" + current
+            + "; automatic path-level migration is blocked and --force does not adopt unknown drift",
+        )
+        result = reporter.results[-1]
+
+        runtime._localize_actionable_detail(result)
+        summary = runtime._format_tldr(reporter.results)
+
+        self.assertIn("recorded sha256=" + "a" * 64, result.detail)
+        self.assertIn("current sha256=" + current, result.detail)
+        self.assertIn("toolchainctl diff opencode-config", result.detail)
+        self.assertIn("toolchainctl adopt opencode-config --expected-sha " + current, result.detail)
+        self.assertIn("toolchainctl adopt opencode-config --expected-sha " + current, summary)
+        self.assertNotIn("исправить «OpenCode config»", summary)
     def test_generic_managed_file_conflict_is_russian_and_actionable(self) -> None:
         reporter = runtime.Reporter()
         reporter.add(
