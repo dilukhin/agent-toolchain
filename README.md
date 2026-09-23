@@ -162,7 +162,7 @@ Manifest schema 2 содержит:
 
 `toolchainctl` сохраняет ранее реализованные безопасные политики OpenCode:
 
-- текущая managed routing policy использует прямой OpenAI/Codex provider: глобальный `model=openai/gpt-5.6-terra`, `small_model=openai/gpt-5.6-luna`; `general/build/plan` направляются на Terra, `explore/luna/luna-safe-worker` на Luna, `sol-specialist` на Sol, `astra-reviewer` на Astra;
+- текущая managed routing policy использует прямой OpenAI/Codex provider: глобальный `model=openai/gpt-6-sol`, `small_model=openai/gpt-6-luna`; `general/build/plan` и `sol-specialist` используют Sol, `explore/luna/luna-safe-worker` — Luna, `astra-reviewer` — Astra;
 - RouterAI provider, каталог и ссылка на credential сохраняются для явного выбора, но не используются ни одним управляемым глобальным маршрутом или управляемой рабочей ролью;
 - `~/.config/opencode/opencode.jsonc` изменяется семантическим merge только когда это безопасно; для routing и других стабильных managed fields manifest хранит evidence конкретных JSON-путей, поэтому изменение пользовательского поля вне ownership не делает весь config конфликтным;
 - прежний whole-file `merged-json` ownership мигрирует в semantic paths только при точном совпадении записанного SHA; неизвестный drift не усыновляется даже через `--force`;

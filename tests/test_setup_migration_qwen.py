@@ -81,10 +81,10 @@ class ExistingQwenConfigTests(unittest.TestCase):
             self.assertEqual(merged["permission"], original_permission)
             self.assertEqual(merged["plugin"], original_plugin)
             self.assertIn("routerai", merged["provider"])
-            self.assertEqual(merged["model"], "openai/gpt-5.6-terra")
-            self.assertEqual(merged["small_model"], "openai/gpt-5.6-luna")
-            self.assertEqual(merged["agent"]["general"]["model"], "openai/gpt-5.6-terra")
-            self.assertEqual(merged["agent"]["luna-safe-worker"]["model"], "openai/gpt-5.6-luna")
+            self.assertEqual(merged["model"], "openai/gpt-6-sol")
+            self.assertEqual(merged["small_model"], "openai/gpt-6-luna")
+            self.assertEqual(merged["agent"]["general"]["model"], "openai/gpt-6-sol")
+            self.assertEqual(merged["agent"]["luna-safe-worker"]["model"], "openai/gpt-6-luna")
             self.assertEqual(merged["autoupdate"], "notify")
 
             canonical = config_dir / "credentials" / "routerai-api-key.txt"
@@ -115,8 +115,8 @@ class ExistingQwenConfigTests(unittest.TestCase):
             self.assertEqual(config_path.read_bytes(), stable_config)
             self.assertEqual(manifest_path.read_bytes(), stable_manifest)
             final = json.loads(config_path.read_text(encoding="utf-8"))
-            self.assertEqual(final["model"], "openai/gpt-5.6-terra")
-            self.assertEqual(final["small_model"], "openai/gpt-5.6-luna")
+            self.assertEqual(final["model"], "openai/gpt-6-sol")
+            self.assertEqual(final["small_model"], "openai/gpt-6-luna")
             self.assertEqual(final["autoupdate"], "notify")
 
 
@@ -145,8 +145,8 @@ class ExistingQwenConfigTests(unittest.TestCase):
             merged = json.loads(config_path.read_text(encoding="utf-8"))
             self.assertEqual(merged["permission"], existing["permission"])
             self.assertEqual(merged["model"], existing["model"])
-            self.assertEqual(merged["small_model"], "openai/gpt-5.6-luna")
-            self.assertEqual(merged["agent"]["general"]["model"], "openai/gpt-5.6-terra")
+            self.assertEqual(merged["small_model"], "openai/gpt-6-luna")
+            self.assertEqual(merged["agent"]["general"]["model"], "openai/gpt-6-sol")
             self.assertIn("routerai", merged["provider"])
             canonical = config_dir / "credentials" / "routerai-api-key.txt"
             self.assertFalse(canonical.exists())

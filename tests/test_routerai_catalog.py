@@ -52,8 +52,8 @@ class RouterAiCatalogTests(unittest.TestCase):
         template = json.loads((root / "templates" / "opencode.jsonc").read_text(encoding="utf-8"))
 
         defaults = config["config_defaults"]
-        self.assertEqual(defaults["model"], "openai/gpt-5.6-terra")
-        self.assertEqual(defaults["small_model"], "openai/gpt-5.6-luna")
+        self.assertEqual(defaults["model"], "openai/gpt-6-sol")
+        self.assertEqual(defaults["small_model"], "openai/gpt-6-luna")
         self.assertEqual(template["model"], defaults["model"])
         self.assertEqual(template["small_model"], defaults["small_model"])
 
@@ -62,6 +62,19 @@ class RouterAiCatalogTests(unittest.TestCase):
             for name, spec in template["agent"].items()
         }
         self.assertEqual(template_agents, defaults["agent_models"])
+        self.assertEqual(
+            defaults["agent_models"],
+            {
+                "general": "openai/gpt-6-sol",
+                "build": "openai/gpt-6-sol",
+                "plan": "openai/gpt-6-sol",
+                "explore": "openai/gpt-6-luna",
+                "luna": "openai/gpt-6-luna",
+                "luna-safe-worker": "openai/gpt-6-luna",
+                "sol-specialist": "openai/gpt-6-sol",
+                "astra-reviewer": "openai/gpt-6-astra",
+            },
+        )
         routes = [defaults["model"], defaults["small_model"], *defaults["agent_models"].values()]
         self.assertTrue(all(isinstance(route, str) and not route.startswith("routerai/") for route in routes))
 

@@ -118,7 +118,7 @@ Windows: `%LOCALAPPDATA%\agent-toolchain\bin` добавляется `toolchainc
 Сохраняются ранее реализованные правила:
 
 - существующий совместимый `opencode.jsonc` изменяется минимальным semantic merge;
-- текущая managed routing policy: `model=openai/gpt-5.6-terra`, `small_model=openai/gpt-5.6-luna`; `general/build/plan` используют Terra, `explore/luna/luna-safe-worker` — Luna, `sol-specialist` — Sol, `astra-reviewer` — Astra;
+- текущая managed routing policy: `model=openai/gpt-6-sol`, `small_model=openai/gpt-6-luna`; `general/build/plan` и `sol-specialist` используют Sol, `explore/luna/luna-safe-worker` — Luna, `astra-reviewer` — Astra;
 - RouterAI provider/catalog/credential reference сохраняются для явного выбора, но управляемые global/agent routes не используют `routerai/...`;
 - после one-way миграции OpenCode config имеет semantic path ownership: пользовательские изменения вне принадлежащих JSON-путей не блокируют reconciliation;
 - legacy `merged-json` / `merged-json-sibling-provider` переводятся в semantic ownership только при совпавшем записанном SHA; неизвестный whole-file drift не усыновляется;
