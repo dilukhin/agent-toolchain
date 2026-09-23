@@ -76,6 +76,19 @@ class RussianActionGuidanceTests(unittest.TestCase):
         self.assertIn("toolchainctl adopt opencode-config --expected-sha " + current, result.detail)
         self.assertIn("toolchainctl adopt opencode-config --expected-sha " + current, summary)
         self.assertNotIn("исправить «OpenCode config»", summary)
+    def test_long_apply_action_does_not_duplicate_command_when_trimmed(self) -> None:
+        reporter = runtime.Reporter()
+        reporter.add(
+            "proxy-tools runtime",
+            runtime.STATE_MISSING,
+            "toolchainctl apply will install bundled runtime /tmp/" + "very-long-release-name-" * 20,
+        )
+
+        summary = runtime._format_tldr(reporter.results)
+
+        self.assertEqual(summary.count("`toolchainctl apply`"), 1)
+        self.assertNotIn("… `toolchainctl apply`", summary)
+
     def test_generic_managed_file_conflict_is_russian_and_actionable(self) -> None:
         reporter = runtime.Reporter()
         reporter.add(
