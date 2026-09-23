@@ -42,6 +42,7 @@ from setup_managed_tools import reconcile_tool_specs
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
 from setup_migration import (
     OPENCODE_SEMANTIC_MODE,
+    adopt_legacy_opencode_config,
     inspect_managed_opencode_paths,
     preview_opencode_config_target,
 )
@@ -211,6 +212,9 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("--apply", action="store_true", help="run the freshly installed toolchainctl apply after update")
     diff_cmd = sub.add_parser("diff", help="show a read-only diagnostic diff for a managed component")
     diff_cmd.add_argument("component", choices=("opencode-config",), help="managed component to inspect")
+    adopt_cmd = sub.add_parser("adopt", help="explicitly adopt a reviewed legacy-drift payload into semantic ownership")
+    adopt_cmd.add_argument("component", choices=("opencode-config",), help="managed component to adopt")
+    adopt_cmd.add_argument("--expected-sha", required=True, help="exact sha256 of the reviewed current payload")
     setup_yc_transitional_guard.add_cli_parser(sub)
     setup_workspace_trust.add_cli_parser(sub)
     return parser
@@ -392,6 +396,7 @@ def _run_diff(args: argparse.Namespace) -> int:
         print("managed target: управляемые поля уже совпадают; semantic diff отсутствует")
         if legacy_whole_file and recorded_hash and recorded_hash != current_hash:
             print("вывод: legacy ownership drift блокирует автоматическую миграцию; --force не усыновляет неизвестные изменения")
+            print(f"явное принятие проверенного текущего payload: toolchainctl adopt opencode-config --expected-sha {current_hash}")
         elif record_mode == OPENCODE_SEMANTIC_MODE and managed_drift:
             print("вывод: изменены уже принадлежащие semantic paths; требуется review перед явным repair")
         return 0
@@ -411,13 +416,93 @@ def _run_diff(args: argparse.Namespace) -> int:
         )
     )
     if legacy_whole_file and recorded_hash and recorded_hash != current_hash:
-        print("после проверки: устраните legacy ownership drift вручную; --force не усыновляет неизвестные изменения")
+        print("после проверки: --force не усыновляет legacy drift")
+        print(f"если текущий config проверен и должен стать базой semantic ownership: toolchainctl adopt opencode-config --expected-sha {current_hash}")
     elif record_mode == OPENCODE_SEMANTIC_MODE and managed_drift:
         print("после проверки: toolchainctl apply --force восстановит только уже доказанно принадлежащие semantic paths")
     else:
         print("после проверки: toolchainctl apply выполнит безопасный semantic merge управляемых полей")
     return 0
 
+
+def _run_adopt(args: argparse.Namespace) -> int:
+    if args.component != "opencode-config":
+        print(f"unsupported adopt component: {args.component}", file=sys.stderr)
+        return 2
+    if re.fullmatch(r"[0-9a-f]{64}", args.expected_sha or "") is None:
+        print("--expected-sha must be exactly 64 lowercase hex characters", file=sys.stderr)
+        return 2
+    try:
+        state_dir, migration_state, migration_detail = prepare_state(check=False)
+    except StateMigrationError as exc:
+        print(f"modified/conflict  agent-toolchain state migration  {exc}", file=sys.stderr)
+        return 2
+    if migration_detail and migration_state:
+        print(f"{migration_state:<18}agent-toolchain state migration  {migration_detail}")
+
+    manifest_path = state_dir / "manifest.json"
+    manifest, manifest_error, migration_pending = load_manifest(manifest_path)
+    if manifest_error:
+        print(f"modified/conflict  ownership manifest  {manifest_error}", file=sys.stderr)
+        return 2
+
+    config_dir = _default_paths()["config"]
+    record = manifest.get("managed_files", {}).get("OpenCode config")
+    recorded_path = record.get("path") if isinstance(record, dict) else None
+    destination = (
+        Path(recorded_path).expanduser().resolve()
+        if isinstance(recorded_path, str)
+        else (config_dir / "opencode.jsonc")
+    )
+    if not destination.is_file():
+        print(f"modified/conflict  OpenCode config  destination is not a regular file: {destination}", file=sys.stderr)
+        return 2
+
+    current_data = destination.read_bytes()
+    existing, parse_error, _features = parse_jsonc_object(current_data)
+    if parse_error or existing is None:
+        print(f"modified/conflict  OpenCode config  {parse_error or 'current config cannot be parsed'}", file=sys.stderr)
+        return 2
+
+    credential_ref = routerai_file_credential(existing)
+    credential_path: Path | None = None
+    if credential_ref:
+        credential_path = resolve_credential_path(credential_ref, config_dir)
+    else:
+        credentials = manifest.get("credentials")
+        if isinstance(credentials, dict):
+            routerai = credentials.get("routerai")
+            if isinstance(routerai, dict):
+                path = routerai.get("path")
+                if isinstance(path, str) and path:
+                    credential_path = resolve_credential_path(path, config_dir)
+    if credential_path is None:
+        print("modified/conflict  OpenCode config  cannot resolve RouterAI credential path for safe adoption", file=sys.stderr)
+        return 2
+
+    desired_data = setup_core.render_config(
+        Path(__file__).resolve().parent / "templates" / "opencode.jsonc",
+        credential_path,
+    )
+    reporter = Reporter()
+    changed = adopt_legacy_opencode_config(
+        destination=destination,
+        desired_data=desired_data,
+        source_label="opencode_setup:managed-merge:templates/opencode.jsonc",
+        manifest=manifest,
+        reporter=reporter,
+        expected_current_sha=args.expected_sha,
+        state_dir=state_dir,
+    )
+    if changed or migration_pending:
+        try:
+            save_manifest(manifest_path, manifest)
+        except (OSError, ValueError) as exc:
+            reporter.add("ownership manifest", STATE_FAILED, f"cannot save {manifest_path}: {exc}")
+        else:
+            reporter.add("ownership manifest", STATE_CONFIGURED, f"semantic ownership recorded: {manifest_path}")
+    reporter.render()
+    return 2 if reporter.has_conflict else 0
 
 def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
     paths = _default_paths()
@@ -950,6 +1035,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_self_update(apply_after=bool(args.apply))
     if args.command == "diff":
         return _run_diff(args)
+    if args.command == "adopt":
+        return _run_adopt(args)
     if args.command == "yc-guard":
         return setup_yc_transitional_guard.run_cli(args)
 

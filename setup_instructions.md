@@ -122,6 +122,7 @@ Windows: `%LOCALAPPDATA%\agent-toolchain\bin` добавляется `toolchainc
 - RouterAI provider/catalog/credential reference сохраняются для явного выбора, но управляемые global/agent routes не используют `routerai/...`;
 - после one-way миграции OpenCode config имеет semantic path ownership: пользовательские изменения вне принадлежащих JSON-путей не блокируют reconciliation;
 - legacy `merged-json` / `merged-json-sibling-provider` переводятся в semantic ownership только при совпавшем записанном SHA; неизвестный whole-file drift не усыновляется;
+- для проверенного legacy drift предусмотрен только явный переход: `toolchainctl diff opencode-config`, затем `toolchainctl adopt opencode-config --expected-sha <current-sha256>`; exact SHA защищает от изменения файла между review и mutation, перед записью создаётся backup, неизвестные поля и отличающиеся routing overrides сохраняются;
 - неизвестные пользовательские fields/model entries и роли сохраняются; в управляемой роли меняется только доказанно принадлежащий `model`, остальные поля роли сохраняются;
 - если JSONC formatting нельзя безопасно сохранить, изменение блокируется как conflict;
 - inline/non-file RouterAI secret не читается и не переносится;

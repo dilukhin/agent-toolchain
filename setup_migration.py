@@ -294,8 +294,10 @@ def _ownership_plan(
     if mode in _LEGACY_MANAGED_MODES:
         recorded = previous.get("sha256")
         if not isinstance(recorded, str) or recorded != current_hash:
+            recorded_label = recorded if isinstance(recorded, str) else "missing"
             return None, [], (
-                "legacy whole-file ownership hash does not match the current OpenCode config; "
+                "legacy whole-file ownership hash mismatch: "
+                f"recorded_sha256={recorded_label}; current_sha256={current_hash}; "
                 "automatic path-level migration is blocked and --force does not adopt unknown drift"
             )
         return set(targets), external_routes, None
@@ -384,6 +386,148 @@ def _semantic_metadata_changed(previous: dict[str, Any], new_record: dict[str, A
             return True
     return False
 
+
+def adopt_legacy_opencode_config(
+    *,
+    destination: Path,
+    desired_data: bytes,
+    source_label: str,
+    manifest: dict[str, Any],
+    reporter: Reporter,
+    expected_current_sha: str,
+    state_dir: Path,
+) -> bool:
+    """Explicitly adopt a reviewed legacy-drift payload into semantic path ownership."""
+    component = "OpenCode config"
+    managed = manifest.get("managed_files")
+    if not isinstance(managed, dict):
+        reporter.add(component, STATE_CONFLICT, "manifest managed_files is not an object")
+        return False
+    previous = managed.get(component)
+    if not isinstance(previous, dict):
+        reporter.add(component, STATE_CONFLICT, "explicit adoption requires an existing legacy OpenCode ownership record")
+        return False
+    if previous.get("mode") not in _LEGACY_MANAGED_MODES:
+        reporter.add(
+            component,
+            STATE_CONFLICT,
+            f"explicit adoption is only valid for legacy whole-file ownership; current mode={previous.get('mode')!r}",
+        )
+        return False
+    if previous.get("path") != str(destination):
+        reporter.add(
+            component,
+            STATE_CONFLICT,
+            f"manifest points to a different destination: recorded={previous.get('path')}; desired={destination}",
+        )
+        return False
+    if _SHA256_RE.fullmatch(expected_current_sha) is None:
+        reporter.add(component, STATE_CONFLICT, "expected current sha256 must be exactly 64 lowercase hex characters")
+        return False
+    if not destination.is_file():
+        reporter.add(component, STATE_CONFLICT, f"destination is not a regular file: {destination}")
+        return False
+
+    current_data = destination.read_bytes()
+    current_hash = sha256_bytes(current_data)
+    if current_hash != expected_current_sha:
+        reporter.add(
+            component,
+            STATE_CONFLICT,
+            f"explicit adoption hash mismatch: expected_sha256={expected_current_sha}; current_sha256={current_hash}; file preserved",
+        )
+        return False
+
+    recorded = previous.get("sha256")
+    if not isinstance(recorded, str) or _SHA256_RE.fullmatch(recorded) is None:
+        reporter.add(component, STATE_CONFLICT, "legacy whole-file ownership does not contain a valid recorded sha256")
+        return False
+    if recorded == current_hash:
+        reporter.add(
+            component,
+            STATE_CONFLICT,
+            "legacy whole-file hash already matches current config; use ordinary toolchainctl apply instead of adoption",
+        )
+        return False
+
+    desired_data = _preserve_exact_external_reference(destination, desired_data)
+    desired, desired_error, _ = parse_jsonc_object(desired_data)
+    if desired_error or desired is None:
+        reporter.add(component, STATE_CONFLICT, desired_error or "template cannot be parsed")
+        return False
+    existing, parse_error, has_jsonc_features = parse_jsonc_object(current_data)
+    if parse_error or existing is None:
+        reporter.add(component, STATE_CONFLICT, parse_error or "existing config cannot be parsed")
+        return False
+
+    target, target_error = preview_opencode_config_target(
+        destination=destination,
+        desired_data=desired_data,
+        previous=None,
+    )
+    if target_error or target is None:
+        reporter.add(component, STATE_CONFLICT, target_error or "explicit adoption target cannot be built")
+        return False
+
+    owned, external_routes, ownership_error = _ownership_plan(
+        existing=existing,
+        target=target,
+        desired=desired,
+        previous=None,
+        current_hash=current_hash,
+        force=False,
+    )
+    if ownership_error or owned is None:
+        reporter.add(component, STATE_CONFLICT, ownership_error or "semantic ownership plan cannot be built")
+        return False
+
+    semantic_change = target != existing
+    if semantic_change and has_jsonc_features:
+        reporter.add(
+            component,
+            STATE_CONFLICT,
+            "explicit adoption needs semantic JSONC changes but current config contains comments/trailing commas; "
+            "file preserved to avoid formatting loss",
+        )
+        return False
+
+    target_data = (
+        (json.dumps(target, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        if semantic_change
+        else current_data
+    )
+    try:
+        new_record = _semantic_record(
+            destination=destination,
+            source_label=source_label,
+            data=target_data,
+            target=target,
+            desired=desired,
+            owned=owned,
+        )
+    except ValueError as exc:
+        reporter.add(component, STATE_CONFLICT, str(exc))
+        return False
+
+    try:
+        backup = backup_file(destination, state_dir, component)
+        if semantic_change:
+            atomic_write(destination, target_data)
+        managed[component] = new_record
+    except OSError as exc:
+        reporter.add(component, STATE_FAILED, f"explicit adoption failed while persisting OpenCode config: {exc}")
+        return False
+
+    detail = (
+        f"legacy drift explicitly adopted from exact current sha256={current_hash}; "
+        f"semantic ownership записан для {len(owned)} path(s); backup: {backup}"
+    )
+    if semantic_change:
+        detail += "; managed target applied"
+    if external_routes:
+        detail += f"; внешние routing override сохранены: {len(external_routes)}"
+    reporter.add(component, STATE_CONFIGURED, detail)
+    return True
 
 def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_label: str,
                               manifest: dict[str, Any], reporter: Reporter, check: bool,
