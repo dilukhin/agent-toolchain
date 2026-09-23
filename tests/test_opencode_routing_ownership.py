@@ -299,6 +299,67 @@ class OpenCodeRoutingOwnershipTests(unittest.TestCase):
             self.assertEqual(updated["model"], "openai/gpt-5.6-terra-next")
             self.assertEqual(updated["agent"]["general"]["model"], "openai/gpt-5.6-terra-next")
 
+    def test_owned_semantic_routes_upgrade_from_gpt56_to_gpt6_with_plain_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            state_dir = root / "state"
+            destination = root / "opencode.jsonc"
+
+            old_policy = desired_config()
+            original = render(old_policy)
+            destination.write_bytes(original)
+            manifest = self._legacy_manifest(destination, original)
+            changed, reporter = self._apply(destination, manifest, old_policy, state_dir)
+            self.assertTrue(changed, [row.detail for row in reporter.results])
+            self.assertEqual(manifest["managed_files"]["OpenCode config"]["mode"], OPENCODE_SEMANTIC_MODE)
+
+            user_edit = json.loads(destination.read_text(encoding="utf-8"))
+            user_edit["permission"] = {"bash": "ask"}
+            destination.write_bytes(render(user_edit))
+            before_check = destination.read_bytes()
+            manifest_before_check = copy.deepcopy(manifest)
+
+            new_policy = desired_config(model="openai/gpt-6-sol")
+            new_policy["small_model"] = "openai/gpt-6-luna"
+            new_policy["agent"]["general"]["model"] = "openai/gpt-6-sol"
+            new_policy["agent"]["explore"]["model"] = "openai/gpt-6-luna"
+
+            check_reporter = Reporter()
+            changed = reconcile_opencode_config(
+                destination=destination,
+                desired_data=render(new_policy),
+                source_label=SOURCE,
+                manifest=manifest,
+                reporter=check_reporter,
+                check=True,
+                force=False,
+                state_dir=state_dir,
+            )
+            self.assertFalse(changed)
+            self.assertEqual(destination.read_bytes(), before_check)
+            self.assertEqual(manifest, manifest_before_check)
+            self.assertTrue(any(row.state == "outdated" for row in check_reporter.results))
+            self.assertFalse(any(row.state == STATE_CONFLICT for row in check_reporter.results))
+
+            changed, reporter = self._apply(destination, manifest, new_policy, state_dir)
+            self.assertTrue(changed, [row.detail for row in reporter.results])
+            updated = json.loads(destination.read_text(encoding="utf-8"))
+            self.assertEqual(updated["model"], "openai/gpt-6-sol")
+            self.assertEqual(updated["small_model"], "openai/gpt-6-luna")
+            self.assertEqual(updated["agent"]["general"]["model"], "openai/gpt-6-sol")
+            self.assertEqual(updated["agent"]["explore"]["model"], "openai/gpt-6-luna")
+            self.assertEqual(updated["permission"], {"bash": "ask"})
+            backups = list((state_dir / "backups").glob("*/OpenCode_config/opencode.jsonc"))
+            self.assertEqual(len(backups), 1)
+            self.assertEqual(backups[0].read_bytes(), before_check)
+
+            stable_config = destination.read_bytes()
+            stable_manifest = copy.deepcopy(manifest)
+            changed, reporter = self._apply(destination, manifest, new_policy, state_dir)
+            self.assertFalse(changed, [row.detail for row in reporter.results])
+            self.assertEqual(destination.read_bytes(), stable_config)
+            self.assertEqual(manifest, stable_manifest)
+
     def test_owned_route_drift_conflicts_without_force_and_force_repairs_only_owned_path(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
