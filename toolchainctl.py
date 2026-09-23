@@ -396,7 +396,7 @@ def _run_diff(args: argparse.Namespace) -> int:
         print("managed target: управляемые поля уже совпадают; semantic diff отсутствует")
         if legacy_whole_file and recorded_hash and recorded_hash != current_hash:
             print("вывод: legacy ownership drift блокирует автоматическую миграцию; --force не усыновляет неизвестные изменения")
-        print(f"явное принятие проверенного текущего payload: toolchainctl adopt opencode-config --expected-sha {current_hash}")
+            print(f"явное принятие проверенного текущего payload: toolchainctl adopt opencode-config --expected-sha {current_hash}")
         elif record_mode == OPENCODE_SEMANTIC_MODE and managed_drift:
             print("вывод: изменены уже принадлежащие semantic paths; требуется review перед явным repair")
         return 0
