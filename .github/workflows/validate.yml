@@ -133,6 +133,8 @@ jobs:
             ./tests/run_managed_tools_integration.py
       - name: Validate transitional YC guard unit tests
         run: python3 -m unittest tests.test_yc_transitional_guard_deployment tests.test_yc_transitional_entry -v
+      - name: Validate read-only P0 metrics
+        run: python3 -m unittest tests.test_opencode_permissions_pilot_metrics -v
       - name: Validate shell bootstrap and retired interface syntax
         run: |
           bash -n ./bootstrap_linux.sh

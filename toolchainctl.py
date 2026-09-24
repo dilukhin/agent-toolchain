@@ -1040,6 +1040,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "workspace-trust":
         return setup_workspace_trust.run_cli(args)
     if args.command == "p0":
+        if sys.platform != "linux":
+            print("modified/conflict  p0 metrics  PILOT_PLATFORM_UNSUPPORTED", file=sys.stderr)
+            return 2
         try:
             owned = p0_metrics.active_artifact(default_state_dir(resolve_override=False))
             if args.artifact_id:
