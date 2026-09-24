@@ -22,6 +22,7 @@ from pathlib import Path, PurePosixPath
 
 import setup_core
 import setup_workspace_trust
+import setup_opencode_permissions_pilot_metrics as p0_metrics
 from toolchain_state import state_base as _state_base, default_state_dir
 from core_identity import CORE_SEMVER, read_identity, version_text
 from setup_lib import (
@@ -87,6 +88,7 @@ _CORE_REQUIRED_FILES = (
     "core_identity.py",
     "toolchain_state.py",
     "setup_workspace_trust.py",
+    "setup_opencode_permissions_pilot_metrics.py",
     "workspace_trust_contract.py",
     "config_data.json",
 )
@@ -220,6 +222,10 @@ def build_parser() -> argparse.ArgumentParser:
     setup_yc_transitional_guard.add_cli_parser(sub)
     setup_agent_inventory.add_cli_parser(sub)
     setup_workspace_trust.add_cli_parser(sub)
+    p0 = sub.add_parser("p0", help="explicit OpenCode Permissions P0 pilot controls")
+    p0_sub = p0.add_subparsers(dest="p0_command", required=True)
+    metrics = p0_sub.add_parser("metrics", help="read current privacy-bounded P0 snapshots")
+    metrics.add_argument("--artifact-id", help="exact historical pilot artifact ID after disable")
     return parser
 
 
@@ -1034,6 +1040,30 @@ def main(argv: list[str] | None = None) -> int:
         return setup_agent_inventory.run_cli(args, config_dir=_default_paths()["config"])
     if args.command == "workspace-trust":
         return setup_workspace_trust.run_cli(args)
+    if args.command == "p0":
+        if sys.platform != "linux":
+            print("modified/conflict  p0 metrics  PILOT_PLATFORM_UNSUPPORTED", file=sys.stderr)
+            return 2
+        try:
+            owned = p0_metrics.active_artifact(default_state_dir(resolve_override=False))
+            if args.artifact_id:
+                artifact_id = args.artifact_id
+                expected_version = owned[1] if owned and owned[0] == artifact_id else None
+                expected_native = owned[2] if owned and owned[0] == artifact_id else None
+            elif owned:
+                artifact_id, expected_version, expected_native = owned
+            else:
+                print(json.dumps({"status": "no_data", "reason": "no_active_artifact"}))
+                return 0
+            result = p0_metrics.read_metrics(
+                home=Path.home(), artifact_id=artifact_id,
+                expected_version=expected_version, expected_native_id=expected_native,
+            )
+            print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            return 0
+        except p0_metrics.MetricsConflict as exc:
+            print(f"modified/conflict  p0 metrics  {exc}", file=sys.stderr)
+            return 2
     if args.command == "updates":
         return _updates_phase(args)
     if args.command == "update":
