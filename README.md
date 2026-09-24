@@ -103,18 +103,22 @@ Bootstrap публикует core атомарно из staging-каталога
 
 ## Managed CLI tools
 
-Сейчас через ToolSpec реально управляются два Python CLI:
+Через ToolSpec управляются Python CLI, встроенные proxy-tools и `tunnelctl`:
 
 | Tool | Production command | Production source | Runtime |
 |---|---|---|---|
 | `ssh_relay` | `ssh_relay` | `main` (`follow-branch`) | отдельный non-editable Python venv |
 | `agent-safe` | `safe` | `master` (`follow-branch`) | отдельный non-editable Python venv |
+| `tunnelctl` | `tunnelctl` | точный проверенный commit (`pinned-tested`) | собранный из исходников Go binary |
+| `proxy-tools` | `opencode-proxied`, `codex-proxied` | текущий core | встроенный runtime |
 
 В начале одного reconciliation-run production branch разрешается ровно один раз в точный 40-hex commit SHA. Этот SHA становится immutable execution identity для runtime и принадлежащих tool skills. Если branch изменился после resolution, новый commit относится к следующему запуску.
 
 Установка Python tool выполняется из `repo@exact-commit`, а не из `~/projects/...`. Health запускается из установленного runtime. Для `ssh_relay` это в том числе `ssh_relay doctor`, который реально импортирует `paramiko`, не выполняя SSH/network соединение.
 
 Developer checkouts `~/projects/ssh_relay` и `~/projects/agent-safe` могут существовать, быть dirty или вообще отсутствовать: это не должно менять production runtime.
+
+`tunnelctl` собирается из временной чистой копии точного commit и публикуется как отдельный versioned binary. Для первого `apply` нужны Git, Go 1.22+ и OpenSSH client; они не устанавливаются автоматически. Проверка выполняет `tunnelctl --version` из установленного binary и `ssh -V`, не запускает туннель и не меняет его автозапуск. Изменение уже запущенного процесса не производится; запуск и переключение управляются отдельными командами `tunnelctl`.
 
 ### Skills из того же exact ref
 
@@ -214,15 +218,13 @@ Windows:
 
 ## Что пока не реализовано
 
-Текущий Python managed-tool deployer поддерживает `git + python-venv` с policy `follow-branch` и `pinned-tested`; перед deployment всегда используется immutable exact commit SHA.
+Python managed-tool deployer поддерживает `git + python-venv` с policy `follow-branch` и `pinned-tested`; Go binary deployer поддерживает проверенный `tunnelctl` по `pinned-tested` exact commit.
 
 Пока **не** подключены как реальные managed tools:
 
-- `tunnelctl` (`go-binary`);
 - `bundle`;
-- `proxy-tools`.
 
-Для них следующий этап должен расширять общий ToolSpec/reconciler, а не добавлять отдельные ad-hoc install paths.
+Для `bundle` следующий этап должен расширять общий ToolSpec/reconciler, а не добавлять отдельный install path. Выпуск готовых Windows/Linux артефактов `tunnelctl` с контрольными суммами остаётся последующим улучшением, которое позволит убрать зависимость клиента от Go.
 
 ## Безопасность
 
