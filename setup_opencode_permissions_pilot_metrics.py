@@ -19,7 +19,7 @@ IDENTITY = (
     "opencode_version", "compatibility_profile", "native_policy_artifact_id",
     "pilot_artifact_id", "classifier_profile",
 )
-BUCKET = re.compile(r"[A-Za-z0-9_./:-]{1,80}\Z")
+BUCKET = re.compile(r"[A-Za-z0-9_./:-]{1,96}\Z")
 PROCESS = re.compile(r"process-[0-9]+\.json\Z")
 ARTIFACT = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
