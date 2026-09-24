@@ -17,6 +17,7 @@ COUNTERS = {
 }
 
 
+@unittest.skipUnless(sys.platform == "linux", "P0 metrics v1 is Linux-only")
 class MetricsTests(unittest.TestCase):
     def directory(self, home: Path) -> Path:
         path = home / ".local/state/opencode_permissions/p0-metrics" / ("sha256-" + "a" * 64)
