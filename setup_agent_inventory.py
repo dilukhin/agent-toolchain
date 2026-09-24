@@ -499,6 +499,9 @@ def add_cli_parser(subparsers) -> None:
     inspect = agent_sub.add_parser("inspect", help="inspect agent definition sources without mutation or network access")
     inspect.add_argument("--project", help="project/cwd to inspect; defaults to current directory")
     inspect.add_argument("--json", action="store_true", help="emit machine-readable safe metadata")
+    adopt = agent_sub.add_parser("adopt-model", help="explicitly adopt only the model field of a reviewed existing Markdown agent")
+    adopt.add_argument("role", help="existing global Markdown agent role")
+    adopt.add_argument("--expected-sha", required=True, help="exact sha256 of the reviewed current agent file")
 
 
 def run_cli(args, *, config_dir: Path) -> int:
