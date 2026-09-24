@@ -209,6 +209,83 @@ class PilotDeploymentTests(unittest.TestCase):
             self.assertFalse(data.exists())
             self.assertFalse(state.exists())
 
+    def test_disable_after_version_drift_restores_owned_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundle, native, _ = self.make_artifacts(root)
+            config, data, state = self.paths(root)
+            config.mkdir()
+            original = {"model": "synthetic/model", "permission": {"bash": {"legacy": "ask"}}}
+            (config / "opencode.jsonc").write_bytes(pilot._pretty_json(original))
+            pilot.apply_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.29", config_dir=config, data_dir=data, state_dir=state,
+            )
+            result = pilot.disable_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.30", config_dir=config, data_dir=data, state_dir=state,
+            )
+            self.assertEqual(result["status"], "disabled")
+            self.assertTrue(result["changed"])
+            self.assertEqual(json.loads((config / "opencode.jsonc").read_text()), original)
+            self.assertFalse((config / "plugins" / pilot.PLUGIN_NAME).exists())
+            self.assertFalse((state / "opencode-permissions-pilot.json").exists())
+
+    def test_disable_after_version_drift_preserves_foreign_plugin(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundle, native, _ = self.make_artifacts(root)
+            config, data, state = self.paths(root)
+            pilot.apply_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.29", config_dir=config, data_dir=data, state_dir=state,
+            )
+            plugin_path = config / "plugins" / pilot.PLUGIN_NAME
+            plugin_path.write_text("foreign replacement\n", encoding="utf-8")
+            config_before = (config / "opencode.jsonc").read_bytes()
+            with self.assertRaises(pilot.PilotDeploymentError) as ctx:
+                pilot.disable_pilot(
+                    pilot_bundle_dir=bundle, native_artifact_dir=native,
+                    installed_version="1.18.30", config_dir=config, data_dir=data, state_dir=state,
+                )
+            self.assertEqual(ctx.exception.code, "PLUGIN_OWNERSHIP_CONFLICT")
+            self.assertEqual(plugin_path.read_text(), "foreign replacement\n")
+            self.assertEqual((config / "opencode.jsonc").read_bytes(), config_before)
+
+    def test_disable_prepared_after_version_drift(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundle, native, _ = self.make_artifacts(root)
+            config, data, state = self.paths(root)
+            config.mkdir()
+            original = {"model": "synthetic/model"}
+            config_path = config / "opencode.jsonc"
+            config_path.write_bytes(pilot._pretty_json(original))
+            original_atomic = pilot._atomic_write
+
+            def interrupted(path, data_bytes):
+                if Path(path).resolve() == config_path.resolve():
+                    raise RuntimeError("synthetic interruption")
+                return original_atomic(Path(path), data_bytes)
+
+            pilot._atomic_write = interrupted
+            try:
+                with self.assertRaises(pilot.PilotDeploymentError):
+                    pilot.apply_pilot(
+                        pilot_bundle_dir=bundle, native_artifact_dir=native,
+                        installed_version="1.18.29", config_dir=config, data_dir=data, state_dir=state,
+                    )
+            finally:
+                pilot._atomic_write = original_atomic
+            self.assertEqual(json.loads((state / "opencode-permissions-pilot.json").read_text())["phase"], "prepared")
+            result = pilot.disable_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.30", config_dir=config, data_dir=data, state_dir=state,
+            )
+            self.assertTrue(result["changed"])
+            self.assertEqual(json.loads(config_path.read_text()), original)
+            self.assertFalse((state / "opencode-permissions-pilot.json").exists())
+
     def test_unknown_plugin_conflicts_without_overwrite(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
