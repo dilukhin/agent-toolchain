@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 import setup_manifest  # noqa: E402
 from setup_lib import Reporter, STATE_CONFLICT, STATE_FAILED  # noqa: E402
-from setup_managed_tools import reconcile_tool_specs  # noqa: E402
+from setup_managed_tools import reconcile_go_tool, reconcile_tool_specs  # noqa: E402
 from setup_tool_skills_impl import reconcile_pinned_tool_skills, tool_skill_bindings  # noqa: E402
 from setup_tools import parse_tool_specs, resolve_tool_specs  # noqa: E402
 
@@ -167,12 +167,12 @@ def main() -> int:
             if _snapshot(manifest) != manifest_before_repeat:
                 raise AssertionError("repeat apply changed ownership manifest metadata")
 
-            tunnel_state = (root / "tunnelctl-state")
+            tunnel_state = root / "tunnelctl-state"
             with mock.patch.dict(os.environ, {"XDG_STATE_HOME": str(tunnel_state), "LOCALAPPDATA": str(tunnel_state)}):
                 readonly_reporter = Reporter()
-                if reconcile_tool_specs(specs, sys.executable, readonly_reporter, check=True, skip_install=False, manifest=manifest):
-                    raise AssertionError("installed-runtime check changed ownership metadata")
-                _assert_clean_report(readonly_reporter, "installed-runtime check")
+                if reconcile_go_tool(specs["tunnelctl"], readonly_reporter, check=True, skip_install=False, manifest=manifest):
+                    raise AssertionError("tunnelctl check changed ownership metadata")
+                _assert_clean_report(readonly_reporter, "tunnelctl installed-runtime check")
                 if tunnel_state.exists():
                     raise AssertionError("tunnelctl version health created log/state during check")
 
