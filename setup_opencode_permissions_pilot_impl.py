@@ -607,17 +607,23 @@ def disable_pilot(
     state_dir: Path,
     installed_platform: str = "linux",
 ) -> dict[str, Any]:
+    # Disabling is an ownership rollback, not an authorization to run the
+    # current OpenCode version. A user must be able to remove our loader after
+    # upgrading OpenCode. Bind the original artifacts to the recorded version
+    # and still verify every owned path and digest before changing anything.
+    state_path = _state_path(state_dir)
+    state = _load_state(state_path)
+    recorded_version = state.get("opencode_version") if state is not None else installed_version
+    _require(isinstance(recorded_version, str) and bool(recorded_version), "PILOT_STATE_VERSION_INVALID")
     validation = validate_artifacts(
         pilot_bundle_dir=pilot_bundle_dir,
         native_artifact_dir=native_artifact_dir,
-        installed_version=installed_version,
+        installed_version=recorded_version,
         installed_platform=installed_platform,
     )
     runtime_dir = _runtime_dir(data_dir, validation["artifact_path_segment"])
     plugin_path = _plugin_path(config_dir)
     config_path = _config_path(config_dir)
-    state_path = _state_path(state_dir)
-    state = _load_state(state_path)
 
     if state is None:
         _require(not plugin_path.exists() and not plugin_path.is_symlink(), "UNKNOWN_PLUGIN_WITHOUT_STATE")
