@@ -65,6 +65,7 @@ REQUIRED_FILES = (
     "core_identity.py",
     "toolchain_state.py",
     "setup_workspace_trust.py",
+    "setup_opencode_permissions_pilot_metrics.py",
     "workspace_trust_contract.py",
     "config_data.json",
 )
