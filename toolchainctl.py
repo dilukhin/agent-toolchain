@@ -52,6 +52,7 @@ from setup_tools import parse_tool_specs, resolve_tool_specs
 from setup_external_updates import cache_path, load_cache, refresh
 from setup_inventory import common_external_cli_inventory
 import setup_yc_transitional_guard
+import setup_agent_inventory
 
 PRODUCT = "agent-toolchain"
 LEGACY_PRODUCT = "opencode_setup"
@@ -77,6 +78,7 @@ _CORE_REQUIRED_FILES = (
     "setup_tool_skills_impl.py",
     "setup_path.py",
     "setup_inventory.py",
+    "setup_agent_inventory.py",
     "setup_external_updates.py",
     "setup_tools.py",
     "setup_yc_transitional_guard.py",
@@ -216,6 +218,7 @@ def build_parser() -> argparse.ArgumentParser:
     adopt_cmd.add_argument("component", choices=("opencode-config",), help="managed component to adopt")
     adopt_cmd.add_argument("--expected-sha", required=True, help="exact sha256 of the reviewed current payload")
     setup_yc_transitional_guard.add_cli_parser(sub)
+    setup_agent_inventory.add_cli_parser(sub)
     setup_workspace_trust.add_cli_parser(sub)
     return parser
 
@@ -1027,6 +1030,8 @@ def main(argv: list[str] | None = None) -> int:
     if arguments not in (["--version"], ["--help"], ["-h"]):
         print(_version_text(), file=sys.stderr)
     args = build_parser().parse_args(arguments)
+    if args.command == "agents":
+        return setup_agent_inventory.run_cli(args, config_dir=_default_paths()["config"])
     if args.command == "workspace-trust":
         return setup_workspace_trust.run_cli(args)
     if args.command == "updates":

@@ -74,8 +74,9 @@ def _trim_action(text: str, limit: int = 220) -> str:
         if span.start() < limit <= span.end():
             suffix = "…" if span.end() < len(normalized) else ""
             return normalized[: span.end()].rstrip() + suffix
-    if command_spans:
-        span = command_spans[-1]
+    trailing_commands = [span for span in command_spans if span.start() >= limit]
+    if trailing_commands:
+        span = trailing_commands[-1]
         command = span.group(0)
         if len(command) + 2 < limit:
             prefix_budget = limit - len(command) - 2
