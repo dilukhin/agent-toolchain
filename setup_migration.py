@@ -56,6 +56,13 @@ OPENCODE_SEMANTIC_MODE = "semantic-paths-v1"
 _LEGACY_MANAGED_MODES = frozenset({None, "merged-json", _SIBLING_MODE})
 _MANAGED_PATHS_FIELD = "managed_paths"
 _SHA256_RE = re.compile(r"[0-9a-f]{64}")
+_MANAGED_AGENT_FIELDS = {
+    "explore": ("model", "description", "permission"),
+    "luna": ("model", "permission"),
+    "luna-safe-worker": ("model", "permission"),
+    "sol-specialist": ("model", "permission"),
+    "astra-reviewer": ("model", "permission"),
+}
 
 
 def _json_pointer(parts: tuple[str, ...]) -> str:
@@ -131,8 +138,10 @@ def _managed_target_items(desired: dict[str, Any]) -> tuple[dict[str, tuple[tupl
         for name, spec in agents.items():
             if not isinstance(name, str) or not isinstance(spec, dict):
                 return {}, "template agent entries must be objects"
-            if "model" in spec:
-                add(("agent", name, "model"))
+            fields = _MANAGED_AGENT_FIELDS.get(name, ("model",))
+            for field in fields:
+                if field in spec:
+                    add(("agent", name, field))
     return result, None
 
 
@@ -141,6 +150,14 @@ def _routing_pointers(targets: dict[str, tuple[tuple[str, ...], Any]]) -> set[st
         pointer
         for pointer, (parts, _value) in targets.items()
         if parts in {("model",), ("small_model",)} or (len(parts) == 3 and parts[0] == "agent" and parts[2] == "model")
+    }
+
+
+def _agent_policy_pointers(targets: dict[str, tuple[tuple[str, ...], Any]]) -> set[str]:
+    return {
+        pointer
+        for pointer, (parts, _value) in targets.items()
+        if len(parts) == 3 and parts[0] == "agent" and parts[2] != "model"
     }
 
 
@@ -184,11 +201,12 @@ def _apply_routing_target(
     if target_error:
         return target_error
     routing = _routing_pointers(targets)
+    agent_policy = _agent_policy_pointers(targets)
     mode = previous.get("mode") if previous else None
     owned = _semantic_owned_pointers(previous)
     legacy_owned = bool(previous) and mode in _LEGACY_MANAGED_MODES
 
-    for pointer in sorted(routing):
+    for pointer in sorted(routing | agent_policy):
         parts, desired_value = targets[pointer]
         exists, _current_value = _path_value(existing, parts)
         enforce = legacy_owned or pointer in owned or not exists
@@ -264,6 +282,7 @@ def _ownership_plan(
     if target_error:
         return None, [], target_error
     routing = _routing_pointers(targets)
+    agent_policy = _agent_policy_pointers(targets)
     external_routes: list[str] = []
 
     if previous is None:
@@ -280,8 +299,12 @@ def _ownership_plan(
                 if current_value != desired_value:
                     external_routes.append(pointer)
                 else:
-                    # Matching values may be adopted only by explicit apply; check
-                    # reports the pending metadata transition without writing.
+                    owned.add(pointer)
+                continue
+            if pointer in agent_policy:
+                if current_value != desired_value:
+                    external_routes.append(pointer)
+                else:
                     owned.add(pointer)
                 continue
             # Preserve the pre-#75 safe-merge contract for stable non-routing
@@ -333,7 +356,7 @@ def _ownership_plan(
         if not exists:
             owned.add(pointer)
             continue
-        if pointer in routing:
+        if pointer in routing or pointer in agent_policy:
             if current_value != desired_value:
                 external_routes.append(pointer)
             else:

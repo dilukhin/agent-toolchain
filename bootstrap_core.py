@@ -57,6 +57,7 @@ REQUIRED_FILES = (
     "setup_path.py",
     "setup_inventory.py",
     "setup_agent_inventory.py",
+    "setup_agent_roles.py",
     "setup_external_updates.py",
     "setup_tools.py",
     "setup_yc_transitional_guard.py",

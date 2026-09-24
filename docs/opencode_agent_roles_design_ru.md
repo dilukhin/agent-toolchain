@@ -165,3 +165,32 @@ Read-only agent:
 - scope/permission violations.
 
 Не оптимизировать только число дешёвых вызовов.
+
+
+## 12. Фактический inventory ILUKHIN перед Phase 2
+
+Read-only inventory на `toolchainctl 0.1.0.c12cc77b` показал:
+
+- global JSON config содержит model-only записи для build/plan/general/explore и четырёх custom roles;
+- отдельные global Markdown-файлы существуют для `astra-reviewer`, `luna`, `luna-safe-worker`, `sol-specialist`;
+- `astra-reviewer.md` уже указывает `openai/gpt-6-astra`;
+- `luna.md` и `luna-safe-worker.md` всё ещё указывают `openai/gpt-5.6-luna`;
+- `sol-specialist.md` всё ещё указывает `openai/gpt-5.6-sol`;
+- `OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, `OPENCODE_CONFIG_CONTENT` не заданы;
+- system-managed config отсутствует;
+- inventory запускался из `~/projects`, который не являлся Git root, поэтому project-local overrides для конкретного репозитория этим прогоном не проверялись.
+
+Upstream OpenCode загружает Markdown agent definitions поверх уже собранного JSON agent map через deep merge. Поэтому stale model в Markdown может переопределять managed JSON model.
+
+## 13. Phase 2 implementation contract
+
+Phase 2 разделяет ownership:
+
+1. Новые роли `docs-researcher`, `code-reviewer`, `evidence-auditor`, `code-worker`, `test-runner` — отдельные whole-file managed Markdown resources. Если такой файл уже существует без ownership evidence, apply сохраняет его и даёт conflict.
+2. `explore` hardening хранится как semantic fields в global JSON config: managed `description` и `permission`, потому что отдельного Markdown `explore` на ILUKHIN не найдено.
+3. Для `luna`, `luna-safe-worker`, `sol-specialist`, `astra-reviewer` вводится `agent-frontmatter-model-v1`: exact-SHA adoption принимает ownership только top-level `model`. Тело prompt, description и permissions не становятся managed.
+4. Удаление/изменение принадлежащего model field даёт conflict; обычное future policy update меняет только model с backup. `--force` восстанавливает только уже adopted model field.
+5. Для leaf custom roles global JSON дополнительно задаёт `permission.task=deny`; Markdown deep merge может добавлять другие rules, но task deny не должен теряться при отсутствии более позднего conflicting task rule.
+6. Managed `AGENTS.md` содержит routing/cost instructions. Они направляют эвристическое делегирование, но не считаются enforcement механизма разрешений.
+
+`test-runner` получает `bash: ask`, а не безусловный allow: автоматическое безопасное выполнение произвольных тестовых команд требует отдельной интеграции с workspace trust/opencode_permissions и не вводится скрыто в этом changeset.

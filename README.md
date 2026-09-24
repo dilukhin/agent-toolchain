@@ -50,7 +50,7 @@ toolchainctl --version       показать версию и build identity з�
 toolchainctl check           read-only диагностика target state
 toolchainctl apply           привести управляемое состояние к target state
 toolchainctl diff opencode-config  показать read-only managed-target diff OpenCode config с редактированием чувствительных значений
-toolchainctl agents inspect    показать read-only inventory источников определений OpenCode agents без вывода prompt/description/permission patterns\ntoolchainctl adopt opencode-config --expected-sha <sha256>  явно принять проверенный legacy-drift payload как базу semantic ownership
+toolchainctl agents inspect    показать read-only inventory источников определений OpenCode agents без вывода prompt/description/permission patterns\ntoolchainctl agents adopt-model <role> --expected-sha <sha256>  принять ownership только поля model существующего Markdown-agent\ntoolchainctl adopt opencode-config --expected-sha <sha256>  явно принять проверенный legacy-drift payload как базу semantic ownership
 toolchainctl update          обновить установленный управляющий core из актуального main
 toolchainctl update --apply  обновить core и затем применить новый target state
 ```
@@ -165,11 +165,13 @@ Manifest schema 2 содержит:
 `toolchainctl` сохраняет ранее реализованные безопасные политики OpenCode:
 
 - текущая managed routing policy использует прямой OpenAI/Codex provider: глобальный `model=openai/gpt-6-sol`, `small_model=openai/gpt-6-luna`; `general/build/plan` и `sol-specialist` используют Sol, `explore/luna/luna-safe-worker` — Luna, `astra-reviewer` — Astra;
+- `explore` получает managed read-only policy без shell/web/edit/task; новые `docs-researcher`, `code-reviewer`, `evidence-auditor`, `code-worker`, `test-runner` публикуются отдельными owned Markdown-agent resources и не перезаписывают одноимённый чужой файл;
+- для существующих `luna`, `luna-safe-worker`, `sol-specialist`, `astra-reviewer` prompt/description/permission остаются user-owned; после exact-SHA `agents adopt-model` toolchain владеет только frontmatter `model`, поэтому будущая смена модели не перезаписывает остальной файл;
 - RouterAI provider, каталог и ссылка на credential сохраняются для явного выбора, но не используются ни одним управляемым глобальным маршрутом или управляемой рабочей ролью;
 - `~/.config/opencode/opencode.jsonc` изменяется семантическим merge только когда это безопасно; для routing и других стабильных managed fields manifest хранит evidence конкретных JSON-путей, поэтому изменение пользовательского поля вне ownership не делает весь config конфликтным;
 - прежний whole-file `merged-json` ownership мигрирует в semantic paths только при точном совпадении записанного SHA; неизвестный drift не усыновляется даже через `--force`;
 - если legacy whole-file SHA уже разошёлся, автоматическая миграция остаётся fail-closed; после `toolchainctl diff opencode-config` пользователь может явно подтвердить конкретный текущий payload командой `toolchainctl adopt opencode-config --expected-sha <current-sha256>`. Команда проверяет exact SHA, делает backup, сохраняет неизвестные поля и отличающиеся routing overrides, а ownership записывает только для известных semantic paths;
-- пользовательские неизвестные поля/models и неизвестные роли сохраняются; в известных ролях toolchain меняет только доказанно принадлежащий `model`, не забирая `permission`, `prompt`, `tools`, `description` и другие пользовательские поля;
+- пользовательские неизвестные поля/models и неизвестные роли сохраняются; JSON policy управляет только явно перечисленными semantic agent fields, а существующие Markdown agents получают ownership только frontmatter `model` после exact-SHA adoption; prompt/description/permission не усыновляются;
 - project-local OpenCode config и отдельные пользовательские agent-файлы могут иметь более высокий приоритет; agent-toolchain не сканирует и не переписывает произвольные проекты;
 - JSONC с форматированием, которое нельзя сохранить безопасно, даёт conflict;
 - `AGENTS.md` использует управляемый блок и не забирает произвольный пользовательский текст;

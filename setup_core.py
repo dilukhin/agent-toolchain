@@ -32,6 +32,7 @@ from setup_lib import (
 )
 from setup_manifest import MANIFEST_SCHEMA, load_manifest, save_manifest
 from setup_migration import reconcile_opencode_config
+from setup_agent_roles import desired_role_models, reconcile_adopted_agent_models, reconcile_managed_role_templates
 from setup_runtime import ensure_agent_safe_runtime, ensure_ssh_relay_runtime, reconcile_npm
 from setup_tools import parse_tool_specs
 
@@ -393,6 +394,26 @@ def main(argv: list[str] | None = None) -> int:
         )
     else:
         reporter.add("OpenCode config", STATE_CONFLICT, "preserved because RouterAI credential path is unresolved")
+
+    role_models = desired_role_models(config)
+    manifest_changed |= reconcile_adopted_agent_models(
+        config_dir=config_dir,
+        desired_models=role_models,
+        manifest=manifest,
+        reporter=reporter,
+        check=args.check,
+        force=args.force,
+        state_dir=state_dir,
+    )
+    manifest_changed |= reconcile_managed_role_templates(
+        repo_root=repo_root,
+        config_dir=config_dir,
+        manifest=manifest,
+        reporter=reporter,
+        check=args.check,
+        force=args.force,
+        state_dir=state_dir,
+    )
 
     agents_data = (repo_root / "templates" / "AGENTS.md").read_bytes()
     manifest_changed |= reconcile_agents_file(
