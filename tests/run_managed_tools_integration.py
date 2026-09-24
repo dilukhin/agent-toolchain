@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 import setup_manifest  # noqa: E402
 from setup_lib import Reporter, STATE_CONFLICT, STATE_FAILED  # noqa: E402
-from setup_managed_tools import reconcile_tool_specs  # noqa: E402
+from setup_managed_tools import reconcile_go_tool, reconcile_tool_specs  # noqa: E402
 from setup_tool_skills_impl import reconcile_pinned_tool_skills, tool_skill_bindings  # noqa: E402
 from setup_tools import parse_tool_specs, resolve_tool_specs  # noqa: E402
 
@@ -41,7 +41,7 @@ def main() -> int:
     specs, error = resolve_tool_specs(declared_specs)
     if error:
         raise AssertionError(error)
-    if set(specs) != {"ssh_relay", "agent-safe", "proxy-tools"}:
+    if set(specs) != {"ssh_relay", "agent-safe", "proxy-tools", "tunnelctl"}:
         raise AssertionError(f"unexpected managed tool registry: {sorted(specs)}")
 
     bindings, error = tool_skill_bindings(env_cfg, specs)
@@ -124,6 +124,10 @@ def main() -> int:
                     public = bin_dir / f"{command}{suffix}"
                     if not (public.exists() or public.is_symlink()):
                         raise AssertionError(f"missing public entrypoint: {public}")
+                if tool_name == "tunnelctl":
+                    binary = Path(record["entrypoints"]["tunnelctl"]["target"])
+                    if not binary.is_file():
+                        raise AssertionError(f"missing installed Go binary: {binary}")
 
                 for skill_name, relative in bindings.get(tool_name, {}).items():
                     destination = skills_dir / skill_name / "SKILL.md"
@@ -162,6 +166,15 @@ def main() -> int:
                 raise AssertionError("repeat apply must be a no-op")
             if _snapshot(manifest) != manifest_before_repeat:
                 raise AssertionError("repeat apply changed ownership manifest metadata")
+
+            tunnel_state = root / "tunnelctl-state"
+            with mock.patch.dict(os.environ, {"XDG_STATE_HOME": str(tunnel_state), "LOCALAPPDATA": str(tunnel_state)}):
+                readonly_reporter = Reporter()
+                if reconcile_go_tool(specs["tunnelctl"], readonly_reporter, check=True, skip_install=False, manifest=manifest):
+                    raise AssertionError("tunnelctl check changed ownership metadata")
+                _assert_clean_report(readonly_reporter, "tunnelctl installed-runtime check")
+                if tunnel_state.exists():
+                    raise AssertionError("tunnelctl version health created log/state during check")
 
         print("PASS managed helper exact-ref integration")
         for tool_name, spec in sorted(specs.items()):
