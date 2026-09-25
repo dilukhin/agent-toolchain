@@ -115,7 +115,7 @@ class ToolSpecTests(unittest.TestCase):
 
         parsed, error = parse_tool_specs(env)
         self.assertIsNone(error)
-        self.assertEqual(set(parsed), {"ssh_relay", "agent-safe", "proxy-tools"})
+        self.assertEqual(set(parsed), {"ssh_relay", "agent-safe", "proxy-tools", "tunnelctl"})
 
         ssh = parsed["ssh_relay"]
         self.assertEqual(ssh.update_policy, "follow-branch")

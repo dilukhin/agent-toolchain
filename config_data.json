@@ -244,6 +244,17 @@
           "linux"
         ]
       },
+      "tunnelctl": {
+        "source": "git",
+        "repo": "https://github.com/dilukhin/tunnelctl.git",
+        "ref": "cbfee60c498c34fe20396e19ef90d3c01460e3b5",
+        "project_directory": "tunnelctl",
+        "runtime": "go-binary",
+        "update_policy": "pinned-tested",
+        "entrypoints": ["tunnelctl"],
+        "health_contract": [{"argv": ["tunnelctl", "--version"]}],
+        "platforms": ["windows", "linux"]
+      },
       "proxy-tools": {
         "source": "builtin",
         "module": "proxy_tools",

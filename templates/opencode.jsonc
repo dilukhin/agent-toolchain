@@ -65,19 +65,40 @@
       "model": "openai/gpt-6-sol"
     },
     "explore": {
-      "model": "openai/gpt-6-luna"
+      "model": "openai/gpt-6-luna",
+      "description": "Fast read-only codebase explorer for locating files, symbols, references, and implementation paths.",
+      "permission": {
+        "*": "deny",
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "task": "deny"
+      }
     },
     "luna": {
-      "model": "openai/gpt-6-luna"
+      "model": "openai/gpt-6-luna",
+      "permission": {
+        "task": "deny"
+      }
     },
     "luna-safe-worker": {
-      "model": "openai/gpt-6-luna"
+      "model": "openai/gpt-6-luna",
+      "permission": {
+        "task": "deny"
+      }
     },
     "sol-specialist": {
-      "model": "openai/gpt-6-sol"
+      "model": "openai/gpt-6-sol",
+      "permission": {
+        "task": "deny"
+      }
     },
     "astra-reviewer": {
-      "model": "openai/gpt-6-astra"
+      "model": "openai/gpt-6-astra",
+      "permission": {
+        "task": "deny"
+      }
     }
   }
 }

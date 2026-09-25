@@ -18,7 +18,7 @@
 - one-way import legacy `opencode_setup` state.
 
 Реализован stdlib-only builtin `proxy-tools` с командами `opencode-proxied` и `codex-proxied`.
-`tunnelctl` по-прежнему не управляется и не изменяется этим проектом.
+`tunnelctl` управляется через `go-binary` ToolSpec с `pinned-tested` SHA. Исходники собираются во временной чистой копии, бинарник публикуется в versioned release, его SHA-256 проверяется по ownership marker. Первый `apply` требует Git, Go 1.22+ и OpenSSH client; готовые артефакты с контрольными суммами остаются будущим этапом. Проверка версии установленного бинарника не пишет журнал, а reconciliation не запускает и не останавливает туннель.
 
 External CLI inventory (`opencode`, `codex`) остаётся read-only и не записывается
 как owned state. `toolchainctl updates refresh/show` использует отдельный
@@ -223,8 +223,7 @@ Target — `~/.local/bin`. Toolchain не редактирует произво�
 
 Следующий архитектурный шаг после завершения rename/migration двух машин:
 
-1. `tunnelctl` как `go-binary` ToolSpec consumer;
-2. затем `bundle`;
-3. затем `proxy-tools`.
+1. выпуск проверяемых Windows/Linux артефактов `tunnelctl`, чтобы не требовать Go на клиенте;
+2. `bundle` через изолированную runtime family.
 
 Новые runtime families должны расширять общий ToolSpec/deployer и health/ownership contracts, а не создавать отдельные ad-hoc install scripts.

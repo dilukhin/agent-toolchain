@@ -1,4 +1,4 @@
-"""Exact-ref ToolSpec deployment for agent-toolchain managed Python CLI tools."""
+"""Exact-ref ToolSpec deployment for agent-toolchain managed CLI tools."""
 from __future__ import annotations
 
 import json
@@ -6,7 +6,9 @@ import hashlib
 import os
 import shutil
 import stat
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -74,6 +76,10 @@ def _venv_command(venv: Path, command: str) -> Path:
     if os.name == "nt":
         return venv / "Scripts" / f"{command}.exe"
     return venv / "bin" / command
+
+
+def _go_command(release: Path, command: str) -> Path:
+    return release / (f"{command}.exe" if os.name == "nt" else command)
 
 
 def _release_dir(spec: ToolSpec) -> Path:
@@ -183,6 +189,18 @@ def _owned_release(release: Path, spec: ToolSpec) -> bool:
     )
     if not base_owned:
         return False
+    if spec.runtime == "go-binary":
+        binary = _go_command(release, spec.entrypoints[0])
+        try:
+            files = {p.name for p in release.iterdir() if p.is_file() and not p.is_symlink()}
+            if files != {_RUNTIME_MARKER, binary.name} or any(p.is_symlink() or not p.is_file() for p in release.iterdir()):
+                return False
+            if os.name != "nt" and not binary.stat().st_mode & stat.S_IXUSR:
+                return False
+            digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+        except OSError:
+            return False
+        return data == {**_marker_payload(spec), "binary_sha256": digest}
     if spec.runtime != "python-builtin":
         return True
     desired_fingerprint = _builtin_fingerprint(spec)
@@ -200,6 +218,12 @@ def _validate_supported_spec(spec: ToolSpec) -> str | None:
     if spec.source == "builtin" and spec.runtime == "python-builtin" and spec.update_policy == "bundled-with-setup":
         if len(spec.entrypoints) < 1 or not spec.module:
             return "builtin Python tool requires module and entrypoints"
+        return None
+    if spec.source == "git" and spec.runtime == "go-binary" and spec.update_policy == "pinned-tested":
+        if not spec.repo or not _is_commit_sha(spec.ref) or len(spec.entrypoints) != 1:
+            return "Go binary requires a repository, exact 40-hex commit and one public command"
+        if spec.name != "tunnelctl" or spec.entrypoints != ("tunnelctl",) or len(spec.health_contract) != 1 or spec.health_contract[0].argv != ("tunnelctl", "--version"):
+            return "current Go binary deployer supports tunnelctl --version health only"
         return None
     if spec.source != "git" or spec.runtime != "python-venv" or spec.update_policy != "pinned-tested":
         return (
@@ -241,6 +265,92 @@ def _health(spec: ToolSpec, release: Path) -> tuple[bool, str]:
         if text:
             details.append(text.splitlines()[0])
     return True, "; ".join(details) or "runtime checks passed"
+
+
+def _health_go(spec: ToolSpec, release: Path) -> tuple[bool, str]:
+    binary = _go_command(release, spec.entrypoints[0])
+    if not binary.is_file():
+        return False, f"expected installed binary is missing: {binary}"
+    details = []
+    for check in spec.health_contract:
+        try:
+            cp = run([str(binary), *check.argv[1:]], timeout=15)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return False, f"installed binary health failed: {exc}"
+        if cp.returncode != 0 or not cp.stdout.strip().startswith("tunnelctl "):
+            return False, f"installed binary version failed: {(cp.stderr or cp.stdout).strip()[-240:]}"
+        details.append(cp.stdout.strip().splitlines()[0])
+    ssh = shutil.which("ssh")
+    if not ssh:
+        return False, "OpenSSH client is required to run tunnelctl"
+    try:
+        cp = run([ssh, "-V"], timeout=10)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return False, f"OpenSSH client failed: {exc}"
+    if cp.returncode != 0:
+        return False, f"OpenSSH client failed: {(cp.stderr or cp.stdout).strip()[-240:]}"
+    return True, "; ".join(details) + "; OpenSSH client available"
+
+
+def _install_go_release(spec: ToolSpec, reporter: Reporter) -> Path | None:
+    release = _release_dir(spec)
+    if release.exists() or release.is_symlink():
+        if _owned_release(release, spec):
+            return release
+        reporter.add(f"{spec.name} runtime", STATE_CONFLICT, f"runtime path exists but ownership is not proven: {release}")
+        return None
+    git, go = shutil.which("git"), shutil.which("go")
+    if not git or not go:
+        reporter.add(f"{spec.name} runtime", STATE_FAILED, "Git and Go 1.22+ are required to build pinned tunnelctl source. MANUAL ACTION REQUIRED: install missing prerequisites and rerun toolchainctl apply")
+        return None
+    try:
+        version = run([go, "version"], timeout=10)
+        if version.returncode != 0:
+            raise ValueError("Go compiler did not respond successfully")
+    except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+        reporter.add(f"{spec.name} runtime", STATE_FAILED, f"Go compiler prerequisite failed: {exc}")
+        return None
+    try:
+        release.parent.mkdir(parents=True, exist_ok=True)
+        release.mkdir()
+    except FileExistsError:
+        reporter.add(f"{spec.name} runtime", STATE_CONFLICT, f"runtime path appeared concurrently: {release}")
+        return None
+    except OSError as exc:
+        reporter.add(f"{spec.name} runtime", STATE_FAILED, f"cannot create runtime path: {exc}")
+        return None
+    complete = False
+    try:
+        with tempfile.TemporaryDirectory(prefix="agent-toolchain-go-source-") as temporary:
+            source = Path(temporary) / "source"
+            env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GOTOOLCHAIN": "local", "GOWORK": "off", "CGO_ENABLED": "0"}
+            clone = run([git, "clone", "--no-checkout", "--", spec.repo, str(source)], env=env, timeout=120)
+            if clone.returncode != 0:
+                raise ValueError("source clone failed: " + clone.stderr.strip()[-300:])
+            checkout = run([git, "-C", str(source), "checkout", "--detach", spec.ref], env=env, timeout=60)
+            if checkout.returncode != 0:
+                raise ValueError("exact-ref checkout failed: " + checkout.stderr.strip()[-300:])
+            head = run([git, "-C", str(source), "rev-parse", "HEAD"], env=env, timeout=10)
+            if head.returncode != 0 or head.stdout.strip().lower() != spec.ref.lower():
+                raise ValueError("source checkout HEAD does not match exact ToolSpec ref")
+            binary = _go_command(release, spec.entrypoints[0])
+            build = run([go, "build", "-trimpath", "-buildvcs=false", "-o", str(binary), "./cmd/tunnelctl"], cwd=source, env=env, timeout=300)
+            if build.returncode != 0:
+                raise ValueError("Go build failed: " + build.stderr.strip()[-400:])
+        ok, detail = _health_go(spec, release)
+        if not ok:
+            raise ValueError("new binary failed health: " + detail)
+        marker = {**_marker_payload(spec), "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest()}
+        atomic_write(_marker_path(release), (json.dumps(marker, sort_keys=True) + "\n").encode("utf-8"))
+        complete = True
+        reporter.add(f"{spec.name} runtime", STATE_CONFIGURED, f"built exact-ref Go binary {spec.ref[:12]}: {release}")
+        return release
+    except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+        reporter.add(f"{spec.name} runtime", STATE_FAILED, str(exc))
+        return None
+    finally:
+        if not complete and release.exists() and not release.is_symlink():
+            shutil.rmtree(release, ignore_errors=True)
 
 
 def _pip_source(spec: ToolSpec) -> str:
@@ -509,9 +619,15 @@ def _manifest_record(spec: ToolSpec, release: Path) -> dict[str, object]:
     venv = release / "venv"
     entries: dict[str, dict[str, str]] = {}
     for command in spec.entrypoints:
+        if spec.runtime == "python-venv":
+            target = _venv_command(venv, command)
+        elif spec.runtime == "go-binary":
+            target = _go_command(release, command)
+        else:
+            target = release / f"{command}.py"
         entries[command] = {
             "public_path": str(_public_entrypoint(spec, command)),
-            "target": str(_venv_command(venv, command) if spec.runtime == "python-venv" else release / f"{command}.py"),
+            "target": str(target),
         }
     result = {
         "owner": "agent-toolchain",
@@ -527,6 +643,8 @@ def _manifest_record(spec: ToolSpec, release: Path) -> dict[str, object]:
 
     if spec.name == "proxy-tools" and spec.runtime == "python-builtin":
         result["core_identity"] = json.loads((release / BUNDLED_IDENTITY).read_text(encoding="utf-8"))
+    if spec.runtime == "go-binary":
+        result["binary_sha256"] = hashlib.sha256(_go_command(release, spec.entrypoints[0]).read_bytes()).hexdigest()
     return result
 
 
@@ -697,6 +815,63 @@ def reconcile_python_tool(
     return entrypoint_changed
 
 
+def reconcile_go_tool(spec: ToolSpec, reporter: Reporter, *, check: bool, skip_install: bool, manifest: dict[str, Any]) -> bool:
+    if platform_name() not in spec.platforms:
+        reporter.add(f"{spec.name} runtime", STATE_SKIPPED, f"not enabled on {platform_name()}")
+        return False
+    unsupported = _validate_supported_spec(spec)
+    if unsupported:
+        reporter.add(f"{spec.name} runtime", STATE_CONFLICT, unsupported)
+        return False
+    if skip_install:
+        reporter.add(f"{spec.name} runtime", STATE_SKIPPED, "managed tool runtime reconciliation skipped")
+        return False
+    release = _release_dir(spec)
+    present = release.exists() or release.is_symlink()
+    if present and not _owned_release(release, spec):
+        reporter.add(f"{spec.name} runtime", STATE_CONFLICT, f"runtime ownership or binary integrity failed: {release}")
+        return False
+    if not present:
+        if check:
+            reporter.add(f"{spec.name} runtime", STATE_MISSING, f"toolchainctl apply will build exact-ref Go binary {spec.ref[:12]}")
+            return False
+        release = _install_go_release(spec, reporter)
+        if release is None:
+            return False
+    else:
+        reporter.add(f"{spec.name} runtime", STATE_OK, f"exact ref {spec.ref[:12]}: {release}")
+    managed_tools = manifest.setdefault("managed_tools", {})
+    previous = managed_tools.get(spec.name)
+    if (isinstance(previous, dict) and previous.get("runtime_path") == str(release)
+            and previous.get("source_ref") == spec.ref
+            and previous.get("binary_sha256") != hashlib.sha256(_go_command(release, spec.entrypoints[0]).read_bytes()).hexdigest()):
+        reporter.add(f"{spec.name} runtime", STATE_CONFLICT, "installed binary hash differs from ownership manifest; preserved")
+        return False
+    healthy, detail = _health_go(spec, release)
+    if not healthy:
+        reporter.add(f"{spec.name} health", STATE_CONFLICT, detail)
+        return False
+    reporter.add(f"{spec.name} health", STATE_OK, detail)
+    entrypoint_changed = False
+    for command in spec.entrypoints:
+        target = _go_command(release, command)
+        entrypoint_ok, changed = _reconcile_entrypoint(spec, command, target, previous, reporter, check)
+        entrypoint_changed |= changed
+        if not entrypoint_ok:
+            return False
+        _report_resolution(spec, command, target, reporter)
+    desired = _manifest_record(spec, release)
+    if previous != desired:
+        if check:
+            reporter.add(f"{spec.name} ownership metadata", STATE_OUTDATED, "managed_tools metadata will be recorded by apply")
+            return False
+        managed_tools[spec.name] = desired
+        reporter.add(f"{spec.name} ownership metadata", STATE_CONFIGURED, "recorded in ownership manifest")
+        return True
+    reporter.add(f"{spec.name} ownership metadata", STATE_OK, "ownership manifest matches installed runtime")
+    return entrypoint_changed
+
+
 def reconcile_tool_specs(
     specs: dict[str, ToolSpec],
     python_exe: str,
@@ -711,6 +886,8 @@ def reconcile_tool_specs(
         spec = specs[name]
         if spec.runtime == "python-builtin":
             changed |= reconcile_builtin_tool(spec, reporter, check=check, manifest=manifest)
+        elif spec.runtime == "go-binary":
+            changed |= reconcile_go_tool(spec, reporter, check=check, skip_install=skip_install, manifest=manifest)
         else:
             changed |= reconcile_python_tool(spec, python_exe, reporter, check=check, skip_install=skip_install, manifest=manifest)
     return changed

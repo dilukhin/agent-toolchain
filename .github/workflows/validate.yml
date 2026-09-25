@@ -18,6 +18,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 20.12.2
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
       - name: Install BMAD runtime prerequisite
         shell: powershell
         run: |
@@ -100,6 +103,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 20.12.2
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
       - name: Install BMAD runtime prerequisite
         run: |
           python3 -m pip install uv
@@ -133,6 +139,15 @@ jobs:
             ./tests/run_managed_tools_integration.py
       - name: Validate transitional YC guard unit tests
         run: python3 -m unittest tests.test_yc_transitional_guard_deployment tests.test_yc_transitional_entry -v
+      - name: Validate read-only P0 metrics
+        run: python3 -m unittest tests.test_opencode_permissions_pilot_metrics -v
+      - name: Validate P0 metrics CLI without state
+        run: |
+          temp_home="$(mktemp -d)"
+          HOME="$temp_home" AGENT_TOOLCHAIN_STATE_DIR="$temp_home/state" python3 ./toolchainctl.py p0 metrics > "$temp_home/result.json"
+          python3 -c 'import json,sys; assert json.load(open(sys.argv[1], encoding="utf-8")) == {"status": "no_data", "reason": "no_active_artifact"}' "$temp_home/result.json"
+          test ! -e "$temp_home/state"
+          test ! -e "$temp_home/.local"
       - name: Validate shell bootstrap and retired interface syntax
         run: |
           bash -n ./bootstrap_linux.sh

@@ -22,6 +22,7 @@ from pathlib import Path, PurePosixPath
 
 import setup_core
 import setup_workspace_trust
+import setup_opencode_permissions_pilot_metrics as p0_metrics
 from toolchain_state import state_base as _state_base, default_state_dir
 from core_identity import CORE_SEMVER, read_identity, version_text
 from setup_lib import (
@@ -53,6 +54,7 @@ from setup_external_updates import cache_path, load_cache, refresh
 from setup_inventory import common_external_cli_inventory
 import setup_yc_transitional_guard
 import setup_agent_inventory
+import setup_agent_roles
 
 PRODUCT = "agent-toolchain"
 LEGACY_PRODUCT = "opencode_setup"
@@ -79,6 +81,7 @@ _CORE_REQUIRED_FILES = (
     "setup_path.py",
     "setup_inventory.py",
     "setup_agent_inventory.py",
+    "setup_agent_roles.py",
     "setup_external_updates.py",
     "setup_tools.py",
     "setup_yc_transitional_guard.py",
@@ -87,6 +90,7 @@ _CORE_REQUIRED_FILES = (
     "core_identity.py",
     "toolchain_state.py",
     "setup_workspace_trust.py",
+    "setup_opencode_permissions_pilot_metrics.py",
     "workspace_trust_contract.py",
     "config_data.json",
 )
@@ -220,6 +224,10 @@ def build_parser() -> argparse.ArgumentParser:
     setup_yc_transitional_guard.add_cli_parser(sub)
     setup_agent_inventory.add_cli_parser(sub)
     setup_workspace_trust.add_cli_parser(sub)
+    p0 = sub.add_parser("p0", help="explicit OpenCode Permissions P0 pilot controls")
+    p0_sub = p0.add_subparsers(dest="p0_command", required=True)
+    metrics = p0_sub.add_parser("metrics", help="read current privacy-bounded P0 snapshots")
+    metrics.add_argument("--artifact-id", help="exact historical pilot artifact ID after disable")
     return parser
 
 
@@ -506,6 +514,60 @@ def _run_adopt(args: argparse.Namespace) -> int:
             reporter.add("ownership manifest", STATE_CONFIGURED, f"semantic ownership recorded: {manifest_path}")
     reporter.render()
     return 2 if reporter.has_conflict else 0
+
+def _run_agent_adopt_model(args: argparse.Namespace) -> int:
+    if args.role not in setup_agent_roles.ADOPTABLE_MODEL_ROLES:
+        print(
+            "unsupported role for model-only adoption: " + str(args.role),
+            file=sys.stderr,
+        )
+        return 2
+    if re.fullmatch(r"[0-9a-f]{64}", args.expected_sha or "") is None:
+        print("--expected-sha must be exactly 64 lowercase hex characters", file=sys.stderr)
+        return 2
+    try:
+        state_dir, migration_state, migration_detail = prepare_state(check=False)
+    except StateMigrationError as exc:
+        print(f"modified/conflict  agent-toolchain state migration  {exc}", file=sys.stderr)
+        return 2
+    if migration_detail and migration_state:
+        print(f"{migration_state:<18}agent-toolchain state migration  {migration_detail}")
+
+    manifest_path = state_dir / "manifest.json"
+    manifest, manifest_error, migration_pending = load_manifest(manifest_path)
+    if manifest_error:
+        print(f"modified/conflict  ownership manifest  {manifest_error}", file=sys.stderr)
+        return 2
+
+    config = json.loads((Path(__file__).resolve().parent / "config_data.json").read_text(encoding="utf-8"))
+    desired_models = setup_agent_roles.desired_role_models(config)
+    desired_model = desired_models.get(args.role)
+    if desired_model is None:
+        print(f"modified/conflict  OpenCode agent model {args.role}  current policy has no target model", file=sys.stderr)
+        return 2
+
+    config_dir = _default_paths()["config"]
+    destination = config_dir / "agents" / f"{args.role}.md"
+    reporter = Reporter()
+    changed = setup_agent_roles.adopt_agent_model(
+        role=args.role,
+        destination=destination,
+        desired_model=desired_model,
+        expected_current_sha=args.expected_sha,
+        manifest=manifest,
+        reporter=reporter,
+        state_dir=state_dir,
+    )
+    if changed or migration_pending:
+        try:
+            save_manifest(manifest_path, manifest)
+        except (OSError, ValueError) as exc:
+            reporter.add("ownership manifest", STATE_FAILED, f"cannot save {manifest_path}: {exc}")
+        else:
+            reporter.add("ownership manifest", STATE_CONFIGURED, f"agent model ownership recorded: {manifest_path}")
+    reporter.render()
+    return 2 if reporter.has_conflict else 0
+
 
 def _core_argv(args: argparse.Namespace, state_dir: Path) -> list[str]:
     paths = _default_paths()
@@ -1031,9 +1093,35 @@ def main(argv: list[str] | None = None) -> int:
         print(_version_text(), file=sys.stderr)
     args = build_parser().parse_args(arguments)
     if args.command == "agents":
+        if args.agents_command == "adopt-model":
+            return _run_agent_adopt_model(args)
         return setup_agent_inventory.run_cli(args, config_dir=_default_paths()["config"])
     if args.command == "workspace-trust":
         return setup_workspace_trust.run_cli(args)
+    if args.command == "p0":
+        if sys.platform != "linux":
+            print("modified/conflict  p0 metrics  PILOT_PLATFORM_UNSUPPORTED", file=sys.stderr)
+            return 2
+        try:
+            owned = p0_metrics.active_artifact(default_state_dir(resolve_override=False))
+            if args.artifact_id:
+                artifact_id = args.artifact_id
+                expected_version = owned[1] if owned and owned[0] == artifact_id else None
+                expected_native = owned[2] if owned and owned[0] == artifact_id else None
+            elif owned:
+                artifact_id, expected_version, expected_native = owned
+            else:
+                print(json.dumps({"status": "no_data", "reason": "no_active_artifact"}))
+                return 0
+            result = p0_metrics.read_metrics(
+                home=Path.home(), artifact_id=artifact_id,
+                expected_version=expected_version, expected_native_id=expected_native,
+            )
+            print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            return 0
+        except p0_metrics.MetricsConflict as exc:
+            print(f"modified/conflict  p0 metrics  {exc}", file=sys.stderr)
+            return 2
     if args.command == "updates":
         return _updates_phase(args)
     if args.command == "update":

@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import setup_opencode_permissions_pilot as pilot  # noqa: E402
+import setup_opencode_permissions_pilot_source as source  # noqa: E402
 
 
 class PilotDeploymentTests(unittest.TestCase):
@@ -140,6 +141,62 @@ class PilotDeploymentTests(unittest.TestCase):
     def paths(self, root: Path):
         return root / "config", root / "data", root / "state"
 
+    def test_pinned_source_cache_is_verified_reused_and_preserved_on_tamper(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundle, native, _ = self.make_artifacts(root)
+            pilot_id = json.loads((bundle / "manifest.json").read_text())["artifact_id"]
+            native_id = json.loads((native / "manifest.json").read_text())["artifact_id"]
+            files = json.loads((bundle / "manifest.json").read_text())["files"]
+            pin = source.SourcePin(
+                commit="a" * 40, version="1.18.29", pilot_id=pilot_id,
+                native_id=native_id,
+                pilot_files=("manifest.json", *(entry["path"] for entry in files)),
+            )
+            calls = []
+
+            def fetch(url):
+                calls.append(url)
+                relative = url.split(pin.commit + "/", 1)[1].split("/")
+                origin = bundle if relative[1] == "pilot" else native
+                return (origin / Path(*relative[3:])).read_bytes()
+
+            cache = root / "cache"
+            pair = source.materialize_source(
+                cache_root=cache, installed_version="1.18.29", pin=pin, fetch=fetch,
+            )
+            self.assertEqual(pair[0].name, bundle.name)
+            self.assertEqual(pair[1].name, native.name)
+            count = len(calls)
+            self.assertEqual(source.materialize_source(
+                cache_root=cache, installed_version="1.18.29", pin=pin, fetch=fetch,
+            ), pair)
+            self.assertEqual(len(calls), count)
+            (pair[0] / "bridge.js").write_text("modified", encoding="utf-8")
+            with self.assertRaisesRegex(source.SourceConflict, "SOURCE_ARTIFACT_INVALID"):
+                source.materialize_source(
+                    cache_root=cache, installed_version="1.18.29", pin=pin, fetch=fetch,
+                )
+            self.assertEqual((pair[0] / "bridge.js").read_text(), "modified")
+
+    def test_source_version_mismatch_and_download_failure_do_not_publish(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            pin = source.CURRENT
+            cache = root / "cache"
+            with self.assertRaisesRegex(source.SourceConflict, "INSTALLED_VERSION_MISMATCH"):
+                source.materialize_source(cache_root=cache, installed_version="1.18.30")
+            self.assertFalse(cache.exists())
+
+            def failed(_url):
+                raise OSError("synthetic offline")
+
+            with self.assertRaisesRegex(source.SourceConflict, "SOURCE_FETCH_FAILED"):
+                source.materialize_source(
+                    cache_root=cache, installed_version="1.18.29", pin=pin, fetch=failed,
+                )
+            self.assertFalse((cache / pin.commit).exists())
+
     def test_apply_readback_repeat_noop_and_disable_restore(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -208,6 +265,83 @@ class PilotDeploymentTests(unittest.TestCase):
             self.assertFalse(config.exists())
             self.assertFalse(data.exists())
             self.assertFalse(state.exists())
+
+    def test_disable_after_version_drift_restores_owned_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundle, native, _ = self.make_artifacts(root)
+            config, data, state = self.paths(root)
+            config.mkdir()
+            original = {"model": "synthetic/model", "permission": {"bash": {"legacy": "ask"}}}
+            (config / "opencode.jsonc").write_bytes(pilot._pretty_json(original))
+            pilot.apply_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.29", config_dir=config, data_dir=data, state_dir=state,
+            )
+            result = pilot.disable_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.30", config_dir=config, data_dir=data, state_dir=state,
+            )
+            self.assertEqual(result["status"], "disabled")
+            self.assertTrue(result["changed"])
+            self.assertEqual(json.loads((config / "opencode.jsonc").read_text()), original)
+            self.assertFalse((config / "plugins" / pilot.PLUGIN_NAME).exists())
+            self.assertFalse((state / "opencode-permissions-pilot.json").exists())
+
+    def test_disable_after_version_drift_preserves_foreign_plugin(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundle, native, _ = self.make_artifacts(root)
+            config, data, state = self.paths(root)
+            pilot.apply_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.29", config_dir=config, data_dir=data, state_dir=state,
+            )
+            plugin_path = config / "plugins" / pilot.PLUGIN_NAME
+            plugin_path.write_text("foreign replacement\n", encoding="utf-8")
+            config_before = (config / "opencode.jsonc").read_bytes()
+            with self.assertRaises(pilot.PilotDeploymentError) as ctx:
+                pilot.disable_pilot(
+                    pilot_bundle_dir=bundle, native_artifact_dir=native,
+                    installed_version="1.18.30", config_dir=config, data_dir=data, state_dir=state,
+                )
+            self.assertEqual(ctx.exception.code, "PLUGIN_OWNERSHIP_CONFLICT")
+            self.assertEqual(plugin_path.read_text(), "foreign replacement\n")
+            self.assertEqual((config / "opencode.jsonc").read_bytes(), config_before)
+
+    def test_disable_prepared_after_version_drift(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundle, native, _ = self.make_artifacts(root)
+            config, data, state = self.paths(root)
+            config.mkdir()
+            original = {"model": "synthetic/model"}
+            config_path = config / "opencode.jsonc"
+            config_path.write_bytes(pilot._pretty_json(original))
+            original_atomic = pilot._atomic_write
+
+            def interrupted(path, data_bytes):
+                if Path(path).resolve() == config_path.resolve():
+                    raise RuntimeError("synthetic interruption")
+                return original_atomic(Path(path), data_bytes)
+
+            pilot._atomic_write = interrupted
+            try:
+                with self.assertRaises(pilot.PilotDeploymentError):
+                    pilot.apply_pilot(
+                        pilot_bundle_dir=bundle, native_artifact_dir=native,
+                        installed_version="1.18.29", config_dir=config, data_dir=data, state_dir=state,
+                    )
+            finally:
+                pilot._atomic_write = original_atomic
+            self.assertEqual(json.loads((state / "opencode-permissions-pilot.json").read_text())["phase"], "prepared")
+            result = pilot.disable_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.30", config_dir=config, data_dir=data, state_dir=state,
+            )
+            self.assertTrue(result["changed"])
+            self.assertEqual(json.loads(config_path.read_text()), original)
+            self.assertFalse((state / "opencode-permissions-pilot.json").exists())
 
     def test_unknown_plugin_conflicts_without_overwrite(self):
         with tempfile.TemporaryDirectory() as td:
