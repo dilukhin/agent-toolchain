@@ -10,6 +10,7 @@ from typing import Any
 
 SCHEMA = 1
 OWNER = "agent-toolchain:routerai-status:v1"
+COMPLETION_CONTRACT = 1
 DOC = "docs/routerai_refresh_status_design_ru.md"
 STATUS_BRANCH = "automation/routerai-status"
 CATALOG_BRANCH = "automation/routerai-catalog"
@@ -100,6 +101,8 @@ def build_status(
     published_catalog_observed_at: str | None, published_main_sha: str,
     candidate_catalog_observed_at: str | None, candidate_sha: str | None,
     candidate_pr: int | None, candidate_validation: str,
+    run_id: int | None = None, run_attempt: int | None = None,
+    completion_contract: int = COMPLETION_CONTRACT,
 ) -> dict[str, Any]:
     last_successful = previous.get("last_successful_check")
     if not isinstance(last_successful, dict):
@@ -139,6 +142,7 @@ def build_status(
         "_managed_notice": MANAGED_NOTICE,
         "schema": SCHEMA,
         "owner": OWNER,
+        "completion_contract": completion_contract,
         "updated_at": attempt_at,
         "published": {
             "catalog_observed_at": published_catalog_observed_at,
@@ -148,6 +152,8 @@ def build_status(
         "last_attempt": {
             "at": attempt_at,
             "trigger": trigger,
+            "run_id": run_id,
+            "run_attempt": run_attempt,
             "status": attempt_status,
             "phase": phase,
             "error": error,
@@ -184,6 +190,7 @@ def pr_body(status: dict[str, Any]) -> str:
         f"- Последняя успешная проверка RouterAI: `{_fmt(successful.get('at'))}`",
         f"- На последней успешной проверке каталог изменился: `{_fmt(successful.get('catalog_changed'))}`",
         f"- Последняя попытка: `{_fmt(attempt.get('at'))}`",
+        f"- Run/attempt: `{_fmt(attempt.get('run_id'))}/{_fmt(attempt.get('run_attempt'))}`",
         f"- Результат последней попытки: `{_fmt(attempt.get('status'))}`",
         f"- Этап: `{_fmt(attempt.get('phase'))}`",
     ]
@@ -220,6 +227,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--candidate-validation", choices=("pending", "success", "failed", "unchanged", "none"), default="none")
     parser.add_argument("--attempt-at", required=True)
     parser.add_argument("--trigger", required=True)
+    parser.add_argument("--run-id", type=int)
+    parser.add_argument("--run-attempt", type=int)
+    parser.add_argument("--completion-contract", type=int, default=COMPLETION_CONTRACT)
     parser.add_argument("--attempt-status", choices=("success", "failed"), required=True)
     parser.add_argument("--phase", required=True)
     parser.add_argument("--error-code")
@@ -239,6 +249,9 @@ def main(argv: list[str] | None = None) -> int:
             previous=previous,
             attempt_at=args.attempt_at,
             trigger=args.trigger,
+            run_id=args.run_id,
+            run_attempt=args.run_attempt,
+            completion_contract=args.completion_contract,
             attempt_status=args.attempt_status,
             phase=args.phase,
             error_code=args.error_code,
