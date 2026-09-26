@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -595,6 +596,11 @@ class PilotDeploymentTests(unittest.TestCase):
                 control.disable(config_dir=config, data_dir=data, state_dir=state,
                                 cache_root=state / control.CACHE_NAME)
             self.assertEqual(plugin.read_text(encoding="utf-8"), "foreign")
+
+    def test_control_rejects_redirected_config_before_reporting_disabled(self):
+        with patch.dict("os.environ", {"OPENCODE_CONFIG_DIR": "/tmp/other-opencode"}):
+            with self.assertRaisesRegex(control.ControlConflict, "P0_CUSTOM_PATH_UNSUPPORTED"):
+                control.canonical_paths()
 
 
 if __name__ == "__main__":

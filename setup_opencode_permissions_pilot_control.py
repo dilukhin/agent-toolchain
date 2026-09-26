@@ -5,6 +5,7 @@ local verified cache so disabling also works after an OpenCode version change.
 """
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -21,6 +22,12 @@ class ControlConflict(ValueError):
 
 
 def canonical_paths() -> tuple[Path, Path, Path, Path]:
+    # The first MP-3 CLI profile covers only default OpenCode config/data
+    # locations. Do not report a false "disabled" state when OpenCode or the
+    # toolchain is redirected through environment-provided locations.
+    _require(not any(os.environ.get(name) for name in
+                     ("OPENCODE_CONFIG_DIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME")),
+             "P0_CUSTOM_PATH_UNSUPPORTED")
     home = Path.home()
     state = canonical_state_dir()
     return (home / ".config" / "opencode", home / ".local" / "share" / "opencode",
