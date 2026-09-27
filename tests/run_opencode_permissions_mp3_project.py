@@ -5,13 +5,13 @@ import json
 import os
 from pathlib import Path
 import socket
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
 import urllib.error
-from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import setup_opencode_permissions_pilot_control as control
@@ -101,10 +101,13 @@ def main() -> int:
                 os.environ.pop(name, None)
             assert subprocess.run([args.opencode, "--version"], text=True, capture_output=True,
                                   timeout=10).stdout.strip() == version
-            with mock.patch.object(enable.source, "materialize_source", return_value=(bundle, native)):
-                result = enable.enable(workspace=project, executable=args.opencode)
-            assert result["status"] == "active" and result["changed"] is True
             config_dir, data_dir, state_dir, cache_root = control.canonical_paths(project)
+            cached = cache_root / enable.source.CURRENT.commit
+            cached.mkdir(parents=True)
+            shutil.copytree(bundle, cached / pilot_id)
+            shutil.copytree(native, cached / native_id)
+            result = enable.enable(workspace=project, executable=args.opencode)
+            assert result["status"] == "active" and result["changed"] is True
             assert config_dir == project / ".opencode"
             assert (config_dir / "plugins" / enable.pilot.PLUGIN_NAME).is_file()
             assert not (home / ".config/opencode/plugins" / enable.pilot.PLUGIN_NAME).exists()
@@ -123,13 +126,8 @@ def main() -> int:
                            for item in (effective_sibling.get("plugin") or [])), "P0_PLUGIN_ESCAPED_PROJECT"
             assert control.status(config_dir=config_dir, data_dir=data_dir,
                                   state_dir=state_dir, cache_root=cache_root)["status"] == "active"
-            # The test used an already-checked-out exact artifact rather than
-            # the network cache, so the rollback calls the same reconciler.
-            rollback = enable.pilot.disable_pilot(
-                pilot_bundle_dir=bundle, native_artifact_dir=native,
-                installed_version=version, config_dir=config_dir,
-                data_dir=data_dir, state_dir=state_dir,
-            )
+            rollback = control.disable(config_dir=config_dir, data_dir=data_dir,
+                                       state_dir=state_dir, cache_root=cache_root)
             assert rollback["status"] == "disabled"
             assert not (config_dir / "plugins" / enable.pilot.PLUGIN_NAME).exists()
             assert not (config_dir / "opencode.jsonc").exists()
