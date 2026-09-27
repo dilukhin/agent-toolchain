@@ -41,7 +41,7 @@ class EnableTests(unittest.TestCase):
             "artifact_id": enable.source.CURRENT.pilot_id,
         })
         self.version = mock.patch.object(enable, "_version", return_value=enable.source.CURRENT.version)
-        self.binary = mock.patch.object(enable.shutil, "which", return_value="/usr/bin/opencode")
+        self.binary = mock.patch.object(enable.shutil, "which", return_value=str(self.root / "opencode"))
         self.env = mock.patch.object(enable, "_preflight_environment")
         self.calls = [item.start() for item in
                       (self.paths, self.status, self.fetch, self.artifacts,
