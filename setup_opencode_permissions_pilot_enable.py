@@ -121,13 +121,17 @@ def enable(*, workspace: Path, executable: str | None = None) -> dict[str, Any]:
         data_dir=data_dir, state_dir=state_dir, ensure_schema=True,
     )
     try:
-        after = _resolved_config(str(binary), workspace)
-        _require(after.get("permission") == validation["permission"],
-                 "P0_EFFECTIVE_PERMISSION_CONFLICT")
-        _require(any(pilot.PLUGIN_NAME in str(spec) for spec in (after.get("plugin") or [])),
-                 "P0_EFFECTIVE_PLUGIN_MISSING")
+        observed = pilot.inspect_pilot(
+            pilot_bundle_dir=bundle, native_artifact_dir=native,
+            installed_version=source.CURRENT.version, config_dir=config_dir,
+            data_dir=data_dir, state_dir=state_dir,
+        )
+        _require(observed.get("status") == "active"
+                 and observed.get("effective_readback") == "PASS"
+                 and observed.get("artifact_id") == source.CURRENT.pilot_id,
+                 "P0_OWNED_READBACK_CONFLICT")
         return {**result, "workspace": str(workspace)}
-    except (EnableConflict, OSError):
+    except (EnableConflict, pilot.PilotDeploymentError, OSError):
         # The reconciler checks exact ownership before removing anything.
         pilot.disable_pilot(
             pilot_bundle_dir=bundle, native_artifact_dir=native,

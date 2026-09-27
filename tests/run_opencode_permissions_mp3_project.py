@@ -57,6 +57,18 @@ def main() -> int:
             assert config_dir == project / ".opencode"
             assert (config_dir / "plugins" / enable.pilot.PLUGIN_NAME).is_file()
             assert not (home / ".config/opencode/plugins" / enable.pilot.PLUGIN_NAME).exists()
+            expected = enable.pilot.validate_artifacts(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version=version, installed_platform="linux",
+            )["permission"]
+            os.chmod(config_dir, 0o555)
+            try:
+                effective_project = enable._resolved_config(args.opencode, project)
+            finally:
+                os.chmod(config_dir, 0o755)
+            assert effective_project.get("permission") == expected, "P0_EFFECTIVE_POLICY_MISMATCH"
+            assert any(enable.pilot.PLUGIN_NAME in str(item)
+                       for item in (effective_project.get("plugin") or [])), "P0_EFFECTIVE_PLUGIN_MISSING"
             effective_sibling = enable._resolved_config(args.opencode, sibling)
             assert not effective_sibling.get("permission"), "P0_POLICY_ESCAPED_PROJECT"
             assert not any(enable.pilot.PLUGIN_NAME in str(item)

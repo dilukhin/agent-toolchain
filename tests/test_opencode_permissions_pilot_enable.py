@@ -1,6 +1,7 @@
 import tempfile
 from pathlib import Path
 import sys
+import subprocess
 import unittest
 from unittest import mock
 
@@ -35,14 +36,18 @@ class EnableTests(unittest.TestCase):
         self.apply = mock.patch.object(enable.pilot, "apply_pilot",
                                        return_value={"status": "active", "changed": True})
         self.disable = mock.patch.object(enable.pilot, "disable_pilot")
+        self.inspect = mock.patch.object(enable.pilot, "inspect_pilot", return_value={
+            "status": "active", "effective_readback": "PASS",
+            "artifact_id": enable.source.CURRENT.pilot_id,
+        })
         self.version = mock.patch.object(enable, "_version", return_value=enable.source.CURRENT.version)
         self.binary = mock.patch.object(enable.shutil, "which", return_value="/usr/bin/opencode")
         self.env = mock.patch.object(enable, "_preflight_environment")
         self.calls = [item.start() for item in
                       (self.paths, self.status, self.fetch, self.artifacts,
-                       self.apply, self.disable, self.version, self.binary, self.env)]
+                       self.apply, self.disable, self.version, self.binary, self.env, self.inspect)]
         for item in (self.paths, self.status, self.fetch, self.artifacts,
-                     self.apply, self.disable, self.version, self.binary, self.env):
+                     self.apply, self.disable, self.version, self.binary, self.env, self.inspect):
             self.addCleanup(item.stop)
 
     def test_competing_agent_override_prevents_download_and_mutation(self):
@@ -53,18 +58,24 @@ class EnableTests(unittest.TestCase):
         self.calls[2].assert_not_called()
         self.calls[4].assert_not_called()
 
+    def test_completed_config_output_is_accepted_after_background_timeout(self):
+        timeout = subprocess.TimeoutExpired(["opencode", "debug", "config"], 10,
+                                            output=b'{"permission": {}}\n')
+        with mock.patch.object(enable.subprocess, "run", side_effect=timeout):
+            self.assertEqual(enable._resolved_config("/usr/bin/opencode", self.workspace),
+                             {"permission": {}})
+
     def test_effective_readback_failure_rolls_back_owned_deployment(self):
-        configs = [{}, {"permission": {"bash": {"*": "allow"}}, "plugin": ["opencode-permissions-p0.js"]}]
-        with mock.patch.object(enable, "_resolved_config", side_effect=configs), self.assertRaisesRegex(
-            enable.EnableConflict, "P0_EFFECTIVE_PERMISSION_CONFLICT"
+        self.calls[9].return_value = {"status": "conflict"}
+        with mock.patch.object(enable, "_resolved_config", return_value={}), self.assertRaisesRegex(
+            enable.EnableConflict, "P0_OWNED_READBACK_CONFLICT"
         ):
             enable.enable(workspace=self.workspace)
         self.calls[4].assert_called_once()
         self.calls[5].assert_called_once()
 
     def test_project_scoped_enable_and_repeat_noop(self):
-        configs = [{}, {"permission": self.native_permission, "plugin": ["opencode-permissions-p0.js"]}]
-        with mock.patch.object(enable, "_resolved_config", side_effect=configs):
+        with mock.patch.object(enable, "_resolved_config", return_value={}):
             result = enable.enable(workspace=self.workspace)
         self.assertEqual(result["workspace"], str(self.workspace))
         self.assertEqual(self.calls[4].call_args.kwargs["config_dir"], self.config)
