@@ -24,6 +24,7 @@ import setup_core
 import setup_workspace_trust
 import setup_opencode_permissions_pilot_metrics as p0_metrics
 import setup_opencode_permissions_pilot_control as p0_control
+import setup_opencode_permissions_pilot_enable as p0_enable
 from toolchain_state import state_base as _state_base, default_state_dir
 from core_identity import CORE_SEMVER, read_identity, version_text
 from setup_lib import (
@@ -96,6 +97,7 @@ _CORE_REQUIRED_FILES = (
     "setup_opencode_permissions_pilot_impl.py",
     "setup_opencode_permissions_pilot_source.py",
     "setup_opencode_permissions_pilot_control.py",
+    "setup_opencode_permissions_pilot_enable.py",
     "workspace_trust_contract.py",
     "config_data.json",
 )
@@ -231,8 +233,12 @@ def build_parser() -> argparse.ArgumentParser:
     setup_workspace_trust.add_cli_parser(sub)
     p0 = sub.add_parser("p0", help="explicit OpenCode Permissions P0 pilot controls")
     p0_sub = p0.add_subparsers(dest="p0_command", required=True)
-    p0_sub.add_parser("status", help="read P0 ownership and effective local state")
-    p0_sub.add_parser("disable", help="remove only an owned P0 pilot")
+    enabled = p0_sub.add_parser("enable", help="opt in to P0 for one Git workspace")
+    enabled.add_argument("--workspace", type=Path, required=True, help="absolute Git workspace root")
+    status = p0_sub.add_parser("status", help="read P0 ownership and effective local state")
+    status.add_argument("--workspace", type=Path, help="project-scoped pilot root")
+    disabled = p0_sub.add_parser("disable", help="remove only an owned P0 pilot")
+    disabled.add_argument("--workspace", type=Path, help="project-scoped pilot root")
     metrics = p0_sub.add_parser("metrics", help="read current privacy-bounded P0 snapshots")
     metrics.add_argument("--artifact-id", help="exact historical pilot artifact ID after disable")
     return parser
@@ -1109,9 +1115,20 @@ def main(argv: list[str] | None = None) -> int:
         if sys.platform != "linux":
             print(f"modified/conflict  p0 {args.p0_command}  PILOT_PLATFORM_UNSUPPORTED", file=sys.stderr)
             return 2
+        if args.p0_command == "enable":
+            try:
+                result = p0_enable.enable(workspace=args.workspace)
+                print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+                return 0
+            except (p0_enable.EnableConflict, p0_control.ControlConflict,
+                    p0_enable.source.SourceConflict, p0_enable.pilot.PilotDeploymentError,
+                    OSError) as exc:
+                code = str(exc) if not isinstance(exc, OSError) else "P0_IO_CONFLICT"
+                print(f"modified/conflict  p0 enable  {code}", file=sys.stderr)
+                return 2
         if args.p0_command in {"status", "disable"}:
             try:
-                config_dir, data_dir, state_dir, cache_root = p0_control.canonical_paths()
+                config_dir, data_dir, state_dir, cache_root = p0_control.canonical_paths(args.workspace)
                 operation = p0_control.status if args.p0_command == "status" else p0_control.disable
                 result = operation(config_dir=config_dir, data_dir=data_dir,
                                    state_dir=state_dir, cache_root=cache_root)

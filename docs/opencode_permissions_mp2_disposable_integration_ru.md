@@ -111,3 +111,11 @@ MP-2 закрыт после выполнения всех acceptance conditions
 Результат: **MP-2 CLOSED / PASS**.
 
 MP-2 не разрешает автоматическое изменение реальной пользовательской среды. MP-3 остаётся отдельным первым user opt-in этапом. Auditor, workspace trust и state-changing classifier остаются вне scope текущего этапа.
+
+## Текущее состояние после исторического закрытия
+
+Исторический closure выше относится к 1.18.29 и не является утверждением о каждом новом выпуске. Текущий exact target после [opencode_permissions PR #38](https://github.com/dilukhin/opencode_permissions/pull/38) — OpenCode 1.18.32/Linux, profile `opencode-1.18.32-gate-b`; официальный архив закреплён SHA-256 `3046e0404fdc60fb80307e7a47824ba07477364178a4d09baa8548496dd6d43b`. На точном head прошли source fingerprints 16/16, runtime proof и Linux/Windows проверки.
+
+Текущая пара артефактов: native `sha256:8bd76e558229888fe01ef079fde3c122e122b6608a2409ecb6b92b69da2d2d03`, pilot `sha256:0ed6e802ce0293494139aee4abcb582d0ae4c3ef556fc106c0df27affa9bac33`. Они отдельно валидированы content-bound contract. MP-2 с ASK-path метриками ранее прошёл [run 35432826165](https://github.com/dilukhin/agent-toolchain/actions/runs/35432826165) на 1.18.29. Для 1.18.32 все шесть production сценариев и project-scoped enable/status/rollback прошли в [run 36313040297](https://github.com/dilukhin/agent-toolchain/actions/runs/36313040297) на head `4fc7845cc7417cc17dc358fb55fbe7e69852ac6b`. Снимки метрик не являются измерением пользовательского потока подтверждений.
+
+MP-3 добавляет отдельное project-scoped включение и проверку отсутствия policy/plugin в соседнем проекте. Его пользовательский цикл и границы описаны в `docs/opencode_permissions_mp3_project_pilot_ru.md`.

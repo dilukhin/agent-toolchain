@@ -484,6 +484,7 @@ def apply_pilot(
     data_dir: Path,
     state_dir: Path,
     installed_platform: str = "linux",
+    ensure_schema: bool = False,
 ) -> dict[str, Any]:
     validation = validate_artifacts(
         pilot_bundle_dir=pilot_bundle_dir,
@@ -505,6 +506,9 @@ def apply_pilot(
         previous_permission = copy.deepcopy(config.get("permission"))
         desired_config = copy.deepcopy(config)
         desired_config["permission"] = copy.deepcopy(validation["permission"])
+        schema_added = ensure_schema and "$schema" not in desired_config
+        if schema_added:
+            desired_config["$schema"] = "https://opencode.ai/config.json"
         config_after = _pretty_json(desired_config)
         loader = _loader_bytes(runtime_dir)
 
@@ -525,6 +529,7 @@ def apply_pilot(
             "config_sha256_before": _sha256_bytes(raw_before) if raw_before is not None else None,
             "previous_permission_present": previous_present,
             "previous_permission": previous_permission if previous_present else None,
+            "schema_added": schema_added,
             "config_sha256_after": _sha256_bytes(config_after),
             "plugin_sha256": _sha256_bytes(loader),
         }
@@ -570,6 +575,8 @@ def apply_pilot(
         _require(before_ok, "PREPARED_CONFIG_DRIFT")
         desired_config = copy.deepcopy(config)
         desired_config["permission"] = copy.deepcopy(validation["permission"])
+        if state.get("schema_added"):
+            desired_config["$schema"] = "https://opencode.ai/config.json"
         config_after = _pretty_json(desired_config)
         _require(_sha256_bytes(config_after) == state["config_sha256_after"], "PREPARED_CONFIG_RECONSTRUCTION_MISMATCH")
         _atomic_write(config_path, config_after)
@@ -661,6 +668,10 @@ def disable_pilot(
             current["permission"] = copy.deepcopy(state.get("previous_permission"))
         else:
             current.pop("permission", None)
+        if state.get("schema_added"):
+            _require(current.get("$schema") == "https://opencode.ai/config.json",
+                     "SCHEMA_ROLLBACK_CONFLICT")
+            current.pop("$schema")
 
         if state.get("config_existed_before"):
             restored = _pretty_json(current)
