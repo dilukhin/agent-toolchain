@@ -22,10 +22,10 @@ class SourcePin:
 
 
 CURRENT = SourcePin(
-    commit="7922d612f244882aae3d843a64393b1363b593d9",
-    version="1.18.29",
-    pilot_id="sha256:21582d375823f499a2792824993a7a7510301c8fce2711cd01a25caececdaf88",
-    native_id="sha256:b38090e07008fb174607aa2a924cfef1dd26d03bdb339a379b1a770397a8ad84",
+    commit="e973879d372e76a763b80d255445f9a864c73486",
+    version="1.18.32",
+    pilot_id="sha256:0ed6e802ce0293494139aee4abcb582d0ae4c3ef556fc106c0df27affa9bac33",
+    native_id="sha256:8bd76e558229888fe01ef079fde3c122e122b6608a2409ecb6b92b69da2d2d03",
     pilot_files=(
         "manifest.json",
         "bridge.js",

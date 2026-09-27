@@ -196,7 +196,7 @@ class PilotDeploymentTests(unittest.TestCase):
 
             with self.assertRaisesRegex(source.SourceConflict, "SOURCE_FETCH_FAILED"):
                 source.materialize_source(
-                    cache_root=cache, installed_version="1.18.29", pin=pin, fetch=failed,
+                    cache_root=cache, installed_version=pin.version, pin=pin, fetch=failed,
                 )
             self.assertFalse((cache / pin.commit).exists())
 

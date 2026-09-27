@@ -21,7 +21,7 @@ class ControlConflict(ValueError):
     pass
 
 
-def canonical_paths() -> tuple[Path, Path, Path, Path]:
+def canonical_paths(workspace: Path | None = None) -> tuple[Path, Path, Path, Path]:
     # The first MP-3 CLI profile covers only default OpenCode config/data
     # locations. Do not report a false "disabled" state when OpenCode or the
     # toolchain is redirected through environment-provided locations.
@@ -30,7 +30,17 @@ def canonical_paths() -> tuple[Path, Path, Path, Path]:
              "P0_CUSTOM_PATH_UNSUPPORTED")
     home = Path.home()
     state = canonical_state_dir()
-    return (home / ".config" / "opencode", home / ".local" / "share" / "opencode",
+    config = home / ".config" / "opencode"
+    if workspace is not None:
+        candidate = Path(workspace)
+        _require(candidate.is_absolute() and candidate.is_dir() and not candidate.is_symlink(),
+                 "P0_WORKSPACE_INVALID")
+        candidate = candidate.resolve(strict=True)
+        _require((candidate / ".git").exists() or (candidate / ".git").is_file(),
+                 "P0_WORKSPACE_GIT_ROOT_REQUIRED")
+        config = candidate / ".opencode"
+        _require(not config.is_symlink(), "P0_WORKSPACE_CONFIG_CONFLICT")
+    return (config, home / ".local" / "share" / "opencode",
             state, state / CACHE_NAME)
 
 

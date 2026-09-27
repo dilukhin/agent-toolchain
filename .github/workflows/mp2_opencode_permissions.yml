@@ -78,3 +78,11 @@ jobs:
             --opencode "$OPENCODE_RUNTIME_BINARY" \
             --release-archive "$OPENCODE_RELEASE_ARCHIVE" \
             --permissions-root "$GITHUB_WORKSPACE/opencode_permissions"
+
+      - name: Verify project-scoped P0 preflight and rollback on exact runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tests/run_opencode_permissions_mp3_project.py \
+            --opencode "$OPENCODE_RUNTIME_BINARY" \
+            --permissions-root "$GITHUB_WORKSPACE/opencode_permissions"
