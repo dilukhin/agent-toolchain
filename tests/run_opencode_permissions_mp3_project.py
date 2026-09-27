@@ -26,6 +26,9 @@ def resolved_from_server(binary: str, project: Path, sibling: Path):
         [binary, "serve", "--hostname", "127.0.0.1", "--port", str(port)],
         cwd=project, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        # Read Config.get() without waiting for plugin dependency installation.
+        # DC-4 and MP-2 separately exercise the real plugin execution path.
+        env={**os.environ, "OPENCODE_PURE": "1"},
     )
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
