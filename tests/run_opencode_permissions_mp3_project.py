@@ -18,6 +18,19 @@ import setup_opencode_permissions_pilot_control as control
 import setup_opencode_permissions_pilot_enable as enable
 
 
+def p0_cli(command: str, workspace: Path, binary: str):
+    env = {**os.environ, "PATH": str(Path(binary).parent) + os.pathsep + os.environ.get("PATH", "")}
+    run = subprocess.run(
+        [sys.executable, str(Path(__file__).resolve().parents[1] / "toolchainctl.py"),
+         "p0", command, "--workspace", str(workspace)],
+        text=True, capture_output=True, timeout=45, env=env,
+    )
+    assert run.returncode == 0, f"P0_CLI_{command.upper()}_FAILED_{run.returncode}"
+    value = json.loads(run.stdout)
+    assert isinstance(value, dict)
+    return value
+
+
 def resolved_from_server(binary: str, project: Path, sibling: Path):
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
@@ -106,7 +119,7 @@ def main() -> int:
             cached.mkdir(parents=True)
             shutil.copytree(bundle, cached / pilot_id)
             shutil.copytree(native, cached / native_id)
-            result = enable.enable(workspace=project, executable=args.opencode)
+            result = p0_cli("enable", project, args.opencode)
             assert result["status"] == "active" and result["changed"] is True
             assert config_dir == project / ".opencode"
             assert (config_dir / "plugins" / enable.pilot.PLUGIN_NAME).is_file()
@@ -124,10 +137,8 @@ def main() -> int:
             assert not effective_sibling.get("permission"), "P0_POLICY_ESCAPED_PROJECT"
             assert not any(enable.pilot.PLUGIN_NAME in str(item)
                            for item in (effective_sibling.get("plugin") or [])), "P0_PLUGIN_ESCAPED_PROJECT"
-            assert control.status(config_dir=config_dir, data_dir=data_dir,
-                                  state_dir=state_dir, cache_root=cache_root)["status"] == "active"
-            rollback = control.disable(config_dir=config_dir, data_dir=data_dir,
-                                       state_dir=state_dir, cache_root=cache_root)
+            assert p0_cli("status", project, args.opencode)["status"] == "active"
+            rollback = p0_cli("disable", project, args.opencode)
             assert rollback["status"] == "disabled"
             assert not (config_dir / "plugins" / enable.pilot.PLUGIN_NAME).exists()
             assert not (config_dir / "opencode.jsonc").exists()
