@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-09-26T08:35:19Z",
+  "observed_at": "2026-09-27T09:15:11Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -1038,7 +1038,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "0.0045684925",
+        "seconds": "0.27410955",
         "completion": "0.27410955"
       }
     },
@@ -1683,9 +1683,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000064289127566664",
-        "completion": "0.000128578255133328",
-        "input_cache_read": "0.000005357427297222"
+        "prompt": "0.0000531805420146",
+        "completion": "0.0001063610840292",
+        "input_cache_read": "0.0000044054886876"
       }
     },
     "deepseek/deepseek-v4-pro-0813": {
@@ -1702,9 +1702,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000040524355872",
-        "completion": "0.000121573067616",
-        "input_cache_read": "0.0000013508118624"
+        "prompt": "0.0000374850291816",
+        "completion": "0.0001124550875448",
+        "input_cache_read": "0.00000119270547396"
       }
     },
     "deepseek/deepseek-v4.1-flash": {
@@ -2632,8 +2632,9 @@
         "tokenizer": "Gemma"
       },
       "pricing": {
-        "prompt": "0.00000460504044",
-        "completion": "0.0000241216404"
+        "prompt": "0.0000065786292",
+        "completion": "0.000021928764",
+        "input_cache_read": "0.0000038375337"
       }
     },
     "google/gemma-4-31b-it": {
@@ -2652,8 +2653,8 @@
         "tokenizer": "Gemma"
       },
       "pricing": {
-        "prompt": "0.0000098679438",
-        "completion": "0.0000372788988",
+        "prompt": "0.0000087715056",
+        "completion": "0.000032893146",
         "input_cache_read": "0.000005482191"
       }
     },
@@ -4398,7 +4399,7 @@
       "pricing": {
         "audio": "0.010964382",
         "prompt": "0.000010964382",
-        "seconds": "0.0001827397",
+        "seconds": "0.010964382",
         "completion": "0.000032893146",
         "input_cache_read": "0.0000010964382"
       }
@@ -4529,9 +4530,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000047601864453",
-        "completion": "0.00020042890296",
-        "input_cache_read": "0.0000080171561184"
+        "prompt": "0.00004478950047",
+        "completion": "0.0001885873704",
+        "input_cache_read": "0.000007543494816"
       }
     },
     "moonshotai/kimi-k2.7-code": {
@@ -4570,9 +4571,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000112944098982",
-        "completion": "0.00099150906426",
-        "input_cache_read": "0.000032893146"
+        "prompt": "0.00005482191",
+        "completion": "0.000307002696",
+        "input_cache_read": "0.00000635934156"
       }
     },
     "morph/morph-v3-fast": {
@@ -4772,7 +4773,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000071268483",
+        "prompt": "0.00000427610898",
         "completion": "0.0000197358876"
       }
     },
@@ -7859,8 +7860,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.000010964382",
-        "completion": "0.000197358876"
+        "prompt": "0.000016446573",
+        "completion": "0.0002055821625",
+        "input_cache_read": "0.00000411164325"
       }
     },
     "qwen/qwen3.8-flash": {
@@ -8313,23 +8315,6 @@
       },
       "pricing": {
         "prompt": "0.0000021928764",
-        "completion": "0.0"
-      }
-    },
-    "respan/span-01-lite": {
-      "name": "Respan: Span-01 Lite (free)",
-      "created": 1790387542,
-      "context_length": 0,
-      "architecture": {
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "decisions"
-        ]
-      },
-      "pricing": {
-        "prompt": "0.0",
         "completion": "0.0"
       }
     },
@@ -9986,9 +9971,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000052036956972",
-        "completion": "0.000163544721912",
-        "input_cache_read": "0.0000096640062948"
+        "prompt": "0.00001957142187",
+        "completion": "0.00006151018302",
+        "input_cache_read": "0.0000032153050215"
       }
     },
     "z-ai/glm-5.3-flash": {
@@ -10199,9 +10184,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000040524355872",
-        "completion": "0.000121573067616",
-        "input_cache_read": "0.0000013508118624"
+        "prompt": "0.0000374850291816",
+        "completion": "0.0001124550875448",
+        "input_cache_read": "0.00000119270547396"
       }
     },
     "~google/gemini-flash-latest": {
@@ -10278,9 +10263,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000112944098982",
-        "completion": "0.00099150906426",
-        "input_cache_read": "0.000032893146"
+        "prompt": "0.00005482191",
+        "completion": "0.000307002696",
+        "input_cache_read": "0.00000635934156"
       }
     },
     "~openai/gpt-latest": {
@@ -10402,9 +10387,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000052036956972",
-        "completion": "0.000163544721912",
-        "input_cache_read": "0.0000096640062948"
+        "prompt": "0.00001957142187",
+        "completion": "0.00006151018302",
+        "input_cache_read": "0.0000032153050215"
       }
     }
   },
@@ -10508,7 +10493,8 @@
       "DeepSeek V4 Pro [reasoning, 146/292 ₽]",
       "DeepSeek V4 Pro [reasoning, 144/289 ₽]",
       "DeepSeek V4 Pro [reasoning, 121/242 ₽]",
-      "DeepSeek V4 Pro [reasoning, 64/129 ₽]"
+      "DeepSeek V4 Pro [reasoning, 64/129 ₽]",
+      "DeepSeek V4 Pro [reasoning, 53/106 ₽]"
     ],
     "minimax/minimax-m2.7": [
       "MiniMax M2.7",
