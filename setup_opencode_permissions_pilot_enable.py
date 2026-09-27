@@ -26,16 +26,23 @@ def _resolved_config(executable: str, workspace: Path) -> dict[str, Any]:
     # Config can contain credentials. Keep stdout/stderr private and never
     # include it in an exception or a CLI diagnostic.
     try:
-        run = subprocess.run(
-            [executable, "debug", "config"], cwd=workspace, text=True,
-            capture_output=True, timeout=35, check=False,
-        )
-        _require(run.returncode == 0 and len(run.stdout) < 1024 * 1024,
-                 "P0_EFFECTIVE_CONFIG_UNAVAILABLE")
-        value = json.loads(run.stdout)
+        try:
+            run = subprocess.run(
+                [executable, "debug", "config"], cwd=workspace, text=True,
+                capture_output=True, timeout=10, check=False,
+            )
+            _require(run.returncode == 0, "P0_EFFECTIVE_CONFIG_UNAVAILABLE")
+            raw = run.stdout
+        except subprocess.TimeoutExpired as exc:
+            # OpenCode can print the resolved config and then retain a detached
+            # dependency install. subprocess.run has killed that process here.
+            # A complete JSON document is sufficient; partial output fails.
+            raw = (exc.stdout or b"").decode("utf-8", "strict")
+        _require(len(raw) < 1024 * 1024, "P0_EFFECTIVE_CONFIG_UNAVAILABLE")
+        value = json.loads(raw)
         _require(isinstance(value, dict), "P0_EFFECTIVE_CONFIG_INVALID")
         return value
-    except (OSError, subprocess.TimeoutExpired, ValueError) as exc:
+    except (OSError, ValueError) as exc:
         if isinstance(exc, EnableConflict):
             raise
         raise EnableConflict("P0_EFFECTIVE_CONFIG_UNAVAILABLE") from exc
@@ -111,7 +118,7 @@ def enable(*, workspace: Path, executable: str | None = None) -> dict[str, Any]:
     result = pilot.apply_pilot(
         pilot_bundle_dir=bundle, native_artifact_dir=native,
         installed_version=source.CURRENT.version, config_dir=config_dir,
-        data_dir=data_dir, state_dir=state_dir,
+        data_dir=data_dir, state_dir=state_dir, ensure_schema=True,
     )
     try:
         after = _resolved_config(str(binary), workspace)

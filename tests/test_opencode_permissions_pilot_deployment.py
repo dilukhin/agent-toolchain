@@ -602,6 +602,32 @@ class PilotDeploymentTests(unittest.TestCase):
             with self.assertRaisesRegex(control.ControlConflict, "P0_CUSTOM_PATH_UNSUPPORTED"):
                 control.canonical_paths()
 
+    def test_project_schema_is_owned_and_removed_on_disable(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            bundle, native, _ = self.make_artifacts(root)
+            config, data, state = self.paths(root)
+            result = pilot.apply_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.29", config_dir=config,
+                data_dir=data, state_dir=state, ensure_schema=True,
+            )
+            self.assertEqual(result["status"], "active")
+            project_config = config / "opencode.jsonc"
+            self.assertEqual(json.loads(project_config.read_text())["$schema"],
+                             "https://opencode.ai/config.json")
+            self.assertFalse(pilot.apply_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.29", config_dir=config,
+                data_dir=data, state_dir=state, ensure_schema=True,
+            )["changed"])
+            pilot.disable_pilot(
+                pilot_bundle_dir=bundle, native_artifact_dir=native,
+                installed_version="1.18.29", config_dir=config,
+                data_dir=data, state_dir=state,
+            )
+            self.assertFalse(project_config.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

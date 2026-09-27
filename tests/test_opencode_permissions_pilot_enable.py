@@ -68,6 +68,7 @@ class EnableTests(unittest.TestCase):
             result = enable.enable(workspace=self.workspace)
         self.assertEqual(result["workspace"], str(self.workspace))
         self.assertEqual(self.calls[4].call_args.kwargs["config_dir"], self.config)
+        self.assertTrue(self.calls[4].call_args.kwargs["ensure_schema"])
         self.assertEqual(self.calls[4].call_args.kwargs["state_dir"], self.state)
         self.calls[5].assert_not_called()
         self.calls[1].return_value = {"status": "active", "artifact_id": enable.source.CURRENT.pilot_id}

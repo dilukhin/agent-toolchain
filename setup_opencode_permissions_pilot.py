@@ -104,6 +104,7 @@ def apply_pilot(
     data_dir: Path,
     state_dir: Path,
     installed_platform: str = "linux",
+    ensure_schema: bool = False,
 ) -> dict[str, Any]:
     # Artifact/version validation first: unsupported targets must not inspect or
     # mutate managed destinations as if they were deployable.
@@ -124,6 +125,7 @@ def apply_pilot(
             data_dir=data_dir,
             state_dir=state_dir,
             installed_platform=installed_platform,
+            ensure_schema=ensure_schema,
         )
     except PilotDeploymentError:
         raise
