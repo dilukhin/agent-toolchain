@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+import urllib.error
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -29,6 +30,7 @@ def resolved_from_server(binary: str, project: Path, sibling: Path):
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
         deadline = time.monotonic() + 30
+        last = "not_started"
         while time.monotonic() < deadline:
             if child.poll() is not None:
                 raise AssertionError("P0_SERVER_EXITED")
@@ -44,9 +46,13 @@ def resolved_from_server(binary: str, project: Path, sibling: Path):
                     assert isinstance(value, dict)
                     configs.append(value)
                 return configs
-            except (OSError, ValueError):
+            except urllib.error.HTTPError as exc:
+                last = f"HTTP_{exc.code}"
                 time.sleep(0.2)
-        raise AssertionError("P0_EFFECTIVE_CONFIG_SERVER_TIMEOUT")
+            except (OSError, ValueError) as exc:
+                last = type(exc).__name__
+                time.sleep(0.2)
+        raise AssertionError(f"P0_EFFECTIVE_CONFIG_SERVER_TIMEOUT_{last}")
     finally:
         child.terminate()
         try:
