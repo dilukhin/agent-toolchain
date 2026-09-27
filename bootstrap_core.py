@@ -67,6 +67,10 @@ REQUIRED_FILES = (
     "toolchain_state.py",
     "setup_workspace_trust.py",
     "setup_opencode_permissions_pilot_metrics.py",
+    "setup_opencode_permissions_pilot.py",
+    "setup_opencode_permissions_pilot_impl.py",
+    "setup_opencode_permissions_pilot_source.py",
+    "setup_opencode_permissions_pilot_control.py",
     "workspace_trust_contract.py",
     "config_data.json",
 )

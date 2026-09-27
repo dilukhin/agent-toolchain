@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import setup_opencode_permissions_pilot as pilot  # noqa: E402
 import setup_opencode_permissions_pilot_source as source  # noqa: E402
+import setup_opencode_permissions_pilot_control as control  # noqa: E402
 
 
 class PilotDeploymentTests(unittest.TestCase):
@@ -521,6 +524,83 @@ class PilotDeploymentTests(unittest.TestCase):
                     installed_version="1.18.29",
                 )
             self.assertEqual(ctx.exception.code, "PILOT_FILE_DIGEST_MISMATCH")
+
+
+    def test_control_status_disable_and_cache_integrity(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source_root = root / "source"
+            source_root.mkdir()
+            bundle, native, _ = self.make_artifacts(source_root)
+            config, data, state = self.paths(root)
+            cache = state / control.CACHE_NAME
+            commit = cache / ("a" * 40)
+            commit.mkdir(parents=True)
+            shutil.copytree(bundle, commit / bundle.name)
+            shutil.copytree(native, commit / native.name)
+
+            before = control.status(config_dir=config, data_dir=data, state_dir=state,
+                                    cache_root=cache)
+            self.assertEqual(before, {"status": "disabled"})
+            self.assertFalse(config.exists())
+            pilot.apply_pilot(pilot_bundle_dir=bundle, native_artifact_dir=native,
+                              installed_version="1.18.29", config_dir=config,
+                              data_dir=data, state_dir=state)
+            active = control.status(config_dir=config, data_dir=data, state_dir=state,
+                                    cache_root=cache)
+            self.assertEqual(active["status"], "active")
+            self.assertEqual(active["opencode_version_at_enable"], "1.18.29")
+            self.assertTrue(control.disable(config_dir=config, data_dir=data, state_dir=state,
+                                            cache_root=cache)["changed"])
+            self.assertEqual(control.status(config_dir=config, data_dir=data, state_dir=state,
+                                            cache_root=cache), {"status": "disabled"})
+            self.assertFalse(control.disable(config_dir=config, data_dir=data, state_dir=state,
+                                             cache_root=cache)["changed"])
+
+    def test_control_rejects_missing_or_modified_rollback_evidence(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            source_root = root / "source"
+            source_root.mkdir()
+            bundle, native, _ = self.make_artifacts(source_root)
+            config, data, state = self.paths(root)
+            cache = state / control.CACHE_NAME
+            pilot.apply_pilot(pilot_bundle_dir=bundle, native_artifact_dir=native,
+                              installed_version="1.18.29", config_dir=config,
+                              data_dir=data, state_dir=state)
+            plugin = config / "plugins" / pilot.PLUGIN_NAME
+            before = plugin.read_bytes()
+            with self.assertRaisesRegex(control.ControlConflict, "P0_SOURCE_CACHE_MISSING"):
+                control.disable(config_dir=config, data_dir=data, state_dir=state,
+                                cache_root=cache)
+            self.assertEqual(plugin.read_bytes(), before)
+            commit = cache / ("a" * 40)
+            commit.mkdir(parents=True)
+            cached_bundle = commit / bundle.name
+            shutil.copytree(bundle, cached_bundle)
+            shutil.copytree(native, commit / native.name)
+            cached_bundle.joinpath("bridge.js").write_text("tampered", encoding="utf-8")
+            with self.assertRaisesRegex(control.ControlConflict, "P0_SOURCE_CACHE_INVALID"):
+                control.status(config_dir=config, data_dir=data, state_dir=state,
+                               cache_root=cache)
+            self.assertEqual(plugin.read_bytes(), before)
+
+    def test_control_absent_state_preserves_foreign_plugin(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            config, data, state = self.paths(root)
+            plugin = config / "plugins" / pilot.PLUGIN_NAME
+            plugin.parent.mkdir(parents=True)
+            plugin.write_text("foreign", encoding="utf-8")
+            with self.assertRaisesRegex(control.ControlConflict, "P0_UNKNOWN_PLUGIN"):
+                control.disable(config_dir=config, data_dir=data, state_dir=state,
+                                cache_root=state / control.CACHE_NAME)
+            self.assertEqual(plugin.read_text(encoding="utf-8"), "foreign")
+
+    def test_control_rejects_redirected_config_before_reporting_disabled(self):
+        with patch.dict("os.environ", {"OPENCODE_CONFIG_DIR": "/tmp/other-opencode"}):
+            with self.assertRaisesRegex(control.ControlConflict, "P0_CUSTOM_PATH_UNSUPPORTED"):
+                control.canonical_paths()
 
 
 if __name__ == "__main__":

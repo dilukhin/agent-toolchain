@@ -23,6 +23,7 @@ from pathlib import Path, PurePosixPath
 import setup_core
 import setup_workspace_trust
 import setup_opencode_permissions_pilot_metrics as p0_metrics
+import setup_opencode_permissions_pilot_control as p0_control
 from toolchain_state import state_base as _state_base, default_state_dir
 from core_identity import CORE_SEMVER, read_identity, version_text
 from setup_lib import (
@@ -91,6 +92,10 @@ _CORE_REQUIRED_FILES = (
     "toolchain_state.py",
     "setup_workspace_trust.py",
     "setup_opencode_permissions_pilot_metrics.py",
+    "setup_opencode_permissions_pilot.py",
+    "setup_opencode_permissions_pilot_impl.py",
+    "setup_opencode_permissions_pilot_source.py",
+    "setup_opencode_permissions_pilot_control.py",
     "workspace_trust_contract.py",
     "config_data.json",
 )
@@ -226,6 +231,8 @@ def build_parser() -> argparse.ArgumentParser:
     setup_workspace_trust.add_cli_parser(sub)
     p0 = sub.add_parser("p0", help="explicit OpenCode Permissions P0 pilot controls")
     p0_sub = p0.add_subparsers(dest="p0_command", required=True)
+    p0_sub.add_parser("status", help="read P0 ownership and effective local state")
+    p0_sub.add_parser("disable", help="remove only an owned P0 pilot")
     metrics = p0_sub.add_parser("metrics", help="read current privacy-bounded P0 snapshots")
     metrics.add_argument("--artifact-id", help="exact historical pilot artifact ID after disable")
     return parser
@@ -1100,8 +1107,20 @@ def main(argv: list[str] | None = None) -> int:
         return setup_workspace_trust.run_cli(args)
     if args.command == "p0":
         if sys.platform != "linux":
-            print("modified/conflict  p0 metrics  PILOT_PLATFORM_UNSUPPORTED", file=sys.stderr)
+            print(f"modified/conflict  p0 {args.p0_command}  PILOT_PLATFORM_UNSUPPORTED", file=sys.stderr)
             return 2
+        if args.p0_command in {"status", "disable"}:
+            try:
+                config_dir, data_dir, state_dir, cache_root = p0_control.canonical_paths()
+                operation = p0_control.status if args.p0_command == "status" else p0_control.disable
+                result = operation(config_dir=config_dir, data_dir=data_dir,
+                                   state_dir=state_dir, cache_root=cache_root)
+                print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+                return 0
+            except (p0_control.ControlConflict, OSError) as exc:
+                code = str(exc) if isinstance(exc, p0_control.ControlConflict) else "P0_IO_CONFLICT"
+                print(f"modified/conflict  p0 {args.p0_command}  {code}", file=sys.stderr)
+                return 2
         try:
             owned = p0_metrics.active_artifact(default_state_dir(resolve_override=False))
             if args.artifact_id:
