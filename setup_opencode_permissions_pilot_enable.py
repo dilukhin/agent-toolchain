@@ -88,6 +88,10 @@ def enable(*, workspace: Path, executable: str | None = None) -> dict[str, Any]:
     _require(not (config_dir / "plugins").is_symlink(), "P0_WORKSPACE_PLUGIN_CONFLICT")
     _require(not (config_dir / "opencode.json").exists(), "P0_WORKSPACE_CONFIG_CONFLICT")
     _require(not (config_dir / "opencode.jsonc").is_symlink(), "P0_WORKSPACE_CONFIG_CONFLICT")
+    binary = executable or shutil.which("opencode")
+    _require(bool(binary) and Path(binary).is_absolute(), "P0_OPENCODE_MISSING")
+    _require(_version(str(binary)) == source.CURRENT.version,
+             "P0_INSTALLED_VERSION_MISMATCH")
     # One owned pilot at a time. Do not mistakenly interpret a global or other
     # project deployment as the currently selected workspace.
     observed = control.status(config_dir=config_dir, data_dir=data_dir,
@@ -97,11 +101,6 @@ def enable(*, workspace: Path, executable: str | None = None) -> dict[str, Any]:
                  "P0_ACTIVE_ARTIFACT_MISMATCH")
         return {**observed, "changed": False}
     _require(observed["status"] == "disabled", "P0_PREPARED_RECOVERY_REQUIRED")
-
-    binary = executable or shutil.which("opencode")
-    _require(bool(binary) and Path(binary).is_absolute(), "P0_OPENCODE_MISSING")
-    _require(_version(str(binary)) == source.CURRENT.version,
-             "P0_INSTALLED_VERSION_MISMATCH")
 
     before = _resolved_config(str(binary), workspace)
     _no_competing_effective_layer(before)
@@ -115,6 +114,7 @@ def enable(*, workspace: Path, executable: str | None = None) -> dict[str, Any]:
     _require(validation["pilot_artifact_id"] == source.CURRENT.pilot_id
              and validation["native_artifact_id"] == source.CURRENT.native_id,
              "P0_SOURCE_IDENTITY_MISMATCH")
+    _no_competing_effective_layer(_resolved_config(str(binary), workspace))
     result = pilot.apply_pilot(
         pilot_bundle_dir=bundle, native_artifact_dir=native,
         installed_version=source.CURRENT.version, config_dir=config_dir,

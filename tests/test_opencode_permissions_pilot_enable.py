@@ -74,6 +74,15 @@ class EnableTests(unittest.TestCase):
         self.calls[4].assert_called_once()
         self.calls[5].assert_called_once()
 
+    def test_new_competing_layer_during_source_fetch_stops_before_apply(self):
+        configs = [{}, {"permission": {"bash": "allow"}}]
+        with mock.patch.object(enable, "_resolved_config", side_effect=configs), self.assertRaisesRegex(
+            enable.EnableConflict, "P0_COMPETING_PERMISSION_LAYER"
+        ):
+            enable.enable(workspace=self.workspace)
+        self.calls[2].assert_called_once()
+        self.calls[4].assert_not_called()
+
     def test_project_scoped_enable_and_repeat_noop(self):
         with mock.patch.object(enable, "_resolved_config", return_value={}):
             result = enable.enable(workspace=self.workspace)
