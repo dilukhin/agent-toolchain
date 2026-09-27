@@ -52,7 +52,7 @@ def _preflight_environment() -> None:
     blocked = (
         "OPENCODE_CONFIG", "OPENCODE_CONFIG_DIR", "OPENCODE_CONFIG_CONTENT",
         "OPENCODE_PERMISSION", "OPENCODE_DISABLE_PROJECT_CONFIG",
-        "OPENCODE_DISABLE_PLUGINS", "OPENCODE_EXPERIMENTAL_PURE",
+        "OPENCODE_PURE", "OPENCODE_FAKE_VCS", "OPENCODE_TEST_HOME",
         "XDG_CONFIG_HOME", "XDG_DATA_HOME",
     )
     _require(not any(os.environ.get(name) for name in blocked),

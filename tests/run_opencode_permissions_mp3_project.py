@@ -4,14 +4,56 @@ import argparse
 import json
 import os
 from pathlib import Path
+import socket
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.request
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import setup_opencode_permissions_pilot_control as control
 import setup_opencode_permissions_pilot_enable as enable
+
+
+def resolved_from_server(binary: str, project: Path, sibling: Path):
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    child = subprocess.Popen(
+        [binary, "serve", "--hostname", "127.0.0.1", "--port", str(port)],
+        cwd=project, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if child.poll() is not None:
+                raise AssertionError("P0_SERVER_EXITED")
+            try:
+                configs = []
+                for directory in (project, sibling):
+                    request = urllib.request.Request(
+                        f"http://127.0.0.1:{port}/config",
+                        headers={"x-opencode-directory": str(directory)},
+                    )
+                    with opener.open(request, timeout=3) as response:
+                        value = json.load(response)
+                    assert isinstance(value, dict)
+                    configs.append(value)
+                return configs
+            except (OSError, ValueError):
+                time.sleep(0.2)
+        raise AssertionError("P0_EFFECTIVE_CONFIG_SERVER_TIMEOUT")
+    finally:
+        child.terminate()
+        try:
+            child.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait(timeout=5)
 
 
 def main() -> int:
@@ -61,15 +103,12 @@ def main() -> int:
                 pilot_bundle_dir=bundle, native_artifact_dir=native,
                 installed_version=version, installed_platform="linux",
             )["permission"]
-            os.chmod(config_dir, 0o555)
-            try:
-                effective_project = enable._resolved_config(args.opencode, project)
-            finally:
-                os.chmod(config_dir, 0o755)
+            effective_project, effective_sibling = resolved_from_server(
+                args.opencode, project, sibling,
+            )
             assert effective_project.get("permission") == expected, "P0_EFFECTIVE_POLICY_MISMATCH"
             assert any(enable.pilot.PLUGIN_NAME in str(item)
                        for item in (effective_project.get("plugin") or [])), "P0_EFFECTIVE_PLUGIN_MISSING"
-            effective_sibling = enable._resolved_config(args.opencode, sibling)
             assert not effective_sibling.get("permission"), "P0_POLICY_ESCAPED_PROJECT"
             assert not any(enable.pilot.PLUGIN_NAME in str(item)
                            for item in (effective_sibling.get("plugin") or [])), "P0_PLUGIN_ESCAPED_PROJECT"
