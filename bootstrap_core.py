@@ -71,6 +71,7 @@ REQUIRED_FILES = (
     "setup_opencode_permissions_pilot_impl.py",
     "setup_opencode_permissions_pilot_source.py",
     "setup_opencode_permissions_pilot_control.py",
+    "setup_opencode_permissions_pilot_enable.py",
     "workspace_trust_contract.py",
     "config_data.json",
 )
