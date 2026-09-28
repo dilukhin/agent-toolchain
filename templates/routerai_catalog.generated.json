@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-09-27T09:15:11Z",
+  "observed_at": "2026-09-28T09:45:46Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -1625,9 +1625,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000059136394317",
-        "completion": "0.0000118272788634",
-        "input_cache_read": "0.00000118272788634"
+        "prompt": "0.000011172365362158",
+        "completion": "0.000022344730724316",
+        "input_cache_read": "0.0000022344730724316"
       }
     },
     "deepseek/deepseek-v4-flash-0731": {
@@ -1683,9 +1683,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000531805420146",
-        "completion": "0.0001063610840292",
-        "input_cache_read": "0.0000044054886876"
+        "prompt": "0.00014663369769048",
+        "completion": "0.00029326739538096",
+        "input_cache_read": "0.00001221947480754"
       }
     },
     "deepseek/deepseek-v4-pro-0813": {
@@ -1702,9 +1702,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000374850291816",
-        "completion": "0.0001124550875448",
-        "input_cache_read": "0.00000119270547396"
+        "prompt": "0.000019648172544",
+        "completion": "0.0003006170399232",
+        "input_cache_read": "0.00001355723905536"
       }
     },
     "deepseek/deepseek-v4.1-flash": {
@@ -3391,8 +3391,7 @@
           "text",
           "image",
           "video",
-          "file",
-          "audio"
+          "file"
         ],
         "output_modalities": [
           "text"
@@ -3415,8 +3414,7 @@
           "text",
           "image",
           "video",
-          "file",
-          "audio"
+          "file"
         ],
         "output_modalities": [
           "text"
@@ -3439,8 +3437,7 @@
           "text",
           "image",
           "video",
-          "file",
-          "audio"
+          "file"
         ],
         "output_modalities": [
           "text"
@@ -3463,8 +3460,7 @@
           "text",
           "image",
           "video",
-          "file",
-          "audio"
+          "file"
         ],
         "output_modalities": [
           "text"
@@ -3487,8 +3483,7 @@
           "text",
           "image",
           "video",
-          "file",
-          "audio"
+          "file"
         ],
         "output_modalities": [
           "text"
@@ -4530,9 +4525,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00004478950047",
-        "completion": "0.0001885873704",
-        "input_cache_read": "0.000007543494816"
+        "prompt": "0.000049339719",
+        "completion": "0.0002620487298",
+        "input_cache_read": "0.0000082232865"
       }
     },
     "moonshotai/kimi-k2.7-code": {
@@ -4571,9 +4566,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00005482191",
-        "completion": "0.000307002696",
-        "input_cache_read": "0.00000635934156"
+        "prompt": "0.00010964382",
+        "completion": "0.00098679438",
+        "input_cache_read": "0.000032893146"
       }
     },
     "morph/morph-v3-fast": {
@@ -9561,9 +9556,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000153501348",
-        "completion": "0.0000307002696",
-        "input_cache_read": "0.000000307002696"
+        "prompt": "0.0000076750674",
+        "completion": "0.0000153501348",
+        "input_cache_read": "0.00000076750674"
       }
     },
     "xiaomi/mimo-v2.6-pro": {
@@ -9933,9 +9928,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000105762428772",
-        "completion": "0.000332396204712",
-        "input_cache_read": "0.0000196415939148"
+        "prompt": "0.00010591593012",
+        "completion": "0.00033287863752",
+        "input_cache_read": "0.000019670101308"
       }
     },
     "z-ai/glm-5.2": {
@@ -9952,9 +9947,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000053571970452",
-        "completion": "0.000168369049992",
-        "input_cache_read": "0.0000099490802268"
+        "prompt": "0.0000537254718",
+        "completion": "0.0001688514828",
+        "input_cache_read": "0.00000997758762"
       }
     },
     "z-ai/glm-5.3": {
@@ -9971,9 +9966,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00001957142187",
-        "completion": "0.00006151018302",
-        "input_cache_read": "0.0000032153050215"
+        "prompt": "0.0000405682134",
+        "completion": "0.0001249939548",
+        "input_cache_read": "0.00000734613594"
       }
     },
     "z-ai/glm-5.3-flash": {
@@ -10184,9 +10179,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000374850291816",
-        "completion": "0.0001124550875448",
-        "input_cache_read": "0.00000119270547396"
+        "prompt": "0.000019648172544",
+        "completion": "0.0003006170399232",
+        "input_cache_read": "0.00001355723905536"
       }
     },
     "~google/gemini-flash-latest": {
@@ -10263,9 +10258,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00005482191",
-        "completion": "0.000307002696",
-        "input_cache_read": "0.00000635934156"
+        "prompt": "0.00010964382",
+        "completion": "0.00098679438",
+        "input_cache_read": "0.000032893146"
       }
     },
     "~openai/gpt-latest": {
@@ -10387,9 +10382,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00001957142187",
-        "completion": "0.00006151018302",
-        "input_cache_read": "0.0000032153050215"
+        "prompt": "0.0000405682134",
+        "completion": "0.0001249939548",
+        "input_cache_read": "0.00000734613594"
       }
     }
   },
