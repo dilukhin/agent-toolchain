@@ -97,16 +97,16 @@ class ToolSpecTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(parsed, {})
 
-    def test_repository_config_declares_follow_branch_policy_without_resolution(self) -> None:
+    def test_repository_config_pins_ssh_relay_without_branch_resolution(self) -> None:
         data = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
         env = data["managed_environment"]
         self.assertEqual(env["manifest_schema"], 2)
         self.assertEqual(env["tool_spec_schema"], TOOL_SPEC_SCHEMA)
 
         raw_ssh = env["tools"]["ssh_relay"]
-        self.assertEqual(raw_ssh["update_policy"], "follow-branch")
-        self.assertEqual(raw_ssh["branch"], "main")
-        self.assertNotIn("ref", raw_ssh)
+        self.assertEqual(raw_ssh["update_policy"], "pinned-tested")
+        self.assertEqual(raw_ssh["ref"], "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
+        self.assertNotIn("branch", raw_ssh)
 
         raw_safe = env["tools"]["agent-safe"]
         self.assertEqual(raw_safe["update_policy"], "follow-branch")
@@ -118,12 +118,19 @@ class ToolSpecTests(unittest.TestCase):
         self.assertEqual(set(parsed), {"ssh_relay", "agent-safe", "proxy-tools", "tunnelctl"})
 
         ssh = parsed["ssh_relay"]
-        self.assertEqual(ssh.update_policy, "follow-branch")
-        self.assertEqual(ssh.tracking_branch, "main")
+        self.assertEqual(ssh.update_policy, "pinned-tested")
+        self.assertIsNone(ssh.tracking_branch)
         self.assertEqual(ssh.runtime, "python-venv")
-        self.assertIsNone(ssh.ref)
+        self.assertEqual(ssh.ref, "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
         self.assertEqual(ssh.entrypoints, ("ssh_relay",))
         self.assertIn(("ssh_relay", "doctor"), tuple(check.argv for check in ssh.health_contract))
+
+        from setup_managed_tools import _pip_source, _validate_supported_spec
+        self.assertIsNone(_validate_supported_spec(ssh))
+        self.assertEqual(
+            _pip_source(ssh),
+            "git+https://github.com/dilukhin/ssh_relay.git@5a8d26f965fc09dc462e6558d821afafe6ebfefb",
+        )
 
         safe = parsed["agent-safe"]
         self.assertEqual(safe.update_policy, "follow-branch")
@@ -137,6 +144,9 @@ class ToolSpecTests(unittest.TestCase):
         self.assertEqual(proxy.runtime, "python-builtin")
         self.assertEqual(proxy.module, "proxy_tools")
         self.assertEqual(proxy.entrypoints, ("opencode-proxied", "codex-proxied"))
+        tunnel = parsed["tunnelctl"]
+        self.assertEqual(tunnel.update_policy, "pinned-tested")
+        self.assertEqual(tunnel.ref, "cbfee60c498c34fe20396e19ef90d3c01460e3b5")
 
 
 if __name__ == "__main__":
