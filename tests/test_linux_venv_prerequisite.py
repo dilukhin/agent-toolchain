@@ -91,7 +91,7 @@ class ManagedVenvPrerequisiteTests(unittest.TestCase):
                 "sudo": "/usr/bin/sudo",
             }.get(name)
 
-        with mock.patch.object(toolchainctl.os, "geteuid", return_value=1000), \
+        with mock.patch.object(toolchainctl.os, "geteuid", return_value=1000, create=True), \
                 mock.patch.object(toolchainctl.shutil, "which", side_effect=which), \
                 mock.patch.object(
                     toolchainctl.subprocess,
@@ -105,7 +105,7 @@ class ManagedVenvPrerequisiteTests(unittest.TestCase):
         run.assert_called_once_with(["/usr/bin/sudo", "-v"], check=False)
 
     def test_prepare_apt_command_true_root_uses_apt_directly_without_sudo(self) -> None:
-        with mock.patch.object(toolchainctl.os, "geteuid", return_value=0), \
+        with mock.patch.object(toolchainctl.os, "geteuid", return_value=0, create=True), \
                 mock.patch.object(
                     toolchainctl.shutil,
                     "which",
@@ -120,7 +120,7 @@ class ManagedVenvPrerequisiteTests(unittest.TestCase):
 
     def test_install_needed_rejects_running_whole_toolchain_through_sudo(self) -> None:
         with mock.patch.dict(os.environ, {"SUDO_USER": "dima"}, clear=False), \
-                mock.patch.object(toolchainctl.os, "geteuid", return_value=0), \
+                mock.patch.object(toolchainctl.os, "geteuid", return_value=0, create=True), \
                 mock.patch.object(toolchainctl, "_prepare_apt_command") as prepare, \
                 mock.patch.object(toolchainctl, "_install_opencode_v2") as install_opencode:
             rc = toolchainctl._install_needed_prerequisites()
