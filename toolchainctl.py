@@ -292,23 +292,38 @@ def _prepend_process_path(path: Path) -> None:
         os.environ["PATH"] = value + (os.pathsep + current if current else "")
 
 
-def _apt_command() -> list[str] | None:
+def _running_via_sudo_as_root() -> bool:
+    geteuid = getattr(os, "geteuid", None)
+    return bool(
+        callable(geteuid)
+        and geteuid() == 0
+        and os.environ.get("SUDO_USER")
+    )
+
+
+def _prepare_apt_command() -> tuple[list[str] | None, str | None]:
+    """Return an apt command prefix after explicit interactive sudo authorization."""
     apt = shutil.which("apt-get")
     if not apt:
-        return None
+        return None, "apt-get is required for --install-needed"
+
     geteuid = getattr(os, "geteuid", None)
     if callable(geteuid) and geteuid() == 0:
-        return [apt]
+        return [apt], None
+
     sudo = shutil.which("sudo")
     if not sudo:
-        return None
-    return [sudo, apt]
+        return None, "sudo is required to install system packages as a regular user"
+
+    print("install-needed: requesting sudo authorization for system package installation")
+    authorized = subprocess.run([sudo, "-v"], check=False)
+    if authorized.returncode != 0:
+        return None, "sudo authorization failed; no system packages were changed"
+
+    return [sudo, "-n", apt], None
 
 
-def _run_apt(args: list[str]) -> subprocess.CompletedProcess[str] | None:
-    base = _apt_command()
-    if base is None:
-        return None
+def _run_apt(base: list[str], args: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [*base, *args],
         capture_output=True,
@@ -351,15 +366,17 @@ def _install_opencode_v2() -> tuple[bool, str]:
 
 def _install_needed_prerequisites() -> int:
     """Install an allowlisted Ubuntu/Debian prerequisite set after explicit user opt-in."""
-    if not _debian_family_linux():
+    if _running_via_sudo_as_root():
         print(
-            "--install-needed currently supports only Debian/Ubuntu-family Linux; no system packages were changed",
+            "install-needed: do not run the whole toolchain with sudo. "
+            "Run 'toolchainctl apply --install-needed' as the regular user; "
+            "it will request sudo only for system package installation.",
             file=sys.stderr,
         )
         return 2
-    if _apt_command() is None:
+    if not _debian_family_linux():
         print(
-            "--install-needed requires apt-get and either root privileges or sudo; no system packages were changed",
+            "--install-needed currently supports only Debian/Ubuntu-family Linux; no system packages were changed",
             file=sys.stderr,
         )
         return 2
@@ -379,16 +396,25 @@ def _install_needed_prerequisites() -> int:
     if not go_ok and not _dpkg_package_installed("golang-go"):
         packages.append("golang-go")
 
-    if packages:
-        print("install-needed: apt packages: " + " ".join(packages))
-        updated = _run_apt(["update"])
-        if updated is None or updated.returncode != 0:
-            detail = "" if updated is None else (updated.stderr or updated.stdout).strip()[-400:]
+    apt_base: list[str] | None = None
+    needs_system_packages = bool(packages) or venv_was_missing
+    if needs_system_packages:
+        apt_base, apt_error = _prepare_apt_command()
+        if apt_base is None:
+            print(f"install-needed: {apt_error}", file=sys.stderr)
+            return 2
+        updated = _run_apt(apt_base, ["update"])
+        if updated.returncode != 0:
+            detail = (updated.stderr or updated.stdout).strip()[-400:]
             print(f"install-needed: apt-get update failed: {detail}", file=sys.stderr)
             return 2
-        installed = _run_apt(["install", "-y", *packages])
-        if installed is None or installed.returncode != 0:
-            detail = "" if installed is None else (installed.stderr or installed.stdout).strip()[-400:]
+
+    if packages:
+        print("install-needed: apt packages: " + " ".join(packages))
+        assert apt_base is not None
+        installed = _run_apt(apt_base, ["install", "-y", *packages])
+        if installed.returncode != 0:
+            detail = (installed.stderr or installed.stdout).strip()[-400:]
             print(f"install-needed: apt-get install failed: {detail}", file=sys.stderr)
             return 2
 
@@ -397,9 +423,10 @@ def _install_needed_prerequisites() -> int:
         versioned = f"python{version}-venv"
         if not _dpkg_package_installed(versioned):
             print(f"install-needed: python3-venv did not provide ensurepip for Python {version}; trying {versioned}")
-            installed = _run_apt(["install", "-y", versioned])
-            if installed is None or installed.returncode != 0:
-                detail = "" if installed is None else (installed.stderr or installed.stdout).strip()[-400:]
+            assert apt_base is not None
+            installed = _run_apt(apt_base, ["install", "-y", versioned])
+            if installed.returncode != 0:
+                detail = (installed.stderr or installed.stdout).strip()[-400:]
                 print(
                     f"install-needed: cannot install venv/ensurepip support for Python {version}. "
                     f"Try: sudo apt-get install -y {versioned}. {detail}",
