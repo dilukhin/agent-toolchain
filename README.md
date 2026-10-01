@@ -17,6 +17,14 @@ toolchainctl apply
 toolchainctl check
 ```
 
+Для чистой Ubuntu/Debian при отсутствии системных prerequisites можно явно разрешить их установку:
+
+```bash
+toolchainctl apply --install-needed
+```
+
+Флаг устанавливает только заранее разрешённый набор недостающих пакетов через `apt-get` (включая `ca-certificates`, `curl`, `wget`, `git`, `openssh-client`, `python3-venv`, `tar`, `gzip`, `unzip` и при необходимости `golang-go`), повторно проверяет `venv/ensurepip` и Go 1.22+, а при отсутствии OpenCode устанавливает OpenCode v2 официальным установщиком. Без этого флага `apply` не устанавливает системные пакеты.
+
 Windows:
 
 ```powershell
