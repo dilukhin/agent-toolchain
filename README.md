@@ -25,6 +25,8 @@ toolchainctl apply --install-needed
 
 Флаг устанавливает только заранее разрешённый набор недостающих пакетов через `apt-get` (включая `ca-certificates`, `curl`, `wget`, `git`, `openssh-client`, `python3-venv`, `tar`, `gzip`, `unzip` и при необходимости `golang-go`), повторно проверяет `venv/ensurepip` и Go 1.22+, а при отсутствии OpenCode устанавливает OpenCode v2 официальным установщиком. Без этого флага `apply` не устанавливает системные пакеты.
 
+Запускайте команду **без** `sudo`: `toolchainctl apply --install-needed`. Если системные пакеты действительно нужны, toolchain сам один раз выполнит интерактивный `sudo -v`, после чего все вызовы `apt-get` идут как `sudo -n apt-get ...` без скрытых повторных запросов пароля. Запуск `sudo toolchainctl apply --install-needed` блокируется, чтобы пользовательские OpenCode/config/runtime не создавались от `root`.
+
 Windows:
 
 ```powershell
