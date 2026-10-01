@@ -181,7 +181,7 @@ Manifest schema 2 содержит:
 - текущая managed routing policy использует прямой OpenAI/Codex provider: глобальный `model=openai/gpt-6-sol`, `small_model=openai/gpt-6-luna`; `general/build/plan` и `sol-specialist` используют Sol, `explore/luna/luna-safe-worker` — Luna, `astra-reviewer` — Astra;
 - `explore` получает managed read-only policy без shell/web/edit/task; новые `docs-researcher`, `code-reviewer`, `evidence-auditor`, `code-worker`, `test-runner` публикуются отдельными owned Markdown-agent resources и не перезаписывают одноимённый чужой файл;
 - для существующих `luna`, `luna-safe-worker`, `sol-specialist`, `astra-reviewer` prompt/description/permission остаются user-owned; после exact-SHA `agents adopt-model` toolchain владеет только frontmatter `model`, поэтому будущая смена модели не перезаписывает остальной файл;
-- RouterAI provider, каталог и ссылка на credential сохраняются для явного выбора, но не используются ни одним управляемым глобальным маршрутом или управляемой рабочей ролью;
+- RouterAI provider и каталог сохраняются для явного выбора, но не используются ни одним управляемым глобальным маршрутом или управляемой рабочей ролью; ссылка на управляемый ключ добавляется только при наличии файла;
 - `~/.config/opencode/opencode.jsonc` изменяется семантическим merge только когда это безопасно; для routing и других стабильных managed fields manifest хранит evidence конкретных JSON-путей, поэтому изменение пользовательского поля вне ownership не делает весь config конфликтным;
 - прежний whole-file `merged-json` ownership мигрирует в semantic paths только при точном совпадении записанного SHA; неизвестный drift не усыновляется даже через `--force`;
 - если legacy whole-file SHA уже разошёлся, автоматическая миграция остаётся fail-closed; после `toolchainctl diff opencode-config` пользователь может явно подтвердить конкретный текущий payload командой `toolchainctl adopt opencode-config --expected-sha <current-sha256>`. Команда проверяет exact SHA, делает backup, сохраняет неизвестные поля и отличающиеся routing overrides, а ownership записывает только для известных semantic paths;
@@ -197,6 +197,8 @@ Fresh-install RouterAI credential path:
 Linux:   ~/.config/opencode/credentials/routerai-api-key.txt
 Windows: %USERPROFILE%\.config\opencode\credentials\routerai-api-key.txt
 ```
+
+Если управляемого ключа ещё нет, конфигурация не ссылается на отсутствующий файл: OpenCode запускается, а использование RouterAI ожидает настройки настоящего ключа. Повторный `apply` добавит ссылку после появления файла. Ранее созданную ссылку на отсутствующий управляемый файл `apply` убирает только при точном совпадении конфигурации с записанным SHA-256; изменённые и внешние ссылки сохраняются.
 
 Если существующий config уже ссылается на другой `{file:...}`, этот путь считается фактическим и сохраняется. Содержимое external credential не читается и не печатается. Fake/placeholder key для fresh install не создаётся. Linux-файл, которым toolchain доказанно управляет, получает mode `0600` без изменения байтов.
 
