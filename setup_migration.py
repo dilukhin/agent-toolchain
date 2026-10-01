@@ -19,6 +19,7 @@ from setup_lib import (
     backup_file,
     merge_routerai_config,
     parse_jsonc_object,
+    routerai_file_credential,
     routerai_provider,
     sha256_bytes,
 )
@@ -27,7 +28,9 @@ _FILE_REF_RE = re.compile(r"\{file:(.+)\}")
 _SIBLING_MODE = "merged-json-sibling-provider"
 
 
-def _preserve_exact_external_reference(destination: Path, desired_data: bytes) -> bytes:
+def _preserve_exact_external_reference(
+    destination: Path, desired_data: bytes, *, removable_missing_ref: str | None = None,
+) -> bytes:
     if not destination.is_file():
         return desired_data
     existing, error, _ = parse_jsonc_object(destination.read_bytes())
@@ -46,10 +49,43 @@ def _preserve_exact_external_reference(destination: Path, desired_data: bytes) -
     target_ref = desired_options.get("apiKey")
     if not isinstance(current_ref, str) or _FILE_REF_RE.fullmatch(current_ref.strip()) is None:
         return desired_data
-    if target_ref == current_ref:
+    if target_ref == current_ref or (
+        current_ref == removable_missing_ref and "apiKey" not in desired_options
+    ):
         return desired_data
     desired_options["apiKey"] = current_ref
     return (json.dumps(desired, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+
+
+def _missing_managed_credential_ref(
+    destination: Path, manifest: dict[str, Any], previous: dict[str, Any] | None,
+) -> str | None:
+    """Allow repair only for an unchanged config and our recorded missing key path."""
+    if not destination.is_file() or not isinstance(previous, dict):
+        return None
+    if previous.get("path") != str(destination):
+        return None
+    credentials = manifest.get("credentials")
+    credential = credentials.get("routerai") if isinstance(credentials, dict) else None
+    if not isinstance(credential, dict) or credential.get("mode") not in {
+        "managed-path", "legacy-managed-path"
+    }:
+        return None
+    recorded_path = credential.get("path")
+    if not isinstance(recorded_path, str):
+        return None
+    key_path = Path(recorded_path)
+    if key_path.exists() or key_path.is_symlink():
+        return None
+    if previous.get("sha256") != sha256_bytes(destination.read_bytes()):
+        return None
+    existing, error, _ = parse_jsonc_object(destination.read_bytes())
+    if error or existing is None:
+        return None
+    reference = routerai_file_credential(existing)
+    if reference is None or Path(reference) != key_path:
+        return None
+    return "{file:" + reference + "}"
 
 
 OPENCODE_SEMANTIC_MODE = "semantic-paths-v1"
@@ -223,9 +259,12 @@ def preview_opencode_config_target(
     destination: Path,
     desired_data: bytes,
     previous: dict[str, Any] | None,
+    removable_missing_ref: str | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """Return the exact semantic target used by reconciliation without mutation."""
-    desired_data = _preserve_exact_external_reference(destination, desired_data)
+    desired_data = _preserve_exact_external_reference(
+        destination, desired_data, removable_missing_ref=removable_missing_ref
+    )
     desired, desired_error, _ = parse_jsonc_object(desired_data)
     if desired_error or desired is None:
         return None, desired_error or "template cannot be parsed"
@@ -259,6 +298,17 @@ def preview_opencode_config_target(
         merged, merge_error = merge_routerai_config(existing, desired)
         if merge_error or merged is None:
             return None, merge_error or "existing config is not safely mergeable"
+
+    if removable_missing_ref is not None:
+        existing_options = existing_router.get("options") if existing_router else None
+        desired_options = desired_router.get("options") if desired_router else None
+        if (
+            isinstance(existing_options, dict)
+            and existing_options.get("apiKey") == removable_missing_ref
+            and isinstance(desired_options, dict)
+            and "apiKey" not in desired_options
+        ):
+            merged["provider"]["routerai"]["options"].pop("apiKey", None)
 
     if "autoupdate" in desired:
         merged["autoupdate"] = copy.deepcopy(desired["autoupdate"])
@@ -565,7 +615,10 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
         reporter.add(component, STATE_CONFLICT, "manifest указывает на другой путь")
         return False
 
-    desired_data = _preserve_exact_external_reference(destination, desired_data)
+    removable_missing_ref = _missing_managed_credential_ref(destination, manifest, previous)
+    desired_data = _preserve_exact_external_reference(
+        destination, desired_data, removable_missing_ref=removable_missing_ref
+    )
     desired, desired_error, _ = parse_jsonc_object(desired_data)
     if desired_error or desired is None:
         reporter.add(component, STATE_CONFLICT, desired_error or "template cannot be parsed")
@@ -621,6 +674,7 @@ def reconcile_opencode_config(*, destination: Path, desired_data: bytes, source_
         destination=destination,
         desired_data=desired_data,
         previous=previous,
+        removable_missing_ref=removable_missing_ref,
     )
     if target_error or target is None:
         reporter.add(component, STATE_CONFLICT, target_error or "managed target cannot be built")

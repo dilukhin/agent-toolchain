@@ -48,8 +48,13 @@ _ROUTERAI_LEGACY_PLACEHOLDER = b"your-routerai-api-key-here\n"
 _MANAGED_CREDENTIAL_MODES = frozenset({"managed-path", "legacy-managed-path"})
 
 
-def render_config(template_path: Path, api_key_file: Path) -> bytes:
+def render_config(template_path: Path, api_key_file: Path | None) -> bytes:
     template = template_path.read_text(encoding="utf-8")
+    if api_key_file is None:
+        missing_key_field = ',\n        "apiKey": "{file:__ROUTERAI_API_KEY_FILE__}"'
+        if template.count(missing_key_field) != 1:
+            raise ValueError("RouterAI credential field is missing or ambiguous in the config template")
+        return template.replace(missing_key_field, "").encode("utf-8")
     escaped = str(api_key_file).replace("\\", "\\\\")
     return template.replace("__ROUTERAI_API_KEY_FILE__", escaped).encode("utf-8")
 
@@ -385,7 +390,10 @@ def main(argv: list[str] | None = None) -> int:
         manifest_changed |= _record_credential(manifest, api_key_file, credential_mode or "external-file")
 
     if api_key_file is not None:
-        config_data = render_config(repo_root / "templates" / "opencode.jsonc", api_key_file)
+        config_key_file = (
+            api_key_file if api_key_file.is_file() or credential_mode == "external-file" else None
+        )
+        config_data = render_config(repo_root / "templates" / "opencode.jsonc", config_key_file)
         manifest_changed |= reconcile_opencode_config(
             destination=config_path,
             desired_data=config_data,
