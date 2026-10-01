@@ -90,10 +90,7 @@ class ExistingQwenConfigTests(unittest.TestCase):
             canonical = config_dir / "credentials" / "routerai-api-key.txt"
             self.assertFalse(canonical.exists())
             self.assertIn("ключ RouterAI не настроен", first.stdout)
-            self.assertEqual(
-                merged["provider"]["routerai"]["options"]["apiKey"],
-                "{file:" + str(canonical.resolve()) + "}",
-            )
+            self.assertNotIn("apiKey", merged["provider"]["routerai"]["options"])
 
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             owner = manifest["managed_files"]["OpenCode config"]
@@ -150,10 +147,7 @@ class ExistingQwenConfigTests(unittest.TestCase):
             self.assertIn("routerai", merged["provider"])
             canonical = config_dir / "credentials" / "routerai-api-key.txt"
             self.assertFalse(canonical.exists())
-            self.assertEqual(
-                merged["provider"]["routerai"]["options"]["apiKey"],
-                "{file:" + str(canonical.resolve()) + "}",
-            )
+            self.assertNotIn("apiKey", merged["provider"]["routerai"]["options"])
 
     def test_qwen_jsonc_with_comments_remains_conflict(self) -> None:
         with tempfile.TemporaryDirectory() as td:
