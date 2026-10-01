@@ -148,14 +148,14 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         self.assertIn("exact ref {spec.ref[:12]} with verified payload hashes", sources["skills"])
         self.assertIn("managed ToolSpec phase already reconciled this tool from an exact ref", sources["adapter"])
 
-    def test_repository_policy_follows_first_party_production_branches(self) -> None:
+    def test_repository_policy_pins_ssh_relay_and_follows_agent_safe(self) -> None:
         config = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
         tools = config["managed_environment"]["tools"]
 
         ssh_relay = tools["ssh_relay"]
-        self.assertEqual(ssh_relay["update_policy"], "follow-branch")
-        self.assertEqual(ssh_relay["branch"], "main")
-        self.assertNotIn("ref", ssh_relay)
+        self.assertEqual(ssh_relay["update_policy"], "pinned-tested")
+        self.assertEqual(ssh_relay["ref"], "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
+        self.assertNotIn("branch", ssh_relay)
 
         agent_safe = tools["agent-safe"]
         self.assertEqual(agent_safe["update_policy"], "follow-branch")
@@ -169,7 +169,8 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         ):
             parsed, error = setup_tools.parse_tool_specs(config["managed_environment"])
         self.assertIsNone(error)
-        self.assertEqual(parsed["ssh_relay"].update_policy, "follow-branch")
+        self.assertEqual(parsed["ssh_relay"].update_policy, "pinned-tested")
+        self.assertEqual(parsed["ssh_relay"].ref, "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
         self.assertEqual(parsed["agent-safe"].update_policy, "follow-branch")
 
         proxy_tools = tools["proxy-tools"]
