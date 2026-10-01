@@ -301,7 +301,7 @@ def _install_go_release(spec: ToolSpec, reporter: Reporter) -> Path | None:
         return None
     git, go = shutil.which("git"), shutil.which("go")
     if not git or not go:
-        reporter.add(f"{spec.name} runtime", STATE_FAILED, "Git and Go 1.22+ are required to build pinned tunnelctl source. MANUAL ACTION REQUIRED: install missing prerequisites and rerun toolchainctl apply")
+        reporter.add(f"{spec.name} runtime", STATE_FAILED, "Git and Go 1.22+ are required to build pinned tunnelctl source. MANUAL ACTION REQUIRED: on Ubuntu/Debian run toolchainctl apply --install-needed (or install git, golang-go and openssh-client manually)")
         return None
     try:
         version = run([go, "version"], timeout=10)
@@ -378,14 +378,14 @@ def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Pat
         reporter.add(
             f"{spec.name} runtime",
             STATE_FAILED,
-            f"base Python {version} cannot create an isolated venv. MANUAL ACTION REQUIRED: install venv/ensurepip support and rerun toolchainctl apply",
+            f"base Python {version} cannot create an isolated venv. MANUAL ACTION REQUIRED: on Ubuntu/Debian run sudo apt-get update && sudo apt-get install -y python3-venv, or run toolchainctl apply --install-needed",
         )
         return None
     if not shutil.which("git"):
         reporter.add(
             f"{spec.name} runtime",
             STATE_FAILED,
-            "Git is required to install the exact repository ref. MANUAL ACTION REQUIRED: install Git and rerun toolchainctl apply",
+            "Git is required to install the exact repository ref. MANUAL ACTION REQUIRED: on Ubuntu/Debian run sudo apt-get install -y git, or run toolchainctl apply --install-needed",
         )
         return None
 
@@ -763,7 +763,7 @@ def reconcile_python_tool(
                 reporter.add(
                     f"{spec.name} runtime",
                     STATE_CONFLICT,
-                    f"base Python {version} lacks venv/ensurepip. MANUAL ACTION REQUIRED: install venv support before toolchainctl apply",
+                    f"base Python {version} lacks venv/ensurepip. MANUAL ACTION REQUIRED: on Ubuntu/Debian run sudo apt-get update && sudo apt-get install -y python3-venv, or run toolchainctl apply --install-needed",
                 )
             else:
                 reporter.add(

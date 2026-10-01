@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import setup_managed_tools as managed  # noqa: E402
+import toolchainctl  # noqa: E402
 import setup_manifest  # noqa: E402
 from setup_lib import Reporter, STATE_CONFLICT, STATE_FAILED  # noqa: E402
 from setup_tools import parse_tool_spec  # noqa: E402
@@ -51,6 +52,8 @@ class ManagedVenvPrerequisiteTests(unittest.TestCase):
             self.assertEqual(runtime.state, STATE_CONFLICT)
             self.assertIn("venv/ensurepip", runtime.detail)
             self.assertIn("MANUAL ACTION REQUIRED", runtime.detail)
+            self.assertIn("python3-venv", runtime.detail)
+            self.assertIn("--install-needed", runtime.detail)
 
     def test_apply_stops_before_runtime_directory_when_venv_prerequisite_is_missing(self) -> None:
         spec = self._spec()
@@ -70,6 +73,15 @@ class ManagedVenvPrerequisiteTests(unittest.TestCase):
             self.assertEqual(runtime.state, STATE_FAILED)
             self.assertIn("venv/ensurepip", runtime.detail)
             self.assertIn("toolchainctl apply", runtime.detail)
+
+    def test_apply_parser_accepts_explicit_install_needed_opt_in(self) -> None:
+        args = toolchainctl.build_parser().parse_args(["apply", "--install-needed"])
+        self.assertEqual(args.command, "apply")
+        self.assertTrue(args.install_needed)
+
+    def test_check_parser_does_not_accept_install_needed_mutation_flag(self) -> None:
+        with self.assertRaises(SystemExit):
+            toolchainctl.build_parser().parse_args(["check", "--install-needed"])
 
 
 if __name__ == "__main__":
