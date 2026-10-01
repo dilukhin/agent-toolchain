@@ -378,7 +378,7 @@ def _install_release(spec: ToolSpec, python_exe: str, reporter: Reporter) -> Pat
         reporter.add(
             f"{spec.name} runtime",
             STATE_FAILED,
-            f"base Python {version} cannot create an isolated venv. MANUAL ACTION REQUIRED: on Ubuntu/Debian run sudo apt-get update && sudo apt-get install -y python3-venv, or run toolchainctl apply --install-needed",
+            f"base Python {version} cannot create an isolated venv/ensurepip runtime. MANUAL ACTION REQUIRED: on Ubuntu/Debian run sudo apt-get update && sudo apt-get install -y python3-venv, or run toolchainctl apply --install-needed",
         )
         return None
     if not shutil.which("git"):
