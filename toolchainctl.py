@@ -275,7 +275,7 @@ def _go_122_available() -> tuple[bool, str]:
     text = (cp.stdout or cp.stderr).strip()
     if cp.returncode != 0:
         return False, text or "go version failed"
-    match = re.search(r"\\bgo(\\d+)\\.(\\d+)", text)
+    match = re.search(r"\bgo(\d+)\.(\d+)", text)
     if not match:
         return False, text or "unrecognized Go version"
     version = (int(match.group(1)), int(match.group(2)))
