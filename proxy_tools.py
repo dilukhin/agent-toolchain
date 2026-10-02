@@ -8,10 +8,14 @@ import os
 import select
 import socket
 import socketserver
+import stat
 import subprocess
 import sys
 import threading
+import traceback
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import TextIO
 
 from core_identity import emit_identity, read_identity, version_text
 
@@ -177,11 +181,63 @@ class _ProxyHandler(socketserver.BaseRequestHandler):
             upstream.close()
 
 
+class _BridgeServer(socketserver.ThreadingTCPServer):
+    def __init__(self, address: tuple[str, int], log: TextIO) -> None:
+        super().__init__(address, _ProxyHandler)
+        self.log = log
+        self.log_lock = threading.Lock()
+
+    def log_error(self, exc: BaseException, client_address: tuple[str, int] | None) -> None:
+        try:
+            with self.log_lock:
+                self.log.write(f"{datetime.now(timezone.utc).isoformat()} client={client_address} bridge error:\n")
+                traceback.print_exception(exc, file=self.log)
+                self.log.flush()
+        except Exception:
+            # Never write from the bridge to the interactive child's terminal.
+            pass
+
+    def handle_error(self, request: socket.socket, client_address: tuple[str, int]) -> None:
+        exc = sys.exc_info()[1]
+        if exc is not None and not isinstance(exc, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, TimeoutError)):
+            self.log_error(exc, client_address)
+
+
+def _bridge_log_path() -> Path:
+    override = os.environ.get("AGENT_TOOLCHAIN_DATA_DIR")
+    if override:
+        root = Path(override).expanduser()
+    elif os.name == "nt" and os.environ.get("LOCALAPPDATA"):
+        root = Path(os.environ["LOCALAPPDATA"]) / "agent-toolchain"
+    elif os.environ.get("XDG_DATA_HOME"):
+        root = Path(os.environ["XDG_DATA_HOME"]).expanduser() / "agent-toolchain"
+    else:
+        root = Path.home() / ".local" / "share" / "agent-toolchain"
+    return root / "log" / "proxy-tools.log"
+
+
 class HttpSocksBridge:
     def __init__(self) -> None:
-        self.server = socketserver.ThreadingTCPServer(("127.0.0.1", 0), _ProxyHandler)
+        log_path = _bridge_log_path()
+        log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        if os.name != "nt" and stat.S_IMODE(os.fstat(fd).st_mode) & 0o077:
+            os.close(fd)
+            raise PermissionError(f"proxy bridge log is not private: {log_path}")
+        self.log = os.fdopen(fd, "a", encoding="utf-8")
+        try:
+            self.server = _BridgeServer(("127.0.0.1", 0), self.log)
+        except Exception:
+            self.log.close()
+            raise
         self.server.daemon_threads = True
-        self.thread = threading.Thread(target=self.server.serve_forever, name="proxy-tools-bridge", daemon=True)
+        self.thread = threading.Thread(target=self._serve, name="proxy-tools-bridge", daemon=True)
+
+    def _serve(self) -> None:
+        try:
+            self.server.serve_forever()
+        except Exception as exc:
+            self.server.log_error(exc, None)
 
     @property
     def address(self) -> tuple[str, int]:
@@ -194,6 +250,7 @@ class HttpSocksBridge:
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=2)
+        self.log.close()
 
 
 def _show_routerai_status() -> None:
@@ -239,7 +296,11 @@ def launch(command: str, argv: list[str]) -> int:
     except (OSError, ConnectionError, ValueError) as exc:
         print(f"SOCKS5 preflight failed: {exc}", file=sys.stderr)
         return 78
-    bridge = HttpSocksBridge()
+    try:
+        bridge = HttpSocksBridge()
+    except OSError as exc:
+        print(f"proxy bridge could not start: {exc}", file=sys.stderr)
+        return 78
     bridge.start()
     env = os.environ.copy()
     proxy = f"http://{bridge.address[0]}:{bridge.address[1]}"
