@@ -44,6 +44,7 @@ _NPM_METADATA_ENV = {
 }
 _EXTERNAL_UPDATE_TIMEOUT_SECONDS = 5.0
 _last_npm_metadata_error: str | None = None
+_plugin_target_error: str | None = None
 
 _TLDR_RESULTS: dict[str, object] = {}
 _TLDR_REGISTERED = False
@@ -309,7 +310,24 @@ def _tldr_actions(results) -> list[str]:
         ):
             action = f"«{result.component}»: выполнить `toolchainctl apply`; {result.detail}"
         elif result.state == STATE_FAILED and "npm metadata lookup:" in result.detail:
-            action = "повторить `toolchainctl apply` после восстановления доступа к npm registry"
+            reason = result.detail.split("npm metadata lookup:", 1)[1].strip()
+            reasons = {
+                "network timeout": "истекло время ожидания ответа npm",
+                "DNS/network lookup failed": "не удалось найти адрес сервера npm",
+                "TLS/SSL failure": "не удалось проверить защищённое соединение с npm",
+                "network connection failed": "соединение с npm прервано",
+                "registry authentication/authorization failed": "npm отказал в доступе; проверьте настройки реестра и авторизации",
+                "package version not published": "запрошенная версия отсутствует в реестре npm",
+                "npm returned an empty metadata response": "npm вернул пустой ответ",
+            }
+            reason = reasons.get(reason, "истекло время ожидания ответа npm" if reason.startswith("timeout after ") else "npm не подтвердил версию")
+            if "package version not published" in result.detail:
+                action = f"«{result.component}»: {reason}; {result.detail.split('; npm metadata lookup:', 1)[0]}"
+            else:
+                action = (
+                    f"«{result.component}»: {reason}; проверьте `npm view @opencode-ai/plugin version --json`"
+                    if result.component == "OpenCode plugin" else f"«{result.component}»: {reason}"
+                ) + "; после устранения причины повторите `toolchainctl apply`"
         elif result.state in {STATE_FAILED, STATE_CONFLICT}:
             action = f"«{result.component}»: {result.detail}"
         elif result.state in {STATE_MISSING, STATE_OUTDATED}:
@@ -317,7 +335,8 @@ def _tldr_actions(results) -> list[str]:
 
         if action is None:
             continue
-        action = _trim_action(action)
+        if result.component != "OpenCode plugin":
+            action = _trim_action(action)
         if action not in actions:
             actions.append(action)
     return actions
@@ -326,11 +345,9 @@ def _tldr_actions(results) -> list[str]:
 def _format_tldr(results) -> str:
     actions = _tldr_actions(results)
     if not actions:
-        return "TL/DR: дополнительных действий не требуется."
-    lines = ["TL/DR: рекомендуется:"]
-    lines.extend(f"  - {action}" for action in actions[:6])
-    if len(actions) > 6:
-        lines.append(f"  - ещё {len(actions) - 6} рекомендац. — см. таблицы выше")
+        return "Итог: дополнительных действий не требуется."
+    lines = ["Итог: требуются действия:"]
+    lines.extend(f"  - {action}" for action in actions)
     return "\n".join(lines)
 
 
@@ -388,6 +405,8 @@ def _safe_npm_metadata_error(cp) -> str:
         return "TLS/SSL failure"
     if any(token in text for token in ("econnreset", "econnrefused", "socket hang up")):
         return "network connection failed"
+    if any(token in text for token in ("e404", "etarget")):
+        return "package version not published"
     if any(token in text for token in ("e401", "e403", "unauthorized", "forbidden")):
         return "registry authentication/authorization failed"
     return f"npm view failed with exit code {cp.returncode}"
@@ -433,27 +452,47 @@ def _standalone_opencode_version() -> str | None:
 
 
 def _resolve_npm_target(npm: str, package: str, configured: object) -> str | None:
+    global _plugin_target_error
     policy = str(configured or "latest").strip()
-    if package != "@opencode-ai/plugin" or policy.lower() != "latest":
+    if package != "@opencode-ai/plugin":
         return _legacy_resolve_npm_target(npm, package, configured)
 
+    _plugin_target_error = None
     items = executable_inventory("opencode")
     if len(items) > 1:
-        # Plugin compatibility target is ambiguous when CLI ownership/resolution is ambiguous.
+        _plugin_target_error = (
+            "найдено несколько установок OpenCode; установка плагина остановлена; "
+            "выполните `toolchainctl check` и устраните неоднозначность активной установки"
+        )
         return None
+    if policy.lower() != "match-opencode":
+        target = _legacy_resolve_npm_target(npm, package, configured)
+        if target is None:
+            _plugin_target_error = (
+                "npm не подтвердил опубликованную версию плагина; проверьте ответ: "
+                "`npm view @opencode-ai/plugin version --json`, затем выполните `toolchainctl apply`"
+            )
+        return target
 
     active = active_instance(items)
-    if active is None or active.manager == "npm":
-        # npm-managed OpenCode is reconciled to npm latest before plugin reconciliation.
-        return _legacy_resolve_npm_target(npm, package, configured)
-
-    opencode_version = _legacy._version_number(active.version)
+    opencode_version = _legacy._version_number(active.version) if active else None
     if opencode_version is None:
+        _plugin_target_error = (
+            "для match-opencode не удалось определить версию активного OpenCode; "
+            "проверьте `opencode --version` и `toolchainctl check`; установка плагина остановлена"
+        )
         return None
 
-    exact_package = f"{package}@{opencode_version}"
-    published = _legacy._npm_latest_version(npm, exact_package)
-    return opencode_version if published == opencode_version else None
+    published = _legacy._npm_latest_version(npm, f"{package}@{opencode_version}")
+    if published == opencode_version:
+        return opencode_version
+    _plugin_target_error = (
+        f"npm не подтвердил плагин {package}@{opencode_version} для match-opencode; "
+        f"проверьте `npm view {package}@{opencode_version} version --json`; "
+        "если версия не опубликована, выберите в config_data.json политику latest "
+        "или опубликованную точную версию, проверив совместимость с OpenCode"
+    )
+    return None
 
 
 def _version_triplet(value: str) -> tuple[int, int, int] | None:
@@ -558,14 +597,17 @@ def _annotate_external_opencode_freshness(reporter, start_index: int) -> None:
     )
 
 
-def _annotate_plugin_version_match(reporter, start_index: int) -> None:
-    opencode_version = _standalone_opencode_version()
+def _annotate_plugin_version_match(reporter, start_index: int, configured="match-opencode") -> None:
+    if str(configured).strip().lower() != "match-opencode":
+        return
+    items = executable_inventory("opencode")
+    active = active_instance(items) if len(items) == 1 else None
+    opencode_version = _legacy._version_number(active.version) if active else None
     if opencode_version is None:
         return
     for result in reporter.results[start_index:]:
         if result.component != "OpenCode plugin":
             continue
-        result.detail = _fix_plugin_change_wording(result.detail)
         result.detail = result.detail.replace(
             " (npm latest)",
             f" (совпадает с OpenCode {opencode_version})",
@@ -591,20 +633,31 @@ def _sync_legacy_policy() -> None:
 
 
 def reconcile_npm(config_dir, config, reporter, check, skip):
-    global _last_npm_metadata_error
+    global _last_npm_metadata_error, _plugin_target_error
     _last_npm_metadata_error = None
+    _plugin_target_error = None
     start_index = len(reporter.results)
     _sync_legacy_policy()
     result = _legacy.reconcile_npm(config_dir, config, reporter, check, skip)
     _annotate_npm_metadata_failure(reporter, start_index)
     _annotate_external_opencode_freshness(reporter, start_index)
-    _annotate_plugin_version_match(reporter, start_index)
+    for item in reporter.results[start_index:]:
+        if item.component == "OpenCode plugin":
+            item.detail = _fix_plugin_change_wording(item.detail)
+            if _plugin_target_error and item.state in {STATE_CONFLICT, STATE_FAILED}:
+                item.detail = _plugin_target_error + (
+                    f"; npm metadata lookup: {_last_npm_metadata_error}" if _last_npm_metadata_error else ""
+                )
+    _annotate_plugin_version_match(
+        reporter, start_index, config["dependencies"].get("@opencode-ai/plugin", "latest")
+    )
     return result
 
 
 def _reconcile_opencode_cli(config, reporter, check, npm):
-    global _last_npm_metadata_error
+    global _last_npm_metadata_error, _plugin_target_error
     _last_npm_metadata_error = None
+    _plugin_target_error = None
     start_index = len(reporter.results)
     _sync_legacy_policy()
     result = _legacy._reconcile_opencode_cli(config, reporter, check, npm)
