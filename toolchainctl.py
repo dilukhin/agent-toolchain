@@ -206,6 +206,260 @@ def _default_paths() -> dict[str, Path]:
     }
 
 
+
+_LINUX_APT_BASE_PACKAGES = (
+    ("ca-certificates", None),
+    ("curl", "curl"),
+    ("wget", "wget"),
+    ("git", "git"),
+    ("openssh-client", "ssh"),
+    ("tar", "tar"),
+    ("gzip", "gzip"),
+    ("unzip", "unzip"),
+)
+_OPENCODE_V2_INSTALL_URL = "https://opencode.ai/v2/install"
+
+
+def _read_os_release() -> dict[str, str]:
+    path = Path("/etc/os-release")
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+    result: dict[str, str] = {}
+    for line in lines:
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        result[key] = value.strip().strip('"')
+    return result
+
+
+def _debian_family_linux() -> bool:
+    if not sys.platform.startswith("linux"):
+        return False
+    data = _read_os_release()
+    distro = data.get("ID", "").lower()
+    likes = set(data.get("ID_LIKE", "").lower().split())
+    return distro in {"ubuntu", "debian", "linuxmint"} or bool({"debian", "ubuntu"} & likes)
+
+
+def _dpkg_package_installed(package: str) -> bool:
+    dpkg = shutil.which("dpkg-query")
+    if not dpkg:
+        return False
+    cp = subprocess.run(
+        [dpkg, "-W", "-f=${Status}", package],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return cp.returncode == 0 and "install ok installed" in cp.stdout
+
+
+def _python_venv_available(python_exe: str = sys.executable) -> bool:
+    cp = subprocess.run(
+        [python_exe, "-B", "-c", "import ensurepip, venv"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return cp.returncode == 0
+
+
+def _go_122_available() -> tuple[bool, str]:
+    go = shutil.which("go")
+    if not go:
+        return False, "Go not found"
+    cp = subprocess.run([go, "version"], capture_output=True, text=True, check=False)
+    text = (cp.stdout or cp.stderr).strip()
+    if cp.returncode != 0:
+        return False, text or "go version failed"
+    match = re.search(r"\bgo(\d+)\.(\d+)", text)
+    if not match:
+        return False, text or "unrecognized Go version"
+    version = (int(match.group(1)), int(match.group(2)))
+    return version >= (1, 22), text
+
+
+def _prepend_process_path(path: Path) -> None:
+    if not path.is_dir():
+        return
+    value = str(path)
+    current = os.environ.get("PATH", "")
+    entries = current.split(os.pathsep) if current else []
+    if value not in entries:
+        os.environ["PATH"] = value + (os.pathsep + current if current else "")
+
+
+def _running_via_sudo_as_root() -> bool:
+    geteuid = getattr(os, "geteuid", None)
+    return bool(
+        callable(geteuid)
+        and geteuid() == 0
+        and os.environ.get("SUDO_USER")
+    )
+
+
+def _prepare_apt_command() -> tuple[list[str] | None, str | None]:
+    """Return an apt command prefix after explicit interactive sudo authorization."""
+    apt = shutil.which("apt-get")
+    if not apt:
+        return None, "apt-get is required for --install-needed"
+
+    geteuid = getattr(os, "geteuid", None)
+    if callable(geteuid) and geteuid() == 0:
+        return [apt], None
+
+    sudo = shutil.which("sudo")
+    if not sudo:
+        return None, "sudo is required to install system packages as a regular user"
+
+    print("install-needed: requesting sudo authorization for system package installation")
+    authorized = subprocess.run([sudo, "-v"], check=False)
+    if authorized.returncode != 0:
+        return None, "sudo authorization failed; no system packages were changed"
+
+    return [sudo, "-n", apt], None
+
+
+def _run_apt(base: list[str], args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [*base, *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _install_opencode_v2() -> tuple[bool, str]:
+    if shutil.which("opencode"):
+        return True, "OpenCode already available"
+    curl = shutil.which("curl")
+    bash = shutil.which("bash")
+    if not curl or not bash:
+        return False, "curl and bash are required for the official OpenCode v2 installer"
+    downloaded = subprocess.run(
+        [curl, "-fsSL", _OPENCODE_V2_INSTALL_URL],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if downloaded.returncode != 0:
+        return False, "OpenCode installer download failed: " + (downloaded.stderr or "").strip()[-300:]
+    installed = subprocess.run(
+        [bash],
+        input=downloaded.stdout,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if installed.returncode != 0:
+        return False, "OpenCode installer failed: " + (installed.stderr or installed.stdout).strip()[-300:]
+    for candidate in (Path.home() / ".opencode" / "bin", Path.home() / ".local" / "bin"):
+        _prepend_process_path(candidate)
+    opencode = shutil.which("opencode")
+    if not opencode:
+        return False, "OpenCode installer completed but the opencode command is not resolvable in this process"
+    return True, f"OpenCode available: {opencode}"
+
+
+def _install_needed_prerequisites() -> int:
+    """Install an allowlisted Ubuntu/Debian prerequisite set after explicit user opt-in."""
+    if _running_via_sudo_as_root():
+        print(
+            "install-needed: do not run the whole toolchain with sudo. "
+            "Run 'toolchainctl apply --install-needed' as the regular user; "
+            "it will request sudo only for system package installation.",
+            file=sys.stderr,
+        )
+        return 2
+    if not _debian_family_linux():
+        print(
+            "--install-needed currently supports only Debian/Ubuntu-family Linux; no system packages were changed",
+            file=sys.stderr,
+        )
+        return 2
+
+    packages: list[str] = []
+    for package, command in _LINUX_APT_BASE_PACKAGES:
+        if _dpkg_package_installed(package):
+            continue
+        if command is None or shutil.which(command) is None:
+            packages.append(package)
+
+    venv_was_missing = not _python_venv_available()
+    if venv_was_missing and not _dpkg_package_installed("python3-venv"):
+        packages.append("python3-venv")
+
+    go_ok, _go_detail = _go_122_available()
+    if not go_ok and not _dpkg_package_installed("golang-go"):
+        packages.append("golang-go")
+
+    apt_base: list[str] | None = None
+    needs_system_packages = bool(packages) or venv_was_missing
+    if needs_system_packages:
+        apt_base, apt_error = _prepare_apt_command()
+        if apt_base is None:
+            print(f"install-needed: {apt_error}", file=sys.stderr)
+            return 2
+        updated = _run_apt(apt_base, ["update"])
+        if updated.returncode != 0:
+            detail = (updated.stderr or updated.stdout).strip()[-400:]
+            print(f"install-needed: apt-get update failed: {detail}", file=sys.stderr)
+            return 2
+
+    if packages:
+        print("install-needed: apt packages: " + " ".join(packages))
+        assert apt_base is not None
+        installed = _run_apt(apt_base, ["install", "-y", *packages])
+        if installed.returncode != 0:
+            detail = (installed.stderr or installed.stdout).strip()[-400:]
+            print(f"install-needed: apt-get install failed: {detail}", file=sys.stderr)
+            return 2
+
+    if not _python_venv_available():
+        version = f"{sys.version_info.major}.{sys.version_info.minor}"
+        versioned = f"python{version}-venv"
+        if not _dpkg_package_installed(versioned):
+            print(f"install-needed: python3-venv did not provide ensurepip for Python {version}; trying {versioned}")
+            assert apt_base is not None
+            installed = _run_apt(apt_base, ["install", "-y", versioned])
+            if installed.returncode != 0:
+                detail = (installed.stderr or installed.stdout).strip()[-400:]
+                print(
+                    f"install-needed: cannot install venv/ensurepip support for Python {version}. "
+                    f"Try: sudo apt-get install -y {versioned}. {detail}",
+                    file=sys.stderr,
+                )
+                return 2
+        if not _python_venv_available():
+            print(
+                f"install-needed: Python {version} still cannot import ensurepip/venv after package installation",
+                file=sys.stderr,
+            )
+            return 2
+
+    go_ok, go_detail = _go_122_available()
+    if not go_ok:
+        print(
+            "install-needed: distro Go is still below the required Go 1.22+ level "
+            f"({go_detail}). Install a current Go release, then rerun toolchainctl apply --install-needed.",
+            file=sys.stderr,
+        )
+        return 2
+
+    opencode_ok, opencode_detail = _install_opencode_v2()
+    if not opencode_ok:
+        print(f"install-needed: {opencode_detail}", file=sys.stderr)
+        return 2
+
+    print("install-needed: Python venv/ensurepip available")
+    print(f"install-needed: {go_detail}")
+    print(f"install-needed: {opencode_detail}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="toolchainctl", description="Manage the installed agent toolchain safely.")
     parser.add_argument("--version", action="version", version=_version_text(), help="show running core version and exit")
@@ -217,6 +471,12 @@ def build_parser() -> argparse.ArgumentParser:
         cmd.add_argument("--skip-dependency-install", action="store_true", help=argparse.SUPPRESS)
         cmd.add_argument("--ssh-relay-url", help=argparse.SUPPRESS)
         cmd.add_argument("--agent-safe-url", help=argparse.SUPPRESS)
+        if name == "apply":
+            cmd.add_argument(
+                "--install-needed",
+                action="store_true",
+                help="install missing allowlisted Debian/Ubuntu prerequisites before apply",
+            )
     updates = sub.add_parser("updates", help="read-only external CLI update advisories")
     update_sub = updates.add_subparsers(dest="updates_command", required=True)
     update_sub.add_parser("refresh", help="query providers and atomically refresh advisory cache")
@@ -1170,6 +1430,10 @@ def main(argv: list[str] | None = None) -> int:
         return setup_yc_transitional_guard.run_cli(args)
 
     check = args.command == "check"
+    if not check and bool(getattr(args, "install_needed", False)):
+        prereq_rc = _install_needed_prerequisites()
+        if prereq_rc != 0:
+            return prereq_rc
     try:
         state_dir, migration_state, migration_detail = prepare_state(check=check)
     except StateMigrationError as exc:

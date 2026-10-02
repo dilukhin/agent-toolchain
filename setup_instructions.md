@@ -26,6 +26,16 @@ toolchainctl apply
 toolchainctl check
 ```
 
+На чистой Ubuntu/Debian можно явно разрешить установку недостающих системных prerequisites:
+
+```bash
+toolchainctl apply --install-needed
+```
+
+Флаг разрешён только для `apply`: он использует `apt-get` для allowlist-пакетов, при необходимости ставит `python3-venv` (с повторной проверкой `ensurepip`), проверяет Go 1.22+ и устанавливает OpenCode v2 официальным installer. `check` остаётся строго read-only и этот флаг не принимает. Обычный `apply` без флага также не меняет системные пакеты.
+
+Команду запускают обычным пользователем, без префикса `sudo`. Если требуются системные пакеты, toolchain выполняет отдельный интерактивный `sudo -v`; после успешной авторизации `apt-get` запускается только через `sudo -n`. Запуск всего `toolchainctl apply --install-needed` через `sudo` блокируется, чтобы пользовательские каталоги и OpenCode не создавались от `root`.
+
 `check` read-only. Он не должен создавать state, runtimes, skills, credentials, backups, clone/pull или менять PATH/permissions.
 
 Старые `setup_windows.ps1` и `setup_linux.sh` выведены из эксплуатации и завершаются ошибкой. Не использовать их как fallback.

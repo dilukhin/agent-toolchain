@@ -68,7 +68,8 @@ class JsoncMigrationTests(unittest.TestCase):
 
 
 class CoreMigrationTests(unittest.TestCase):
-    def _run_core(self, home: Path, config_dir: Path, stash_dir: Path, credential_dir: Path) -> subprocess.CompletedProcess[str]:
+    def _run_core(self, home: Path, config_dir: Path, stash_dir: Path, credential_dir: Path,
+                  *, check: bool = False) -> subprocess.CompletedProcess[str]:
         projects = home / "projects"
         # Existing non-git directories force safe dependency conflicts and prevent network cloning.
         (projects / "ssh_relay").mkdir(parents=True, exist_ok=True)
@@ -84,6 +85,8 @@ class CoreMigrationTests(unittest.TestCase):
             "--projects-dir", str(projects),
             "--skip-package-install", "--skip-dependency-install",
         ]
+        if check:
+            cmd.append("--check")
         env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
         return subprocess.run(cmd, text=True, encoding="utf-8", env=env,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -192,7 +195,107 @@ class CoreMigrationTests(unittest.TestCase):
             self.assertFalse((stash_dir / "api-key.txt").exists())
             self.assertIn("ключ RouterAI не настроен", cp.stdout)
             generated = json.loads((config_dir / "opencode.jsonc").read_text(encoding="utf-8"))
-            self.assertEqual(generated["provider"]["routerai"]["options"]["apiKey"], "{file:" + str(canonical.resolve()) + "}")
+            self.assertNotIn("apiKey", generated["provider"]["routerai"]["options"])
+
+    def test_missing_managed_key_is_repaired_without_placeholder(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            config_dir = home / ".config" / "opencode"
+            stash_dir = home / "projects" / "stash" / "opencode.ai"
+            credential_dir = config_dir / "credentials"
+            credential_dir.mkdir(parents=True)
+            key_path = credential_dir / "routerai-api-key.txt"
+            key_path.write_text("fixture-key", encoding="utf-8")
+            if os.name != "nt":
+                key_path.chmod(0o600)
+
+            first = self._run_core(home, config_dir, stash_dir, credential_dir)
+            self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
+            config_path = config_dir / "opencode.jsonc"
+            with_key = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                with_key["provider"]["routerai"]["options"]["apiKey"],
+                "{file:" + str(key_path.resolve()) + "}",
+            )
+            key_path.unlink()
+            original_bytes = config_path.read_bytes()
+            checked = self._run_core(home, config_dir, stash_dir, credential_dir, check=True)
+            self.assertEqual(checked.returncode, 2, checked.stdout + checked.stderr)
+            self.assertEqual(config_path.read_bytes(), original_bytes)
+
+            repaired = self._run_core(home, config_dir, stash_dir, credential_dir)
+            self.assertEqual(repaired.returncode, 2, repaired.stdout + repaired.stderr)
+            without_key = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertNotIn("apiKey", without_key["provider"]["routerai"]["options"])
+            self.assertFalse(key_path.exists())
+            manifest = json.loads((home / "state" / "manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["credentials"]["routerai"]["path"], str(key_path.resolve()))
+            stable_bytes = config_path.read_bytes()
+            again = self._run_core(home, config_dir, stash_dir, credential_dir)
+            self.assertEqual(again.returncode, 2, again.stdout + again.stderr)
+            self.assertEqual(config_path.read_bytes(), stable_bytes)
+
+            key_path.write_text("fixture-restored-key", encoding="utf-8")
+            if os.name != "nt":
+                key_path.chmod(0o600)
+            restored = self._run_core(home, config_dir, stash_dir, credential_dir)
+            self.assertEqual(restored.returncode, 2, restored.stdout + restored.stderr)
+            restored_config = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                restored_config["provider"]["routerai"]["options"]["apiKey"],
+                "{file:" + str(key_path.resolve()) + "}",
+            )
+
+    def test_modified_config_blocks_automatic_missing_key_repair(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            config_dir = home / ".config" / "opencode"
+            stash_dir = home / "projects" / "stash" / "opencode.ai"
+            credential_dir = config_dir / "credentials"
+            credential_dir.mkdir(parents=True)
+            key_path = credential_dir / "routerai-api-key.txt"
+            key_path.write_text("fixture-key", encoding="utf-8")
+            if os.name != "nt":
+                key_path.chmod(0o600)
+            first = self._run_core(home, config_dir, stash_dir, credential_dir)
+            self.assertEqual(first.returncode, 2, first.stdout + first.stderr)
+            key_path.unlink()
+
+            config_path = config_dir / "opencode.jsonc"
+            changed = json.loads(config_path.read_text(encoding="utf-8"))
+            changed["user_setting"] = True
+            config_path.write_text(json.dumps(changed, indent=2) + "\n", encoding="utf-8")
+            before = config_path.read_bytes()
+            attempted = self._run_core(home, config_dir, stash_dir, credential_dir)
+            self.assertEqual(attempted.returncode, 2, attempted.stdout + attempted.stderr)
+            self.assertEqual(config_path.read_bytes(), before)
+            self.assertEqual(
+                json.loads(before)["provider"]["routerai"]["options"]["apiKey"],
+                "{file:" + str(key_path.resolve()) + "}",
+            )
+
+    def test_missing_external_key_reference_is_preserved(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "home"
+            config_dir = home / ".config" / "opencode"
+            stash_dir = home / "projects" / "stash" / "opencode.ai"
+            credential_dir = config_dir / "credentials"
+            config_dir.mkdir(parents=True)
+            external = home / "private" / "routerai.txt"
+            config_path = config_dir / "opencode.jsonc"
+            config_path.write_text(json.dumps({
+                "provider": {"routerai": {"options": {
+                    "apiKey": "{file:" + str(external) + "}",
+                }}},
+            }), encoding="utf-8")
+            cp = self._run_core(home, config_dir, stash_dir, credential_dir)
+            self.assertEqual(cp.returncode, 2, cp.stdout + cp.stderr)
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                config["provider"]["routerai"]["options"]["apiKey"],
+                "{file:" + str(external) + "}",
+            )
+            self.assertFalse((credential_dir / "routerai-api-key.txt").exists())
 
 
 class RepositoryInspectionTests(unittest.TestCase):

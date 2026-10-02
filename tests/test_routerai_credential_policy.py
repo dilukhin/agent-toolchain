@@ -55,10 +55,7 @@ class RouterAiCredentialPolicyTests(unittest.TestCase):
             config_path = home / ".config" / "opencode" / "opencode.jsonc"
             manifest_path = home / "state" / "manifest.json"
             generated = json.loads(config_path.read_text(encoding="utf-8"))
-            self.assertEqual(
-                generated["provider"]["routerai"]["options"]["apiKey"],
-                "{file:" + str(canonical.resolve()) + "}",
-            )
+            self.assertNotIn("apiKey", generated["provider"]["routerai"]["options"])
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             credential = manifest["credentials"]["routerai"]
             self.assertEqual(credential["mode"], "managed-path")
