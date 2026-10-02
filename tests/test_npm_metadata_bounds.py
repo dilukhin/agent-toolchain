@@ -45,7 +45,7 @@ class NpmMetadataBoundsTests(unittest.TestCase):
         return {
             "dependencies": {
                 "opencode-cli-package": "opencode-ai",
-                "@opencode-ai/plugin": "latest",
+                "@opencode-ai/plugin": "match-opencode",
             }
         }
 
