@@ -26,6 +26,11 @@ External CLI inventory (`opencode`, `codex`) остаётся read-only и не 
 launcher выполняется SOCKS5 handshake, затем создаётся отдельный ephemeral
 HTTP-to-SOCKS bridge и после завершения дочернего CLI закрывается. Ошибка
 SOCKS не запускает VPN или `tunnelctl`.
+Ошибки отдельных соединений bridge не выводятся в терминал дочернего CLI:
+обычные разрывы игнорируются, неожиданные исключения записываются в
+`<AGENT_TOOLCHAIN_DATA_DIR>/log/proxy-tools.log` (по умолчанию
+`~/.local/share/agent-toolchain/log/proxy-tools.log` на Linux).
+Если приватный журнал недоступен, launcher завершается до запуска CLI.
 
 ## Manifest schema 2
 

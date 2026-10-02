@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import json
+import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -85,6 +89,72 @@ class UpdateCacheTests(unittest.TestCase):
 
 
 class ProxyLaunchTests(unittest.TestCase):
+    def test_bridge_errors_never_write_to_tui_and_unexpected_errors_go_to_log(self) -> None:
+        with tempfile.TemporaryDirectory() as td, mock.patch.dict("os.environ", {"AGENT_TOOLCHAIN_DATA_DIR": td}):
+            bridge = proxy_tools.HttpSocksBridge()
+            try:
+                output = io.StringIO()
+                with contextlib.redirect_stderr(output):
+                    for error in (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, TimeoutError):
+                        try:
+                            raise error("peer disconnected")
+                        except error:
+                            bridge.server.handle_error(None, ("127.0.0.1", 12345))
+                    try:
+                        raise ValueError("unexpected bridge failure")
+                    except ValueError:
+                        bridge.server.handle_error(None, ("127.0.0.1", 12345))
+                self.assertEqual(output.getvalue(), "")
+                log = (Path(td) / "log" / "proxy-tools.log").read_text(encoding="utf-8")
+                self.assertIn("unexpected bridge failure", log)
+                self.assertNotIn("peer disconnected", log)
+            finally:
+                bridge.server.server_close()
+                bridge.log.close()
+
+    def test_unavailable_bridge_log_does_not_start_child(self) -> None:
+        instance = mock.Mock(canonical_path=Path("/bin/opencode"))
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / "log").write_text("not a directory", encoding="utf-8")
+            with mock.patch.dict("os.environ", {"AGENT_TOOLCHAIN_DATA_DIR": td}), \
+                 mock.patch("proxy_tools.external_cli_inventory", return_value=mock.Mock(active=instance)), \
+                 mock.patch("proxy_tools.load_cache", return_value={"tools": {}}), \
+                 mock.patch("proxy_tools._show_routerai_status"), \
+                 mock.patch("proxy_tools.socks5_preflight"), \
+                 mock.patch("proxy_tools.subprocess.Popen") as popen:
+                self.assertEqual(proxy_tools.launch("opencode", []), 78)
+            popen.assert_not_called()
+
+    def test_live_bridge_error_is_logged_without_terminal_output(self) -> None:
+        with tempfile.TemporaryDirectory() as td, mock.patch.dict("os.environ", {"AGENT_TOOLCHAIN_DATA_DIR": td}):
+            bridge = proxy_tools.HttpSocksBridge()
+            upstream, peer = socket.socketpair()
+            reported = threading.Event()
+            original = bridge.server.handle_error
+
+            def handle_error(request, address):
+                try:
+                    original(request, address)
+                finally:
+                    reported.set()
+
+            try:
+                output = io.StringIO()
+                with contextlib.redirect_stderr(output), \
+                     mock.patch.object(bridge.server, "handle_error", side_effect=handle_error), \
+                     mock.patch("proxy_tools._socks_connect", return_value=upstream), \
+                     mock.patch("proxy_tools._relay", side_effect=ValueError("live bridge failure")):
+                    bridge.start()
+                    with socket.create_connection(bridge.address, timeout=2) as client:
+                        client.sendall(b"CONNECT example.test:443 HTTP/1.1\r\n\r\n")
+                        self.assertIn(b"200 Connection Established", client.recv(1024))
+                    self.assertTrue(reported.wait(2), "bridge did not handle the exception")
+                self.assertEqual(output.getvalue(), "")
+                self.assertIn("live bridge failure", (Path(td) / "log" / "proxy-tools.log").read_text(encoding="utf-8"))
+            finally:
+                bridge.close()
+                peer.close()
+
     def test_preflight_requires_no_auth_handshake(self) -> None:
         class FakeSocket:
             def __init__(self):
