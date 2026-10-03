@@ -10,10 +10,10 @@
   "models": {
     "openai/gpt-4o": {
       "description": "Дорогая универсальная модель, запасной вариант для сложных задач",
-      "name": "OpenAI GPT-4o [дорогая универсальная, 271/1082 ₽]",
+      "name": "OpenAI GPT-4o [дорогая универсальная, 271/1085 ₽]",
       "price_input_rub_per_1m": 271,
-      "price_output_rub_per_1m": 1082,
-      "cache_read_rub_per_1m": 135
+      "price_output_rub_per_1m": 1085,
+      "cache_read_rub_per_1m": 136
     },
     "openai/gpt-4o-mini": {
       "description": "Быстрая и дешёвая модель для простых задач",
@@ -24,30 +24,30 @@
     },
     "deepseek/deepseek-chat": {
       "description": "Недорогая модель для анализа кода и повседневных задач",
-      "name": "DeepSeek Chat [дешёвая code/chat, 35/96 ₽]",
+      "name": "DeepSeek Chat [дешёвая code/chat, 35/97 ₽]",
       "price_input_rub_per_1m": 35,
-      "price_output_rub_per_1m": 96
+      "price_output_rub_per_1m": 97
     },
     "anthropic/claude-opus-4.7": {
       "description": "Топовая модель для сложного агентного программирования",
-      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 541/2705 ₽]",
-      "price_input_rub_per_1m": 541,
-      "price_output_rub_per_1m": 2705,
+      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 543/2713 ₽]",
+      "price_input_rub_per_1m": 543,
+      "price_output_rub_per_1m": 2713,
       "cache_read_rub_per_1m": 54
     },
     "qwen/qwen3.6-plus": {
       "description": "Основная рабочая модель для OpenCode",
-      "name": "Qwen 3.6 Plus [основная, 35/211 ₽]",
+      "name": "Qwen 3.6 Plus [основная, 35/212 ₽]",
       "price_input_rub_per_1m": 35,
-      "price_output_rub_per_1m": 211,
+      "price_output_rub_per_1m": 212,
       "cache_read_rub_per_1m": 4
     },
     "deepseek/deepseek-v4-pro": {
       "description": "Сильная reasoning/code модель",
-      "name": "DeepSeek V4 Pro [reasoning, 27/54 ₽]",
-      "price_input_rub_per_1m": 27,
-      "price_output_rub_per_1m": 54,
-      "cache_read_rub_per_1m": 2
+      "name": "DeepSeek V4 Pro [reasoning, 32/63 ₽]",
+      "price_input_rub_per_1m": 32,
+      "price_output_rub_per_1m": 63,
+      "cache_read_rub_per_1m": 3
     },
     "minimax/minimax-m2.7": {
       "description": "Дешёвая рабочая модель",
@@ -65,23 +65,23 @@
     },
     "moonshotai/kimi-k2.5": {
       "description": "Запасная агентная для tool-use и анализа кода",
-      "name": "Kimi K2.5 [агентная, 49/243 ₽]",
+      "name": "Kimi K2.5 [агентная, 49/244 ₽]",
       "price_input_rub_per_1m": 49,
-      "price_output_rub_per_1m": 243,
+      "price_output_rub_per_1m": 244,
       "cache_read_rub_per_1m": 8
     },
     "z-ai/glm-5-turbo": {
       "description": "Дорогой fallback для длинных цепочек",
-      "name": "GLM-5 Turbo [fallback, 130/433 ₽]",
+      "name": "GLM-5 Turbo [fallback, 130/434 ₽]",
       "price_input_rub_per_1m": 130,
-      "price_output_rub_per_1m": 433,
+      "price_output_rub_per_1m": 434,
       "cache_read_rub_per_1m": 26
     },
     "openai/gpt-5.2-codex": {
       "description": "Оптимизированная для программной инженерии",
-      "name": "GPT-5.2-Codex [код/агент, 189/1515 ₽]",
-      "price_input_rub_per_1m": 189,
-      "price_output_rub_per_1m": 1515,
+      "name": "GPT-5.2-Codex [код/агент, 190/1519 ₽]",
+      "price_input_rub_per_1m": 190,
+      "price_output_rub_per_1m": 1519,
       "cache_read_rub_per_1m": 19
     },
     "qwen/qwen3-coder-next": {
@@ -93,9 +93,9 @@
     },
     "qwen/qwen3.5-122b-a10b": {
       "description": "Мультимодальная модель с reasoning, контекст 262K токенов",
-      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 28/225 ₽]",
+      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 28/226 ₽]",
       "price_input_rub_per_1m": 28,
-      "price_output_rub_per_1m": 225
+      "price_output_rub_per_1m": 226
     }
   },
   "config_defaults": {
