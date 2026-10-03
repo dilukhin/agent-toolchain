@@ -148,7 +148,7 @@ class PublicProxyIntegrationTests(unittest.TestCase):
             fake = (
                 "import json, os, sys\n"
                 "if sys.argv[1:] == ['--version']:\n"
-                "    print('fake-cli 1.0')\n"
+                "    print(os.environ.get('FAKE_VERSION', 'fake-cli 1.0'))\n"
                 "    raise SystemExit(0)\n"
                 "json.dump({'argv': sys.argv[1:], 'cwd': os.getcwd(), 'http': os.environ.get('HTTP_PROXY'), 'all': os.environ.get('ALL_PROXY')}, open(os.environ['FAKE_RESULT'], 'w'))\n"
                 "raise SystemExit(37)\n"
@@ -216,6 +216,20 @@ class PublicProxyIntegrationTests(unittest.TestCase):
                     result.unlink()
                     self.assertEqual(subprocess.run([str(public), "--health"], cwd=root, env=os.environ).returncode, 0)
                     self.assertFalse(result.exists())
+
+                # Two independent V2 launches must each use a private server and
+                # retain the proxy only for the lifetime of their child process.
+                os.environ["FAKE_VERSION"] = "opencode v2.0.22"
+                public = public_paths[0]
+                for args in ([], ["-s", "ses_fixture"]):
+                    completed = subprocess.run([str(public), *args], cwd=root, env=os.environ, capture_output=True)
+                    self.assertEqual(completed.returncode, 37, completed.stderr)
+                    payload = json.loads(result.read_text(encoding="utf-8"))
+                    self.assertEqual(payload["argv"], ["--standalone", *args])
+                    bridge = urlsplit(payload["http"])
+                    with self.assertRaises(OSError):
+                        socket.create_connection((bridge.hostname, bridge.port), timeout=0.25)
+                os.environ.pop("FAKE_VERSION")
 
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as unavailable:
                     unavailable.bind(("127.0.0.1", 0))
