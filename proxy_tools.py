@@ -5,6 +5,7 @@ import argparse
 import ipaddress
 import json
 import os
+import re
 import select
 import socket
 import socketserver
@@ -272,12 +273,46 @@ def _show_routerai_status() -> None:
         )
 
 
+def _opencode_launch_args(version: str | None, argv: list[str]) -> list[str]:
+    """Keep the V2 interactive server inside the lifetime of our proxy.
+
+    Command names and root value flags follow OpenCode v2.0.22 commands.ts.
+    Subcommands and explicitly selected servers retain their own semantics.
+    """
+    if not isinstance(version, str) or re.match(r"^(?:opencode\s+)?v?2\.\d+\.\d+\b", version.strip()) is None:
+        return argv
+    commands = {
+        "upgrade", "update", "uninstall", "acp", "api", "debug", "auth", "mcp",
+        "plugin", "models", "stats", "mini", "run", "session", "service",
+        "reload", "pair", "serve",
+    }
+    value_flags = {"--session", "-s", "--prompt"}
+    index = 0
+    directory_seen = False
+    while index < len(argv):
+        arg = argv[index]
+        if arg == "--":
+            break
+        if arg in {"--help", "-h", "--version", "-v", "--server", "--standalone", "--no-standalone"} or arg.startswith(("--server=", "--standalone=")):
+            return argv
+        if arg in value_flags:
+            index += 2
+            continue
+        if not arg.startswith("-") and not directory_seen:
+            if arg in commands:
+                return argv
+            directory_seen = True
+        index += 1
+    return ["--standalone", *argv]
+
+
 def launch(command: str, argv: list[str]) -> int:
     emit_identity(command + "-proxied", read_identity(Path(__file__).resolve().parent, bundled=True))
     inventory = external_cli_inventory(ExternalCliSpec(command, command.title()))
     if not inventory.active:
         print(f"{command}: no executable found", file=sys.stderr)
         return 127
+    child_args = _opencode_launch_args(inventory.active.version, argv) if command == "opencode" else argv
     record = load_cache().get("tools", {}).get(command)
     if record and cache_fresh(record):
         message = advisory(inventory, record)
@@ -308,7 +343,7 @@ def launch(command: str, argv: list[str]) -> int:
     env.update({"HTTP_PROXY": proxy, "HTTPS_PROXY": proxy, "ALL_PROXY": f"socks5://{socks_host}:{socks_port}", "NO_PROXY": "localhost,127.0.0.1,::1"})
     env.update({"http_proxy": proxy, "https_proxy": proxy, "all_proxy": env["ALL_PROXY"], "no_proxy": env["NO_PROXY"]})
     try:
-        child = subprocess.Popen([str(inventory.active.canonical_path), *argv], cwd=os.getcwd(), env=env)
+        child = subprocess.Popen([str(inventory.active.canonical_path), *child_args], cwd=os.getcwd(), env=env)
         return child.wait()
     finally:
         bridge.close()
