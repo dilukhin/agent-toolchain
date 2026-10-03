@@ -181,3 +181,26 @@ toolchainctl update --apply
 В status/PR публикуется только санитизированная краткая диагностика: этап, код, безопасное описание и рекомендация. Полный stderr/traceback остаётся в GitHub Actions logs, чтобы не переносить в долговечный статус секреты, authorization headers, приватные пути или большой непроверенный вывод.
 
 Подробные цели, failure model, причины отделения status branch и инструкция по воспроизведению механизма для другого внешнего источника: `docs/routerai_refresh_status_design_ru.md`.
+
+## Полный успешный refresh и operational watchdog
+
+`last_successful_check` сохраняет прежний смысл: это последняя успешная проверка внешнего источника, а не heartbeat всего pipeline. Полный технический успех определяется отдельно completion contract v1.
+
+Для одного состояния полный refresh считается успешным только после всех применимых стадий:
+
+- получение/нормализация RouterAI и regression tests успешны;
+- если существует кандидат относительно `main`, его ветка подтверждена read-back, существует открытый PR на точный SHA и имеется успешный `validate.yml` для этого SHA;
+- если generated diff отсутствует, требуется успешный `validate.yml` для точного текущего SHA `main`;
+- уже существующую успешную Windows/Linux validation разрешено переиспользовать только при точном совпадении SHA; после отсутствующей/неуспешной проверки запускается новый `workflow_dispatch`;
+- managed status успешно опубликован в `automation/routerai-status` и прочитан обратно;
+- завершающий job `Confirm complete RouterAI refresh` подтверждает весь контракт.
+
+Наличие нового `git push` не является условием продолжения pipeline. Если automation-ветка уже содержит кандидат, повторный refresh обязан восстановить отсутствующий PR или завершить обязательную validation, а не объявлять успех только потому, что нового commit нет.
+
+Status schema остаётся `1`: к `last_attempt` добавлены `run_id`/`run_attempt`, а в корень — `completion_contract`. Старый доказанно managed status без этих полей принимается как предыдущая версия состояния; это не делает старые workflow runs доказательством completion contract v1.
+
+Отдельный `.github/workflows/routerai_watchdog.yml` запускается после завершения refresh, по расписанию и вручную. Он не использует `observed_at` как heartbeat: учитываются только завершённые runs нового completion contract и соответствующий им managed status. Порог длительного отсутствия полного успеха — 72 часа, совпадающий с существующей пользовательской границей `ROUTERAI_STALE_MAX_AGE`.
+
+Watchdog управляет одним служебным operational issue с versioned owner-marker. Повторное одинаковое состояние — no-op; recovery закрывает только этот доказанно owned issue. Несколько issues с marker либо marker на issue другого автора считаются конфликтом и обрабатываются fail closed.
+
+Ограничение: watchdog тоже работает внутри GitHub Actions. При глобальной недоступности Actions он не способен сообщить о проблеме до восстановления сервиса; это не внешний независимый мониторинг.
