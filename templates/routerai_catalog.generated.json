@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-10-03T09:08:42Z",
+  "observed_at": "2026-10-04T09:47:03Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -1281,6 +1281,42 @@
         "completion": "0.0"
       }
     },
+    "cloudflare/clef": {
+      "name": "Cloudflare: Clef",
+      "created": 1790870972,
+      "context_length": 65536,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "decisions"
+        ]
+      },
+      "pricing": {
+        "prompt": "0.0000260469768",
+        "completion": "0.0"
+      }
+    },
+    "cloudflare/clef-flash": {
+      "name": "Cloudflare: Clef Flash",
+      "created": 1790870973,
+      "context_length": 65536,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "decisions"
+        ]
+      },
+      "pricing": {
+        "prompt": "0.0000097676163",
+        "completion": "0.0"
+      }
+    },
     "cognitivecomputations/dolphin-mistral-24b-venice-edition": {
       "name": "Venice: Uncensored",
       "created": 1752094966,
@@ -1753,9 +1789,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000022569879043712",
-        "completion": "0.000225027820314752",
-        "input_cache_read": "0.00001341940244736"
+        "prompt": "0.000036115696151808",
+        "completion": "0.000300847444142336",
+        "input_cache_read": "0.000011406492080256"
       }
     },
     "deepseek/deepseek-v4.1-flash": {
@@ -4705,9 +4741,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000162793605",
-        "completion": "0.00123256464799",
-        "input_cache_read": "0.0000314734303"
+        "prompt": "0.0002441904075",
+        "completion": "0.0012209520375",
+        "input_cache_read": "0.00002441904075"
       }
     },
     "morph/morph-v3-fast": {
@@ -6699,6 +6735,24 @@
         "completion": "0.000195352326"
       }
     },
+    "perplexity/pplx-decider-v1-27b": {
+      "name": "Perplexity: Decider V1 27B",
+      "created": 1790886451,
+      "context_length": 262144,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "decisions"
+        ]
+      },
+      "pricing": {
+        "prompt": "0.0000043411628",
+        "completion": "0.0"
+      }
+    },
     "perplexity/pplx-embed-v1-0.6B": {
       "name": "Perplexity: Embed V1 0.6B",
       "created": 1773624868,
@@ -7266,9 +7320,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000075970349",
-        "completion": "0.000021705814",
-        "input_cache_read": "0.00000488380815"
+        "prompt": "0.0000086823256",
+        "completion": "0.0000303881396"
       }
     },
     "qwen/qwen3-8b": {
@@ -9877,9 +9930,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000130234884",
-        "completion": "0.0000303881396",
-        "input_cache_read": "0.00000021705814"
+        "prompt": "0.00001280643026",
+        "completion": "0.00002734932564",
+        "input_cache_read": "0.000000271322675"
       }
     },
     "xiaomi/mimo-v2.6-pro": {
@@ -10500,9 +10553,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000022569879043712",
-        "completion": "0.000225027820314752",
-        "input_cache_read": "0.00001341940244736"
+        "prompt": "0.000036115696151808",
+        "completion": "0.000300847444142336",
+        "input_cache_read": "0.000011406492080256"
       }
     },
     "~google/gemini-flash-latest": {
@@ -10579,9 +10632,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000162793605",
-        "completion": "0.00123256464799",
-        "input_cache_read": "0.0000314734303"
+        "prompt": "0.0002441904075",
+        "completion": "0.0012209520375",
+        "input_cache_read": "0.00002441904075"
       }
     },
     "~openai/gpt-latest": {
