@@ -1,0 +1,33 @@
+name: Проверить источник обновлений OpenCode
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/101-opencode-release-metadata
+    paths:
+      - setup_external_updates.py
+      - .github/workflows/opencode_update_source.yml
+
+permissions:
+  contents: read
+
+jobs:
+  official-metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Проверить настоящий ответ официального сервиса
+        run: |
+          python - <<'PY'
+          import json
+          from setup_external_updates import _standalone_latest
+          version, error = _standalone_latest(timeout=10)
+          print(json.dumps({'latest_version': version, 'error': error}))
+          if error or not version:
+              raise SystemExit(error or 'Источник не вернул версию')
+          PY

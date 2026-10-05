@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -17,6 +18,66 @@ from setup_lib import atomic_write, run
 
 CACHE_SCHEMA = 1
 DEFAULT_TTL = 24 * 60 * 60
+OPENCODE_LATEST_URL = "https://opencode.ai/update/api/latest/cli/npm"
+OPENCODE_LATEST_MAX_BYTES = 64 * 1024
+
+
+def _version(value: Any) -> str | None:
+    if not isinstance(value, str) or len(value) > 120:
+        return None
+    match = re.fullmatch(
+        r"(?:(?:opencode|codex|codex-cli)\s+)?v?"
+        r"([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)",
+        value.strip(),
+    )
+    return match.group(1) if match else None
+
+
+def _version_key(value: str) -> tuple:
+    release, _, prerelease = value.split("+", 1)[0].partition("-")
+    core = tuple(int(part) for part in release.split("."))
+    parts = tuple((0, int(part)) if part.isdigit() else (1, part) for part in prerelease.split("."))
+    return core, (0, parts) if prerelease else (1, ())
+
+
+def _standalone_v2(item: ExternalCliInventory) -> bool:
+    if not item.active or item.spec.command != "opencode" or item.active.provider != "standalone":
+        return False
+    version = _version(item.active.version)
+    return version is not None and version.startswith("2.") and "-" not in version
+
+
+def _lookup_supported(item: ExternalCliInventory) -> bool:
+    return bool(item.active and (
+        (item.active.provider == "npm" and item.active.package)
+        or item.active.provider == "chocolatey" or _standalone_v2(item)
+    ))
+
+
+def _standalone_latest(timeout: float) -> tuple[str | None, str | None]:
+    # Same read-only metadata endpoint as the official OpenCode V2 installer.
+    request = urllib.request.Request(OPENCODE_LATEST_URL, headers={
+        "Accept": "application/json", "User-Agent": "agent-toolchain-updates/1",
+    })
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read(OPENCODE_LATEST_MAX_BYTES + 1)
+        if len(raw) > OPENCODE_LATEST_MAX_BYTES:
+            return None, "OpenCode release metadata exceeds size limit"
+        data = json.loads(raw.decode("utf-8"))
+        if not isinstance(data, dict):
+            return None, "OpenCode returned malformed release metadata"
+        version = _version(data.get("version"))
+        metadata = data.get("metadata")
+        package = metadata.get("package") if isinstance(metadata, dict) else None
+        if (not version or not version.startswith("2.") or "-" in version
+                or package not in ("@opencode/cli", "@opencode-ai/cli")):
+            return None, "OpenCode returned unsupported release metadata"
+        return version, None
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return None, "OpenCode release lookup failed; check network access"
+    except (UnicodeDecodeError, ValueError):
+        return None, "OpenCode returned malformed release metadata"
 
 ROUTERAI_STATUS_SCHEMA = 1
 ROUTERAI_STATUS_CACHE_SCHEMA = 1
@@ -60,8 +121,12 @@ def cache_fresh(record: dict[str, Any], now: float | None = None, ttl: int = DEF
 
 
 def _latest(item: ExternalCliInventory, timeout: float) -> tuple[str | None, str | None]:
-    if not item.active or item.conflict:
+    if not item.active:
+        return None, "executable not installed"
+    if item.conflict:
         return None, "provider conflict; lookup suppressed"
+    if _standalone_v2(item):
+        return _standalone_latest(timeout)
     provider = item.active.provider
     if provider == "npm" and item.active.package:
         try:
@@ -100,26 +165,62 @@ def refresh(*, path: Path | None = None, timeout: float = 3.0) -> dict[str, Any]
     now = time.time()
     for name, inventory in common_external_cli_inventory().items():
         installed = inventory.active.version if inventory.active else None
-        latest, error = _latest(inventory, timeout)
+        latest, error, reason = None, None, None
+        if not inventory.active:
+            status = "not_installed"
+            reason = "Программа не найдена в PATH; проверка обновлений пропущена."
+        elif inventory.conflict:
+            status = "conflict"
+            reason = "Обнаружен конфликт способов установки; проверка обновлений пропущена."
+        elif not _lookup_supported(inventory):
+            status = "unsupported"
+            reason = "Для этого способа установки или версии проверка обновлений пока не поддерживается."
+        else:
+            try:
+                latest, error = _latest(inventory, timeout)
+            except (OSError, TimeoutError, subprocess.TimeoutExpired):
+                error = "Запрос версии не выполнен; проверьте доступность сети и менеджера пакетов."
+            if not error:
+                latest = _version(latest)
+                if latest is None:
+                    error = "Источник вернул некорректную версию."
+            status = "error" if error else "ok"
+        advice = None
+        if status == "ok":
+            advice = "opencode upgrade" if _standalone_v2(inventory) else inventory.update_advice
         result["tools"][name] = {
             "tool": name, "provider": inventory.active.provider if inventory.active else "unknown",
             "installed_version": installed, "latest_version": latest,
-            "checked_at": now, "status": "ok" if not error else "error",
-            "error": error, "advice": inventory.update_advice if not error else None,
+            "checked_at": now, "status": status,
+            "error": error, "reason": reason, "advice": advice,
         }
     atomic_write(path or cache_path(), (json.dumps(result, indent=2, sort_keys=True) + "\n").encode("utf-8"))
     return result
 
 
 def advisory(inventory: ExternalCliInventory, record: dict[str, Any] | None) -> str | None:
-    if not record:
+    if not record or not inventory.active:
         return None
+    label = inventory.spec.display_name or inventory.spec.command
+    if inventory.conflict:
+        return f"{label}: конфликт способов установки; рекомендация обновления недоступна"
+    if record.get("provider") != inventory.active.provider:
+        return f"{label}: способ установки изменился; выполните toolchainctl updates refresh"
+    if _version(record.get("installed_version")) != _version(inventory.active.version):
+        return f"{label}: установленная версия изменилась; выполните toolchainctl updates refresh"
+    if record.get("status") in {"not_installed", "conflict"}:
+        return f"{label}: установка изменилась; выполните toolchainctl updates refresh"
+    if record.get("status") == "unsupported":
+        return f"{label}: проверка обновлений для этого способа установки или версии пока не поддерживается"
     if record.get("status") != "ok" or not record.get("latest_version"):
-        return "update advisory unavailable: " + str(record.get("error") or "unknown error")
-    if record.get("latest_version") != record.get("installed_version"):
-        if inventory.conflict:
-            return f"{inventory.spec.display_name or inventory.spec.command}: provider conflict; automatic update advice suppressed"
-        return f"{inventory.spec.display_name or inventory.spec.command}: update available {record['installed_version']} -> {record['latest_version']}; {record.get('advice', '')}"
+        return f"{label}: сведения об обновлении недоступны: " + str(record.get("error") or "неизвестная ошибка")
+    installed, latest = _version(inventory.active.version), _version(record.get("latest_version"))
+    if installed is None or latest is None:
+        return f"{label}: не удалось сопоставить версии; проверьте их вручную"
+    if _version_key(latest) > _version_key(installed):
+        advice = record.get("advice")
+        suffix = f"; {advice}" if advice else ""
+        return f"{label}: доступно обновление {installed} -> {latest}{suffix}"
     return None
 
 
