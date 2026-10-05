@@ -80,7 +80,7 @@ class ExternalUpdateStateTests(unittest.TestCase):
     def test_standalone_request_uses_official_bounded_metadata_without_installer(self):
         response = mock.MagicMock()
         response.__enter__.return_value = response
-        response.read.return_value = b'{"version":"2.0.23","package":"@opencode/cli"}'
+        response.read.return_value = b'{"version":"2.0.23","metadata":{"package":"@opencode/cli"}}'
         with mock.patch.object(updates.urllib.request, "urlopen", return_value=response) as urlopen, \
              mock.patch.object(updates, "run") as run:
             record = self.refresh({"opencode": inventory()})["opencode"]
@@ -94,9 +94,14 @@ class ExternalUpdateStateTests(unittest.TestCase):
 
     def test_invalid_metadata_and_network_failures_are_not_current(self):
         payloads = [b"bad", b"\xff", b"[]", b"{}",
-                    b'{"version":"2.0.23","package":"untrusted/cli"}',
-                    b'{"version":"1.18.34","package":"@opencode/cli"}',
-                    b'{"version":"2.1.0-beta.1","package":"@opencode/cli"}',
+                    b'{"version":"2.0.23","package":"@opencode/cli"}',
+                    b'{"version":"2.0.23","metadata":null}',
+                    b'{"version":"2.0.23","metadata":[]}',
+                    b'{"version":"2.0.23","metadata":{"package":[]}}',
+                    b'{"version":"2.0.23","metadata":{"package":{}}}',
+                    b'{"version":"2.0.23","metadata":{"package":"untrusted/cli"}}',
+                    b'{"version":"1.18.34","metadata":{"package":"@opencode/cli"}}',
+                    b'{"version":"2.1.0-beta.1","metadata":{"package":"@opencode/cli"}}',
                     b"x" * (updates.OPENCODE_LATEST_MAX_BYTES + 1)]
         for payload in payloads:
             with self.subTest(payload=payload[:40]):
@@ -113,6 +118,24 @@ class ExternalUpdateStateTests(unittest.TestCase):
             self.assertIsNone(version)
             self.assertTrue(message)
             self.assertNotIn("private", message)
+
+    def test_official_update_worker_artifact_shape(self):
+        # services/update/src/index.ts returns decodeArtifact(row), preserving
+        # metadata nesting; the V2 updater reads data.metadata.package.
+        for package in ("@opencode/cli", "@opencode-ai/cli"):
+            artifact = {
+                "channel": "latest", "name": "cli", "distribution": "npm",
+                "version": "2.0.23", "metadata": {"package": package,
+                    "github": {"sha": "a" * 40, "run_id": "12345"}},
+                "active": True, "minimum": False,
+                "time_created": 1790928000000, "time_updated": 1790928000000,
+            }
+            response = mock.MagicMock()
+            response.__enter__.return_value = response
+            response.read.return_value = json.dumps(artifact).encode("utf-8")
+            with self.subTest(package=package), \
+                 mock.patch.object(updates.urllib.request, "urlopen", return_value=response):
+                self.assertEqual(updates._latest(inventory(), 2), ("2.0.23", None))
 
     def test_advisory_normalizes_versions_and_never_recommends_downgrade(self):
         item = inventory()
