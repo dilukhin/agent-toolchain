@@ -521,6 +521,9 @@ def _updates_phase(args: argparse.Namespace) -> int:
         print(f"{name}: provider={record.get('provider', inventory.active.provider if inventory.active else 'unknown')} "
               f"installed={record.get('installed_version', inventory.active.version if inventory.active else 'unknown')} "
               f"latest={record.get('latest_version', 'unknown')} status={record.get('status', 'missing')}")
+        detail = record.get("reason") or record.get("error")
+        if detail:
+            print(f"  {detail}")
     return 0
 
 
