@@ -2,25 +2,25 @@
   "_managed_notice": "НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ. Этот файл и ветка automation/routerai-status полностью принадлежат автоматизации обновления RouterAI. Здесь хранится машинно-читаемое состояние последней попытки, последней успешной проверки, опубликованных данных и кандидата. Подробности, решённые проблемы и схема повторного применения: docs/routerai_refresh_status_design_ru.md. Штатный ручной запуск полного обновления: gh workflow run routerai_catalog.yml --repo dilukhin/agent-toolchain --ref main",
   "schema": 1,
   "owner": "agent-toolchain:routerai-status:v1",
-  "updated_at": "2026-10-04T09:52:17Z",
+  "updated_at": "2026-10-05T10:29:44Z",
   "published": {
     "catalog_observed_at": "2026-08-29T07:50:20Z",
-    "main_sha": "f6c51b9e97dafe78e1b8b6c8fe7b68475b3e857e"
+    "main_sha": "75d5bb0c6f548fc57fa7a94380b7ae2e10504296"
   },
   "last_successful_check": {
-    "at": "2026-10-04T09:47:03Z",
+    "at": "2026-10-05T10:25:36Z",
     "catalog_changed": true
   },
   "last_attempt": {
-    "at": "2026-10-04T09:52:17Z",
+    "at": "2026-10-05T10:29:44Z",
     "trigger": "schedule",
     "status": "success",
     "phase": "complete",
     "error": null
   },
   "candidate": {
-    "catalog_observed_at": "2026-10-04T09:47:03Z",
-    "branch_sha": "9ff769467cbf559520c41a3c4d932dfa64757e5b",
+    "catalog_observed_at": "2026-10-05T10:25:36Z",
+    "branch_sha": "5f7b67aaed8d6e8cbee157b8a7d5445eab4528ce",
     "pr_number": 34,
     "validation": "success"
   }
