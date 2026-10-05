@@ -68,8 +68,10 @@ def _standalone_latest(timeout: float) -> tuple[str | None, str | None]:
         if not isinstance(data, dict):
             return None, "OpenCode returned malformed release metadata"
         version = _version(data.get("version"))
+        metadata = data.get("metadata")
+        package = metadata.get("package") if isinstance(metadata, dict) else None
         if (not version or not version.startswith("2.") or "-" in version
-                or data.get("package") not in {"@opencode/cli", "@opencode-ai/cli"}):
+                or package not in ("@opencode/cli", "@opencode-ai/cli")):
             return None, "OpenCode returned unsupported release metadata"
         return version, None
     except (urllib.error.URLError, TimeoutError, OSError):
