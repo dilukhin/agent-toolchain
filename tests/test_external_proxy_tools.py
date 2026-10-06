@@ -99,7 +99,11 @@ class ProxyLaunchTests(unittest.TestCase):
             ("opencode", "2.0.22", ["--", "run"], ["--standalone", "--", "run"]),
             ("opencode", "1.18.34", ["-c"], ["-c"]),
             ("opencode", None, [], []),
-            ("codex", "2.0.22", [], []),
+            ("codex", "codex-cli 0.160.0", [], ["--no-daemon"]),
+            ("codex", "codex-cli 0.160.0", ["-m", "gpt-6-luna"], ["--no-daemon", "-m", "gpt-6-luna"]),
+            ("codex", "codex-cli 0.160.0", ["-c", "model=\"gpt-6-luna\"", "Fix this"],
+             ["--no-daemon", "-c", "model=\"gpt-6-luna\"", "Fix this"]),
+            ("codex", "codex-cli 0.160.0", ["--", "exec"], ["--no-daemon", "--", "exec"]),
         ]
         unchanged = [
             ["--standalone", "-c"], ["--server", "http://localhost:4096"],
@@ -109,8 +113,16 @@ class ProxyLaunchTests(unittest.TestCase):
             ["--session", "session_id", "--server", "http://localhost:4096"],
         ]
         cases.extend(("opencode", "2.0.22", args, args) for args in unchanged)
+        codex_unchanged = [
+            ["exec", "hello"], ["-m", "gpt-6-luna", "exec", "hello"],
+            ["app-server", "--stdio"], ["doctor", "--json"],
+            ["--remote", "ws://127.0.0.1:4500"], ["--remote=unix://"],
+            ["--no-daemon"], ["--help"], ["--version"],
+        ]
+        cases.extend(("codex", "codex-cli 0.160.0", args, args) for args in codex_unchanged)
         for command, version, args, expected in cases:
             with self.subTest(command=command, version=version, args=args):
+                original = list(args)
                 instance = mock.Mock(canonical_path=Path("/bin") / command, version=version)
                 child = mock.Mock()
                 child.wait.return_value = 37
@@ -123,6 +135,7 @@ class ProxyLaunchTests(unittest.TestCase):
                      mock.patch("proxy_tools.subprocess.Popen", return_value=child) as popen:
                     self.assertEqual(proxy_tools.launch(command, args), 37)
                 self.assertEqual(popen.call_args.args[0], [str(instance.canonical_path), *expected])
+                self.assertEqual(args, original)
                 self.assertEqual(popen.call_args.kwargs["env"]["HTTPS_PROXY"], "http://127.0.0.1:12345")
                 bridge.start.assert_called_once()
                 bridge.close.assert_called_once()
