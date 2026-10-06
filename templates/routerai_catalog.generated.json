@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-10-05T10:25:36Z",
+  "observed_at": "2026-10-06T10:16:50Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -19,9 +19,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000086823256",
-        "completion": "0.000173646512",
-        "input_cache_read": "0.000021705814"
+        "prompt": "0.000088328136",
+        "completion": "0.000176656272",
+        "input_cache_read": "0.000022082034"
       }
     },
     "aion-labs/aion-3.0": {
@@ -38,9 +38,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00032558721",
-        "completion": "0.00065117442",
-        "input_cache_read": "0.0000813968025"
+        "prompt": "0.00033123051",
+        "completion": "0.00066246102",
+        "input_cache_read": "0.0000828076275"
       }
     },
     "aion-labs/aion-3.0-mini": {
@@ -57,9 +57,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000075970349",
-        "completion": "0.000151940698",
-        "input_cache_read": "0.0000195352326"
+        "prompt": "0.000077287119",
+        "completion": "0.000154574238",
+        "input_cache_read": "0.0000198738306"
       }
     },
     "aion-labs/aion-3.5": {
@@ -76,9 +76,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00032558721",
-        "completion": "0.00065117442",
-        "input_cache_read": "0.0000813968025"
+        "prompt": "0.00033123051",
+        "completion": "0.00066246102",
+        "input_cache_read": "0.0000828076275"
       }
     },
     "aion-labs/aion-3.5-mini": {
@@ -95,9 +95,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000075970349",
-        "completion": "0.000151940698",
-        "input_cache_read": "0.0000195352326"
+        "prompt": "0.000077287119",
+        "completion": "0.000154574238",
+        "input_cache_read": "0.0000198738306"
       }
     },
     "aion-labs/aion-rp-llama-3.1-8b": {
@@ -114,8 +114,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000086823256",
-        "completion": "0.000173646512"
+        "prompt": "0.000088328136",
+        "completion": "0.000176656272"
       }
     },
     "alibaba/happyhorse-1.0": {
@@ -132,7 +132,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "10.722672116",
+        "seconds": "10.908524796",
         "completion": "0.0"
       }
     },
@@ -150,7 +150,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "10.722672116",
+        "seconds": "10.908524796",
         "completion": "0.0"
       }
     },
@@ -168,7 +168,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "4.3411628",
+        "seconds": "4.4164068",
         "completion": "0.0"
       }
     },
@@ -186,7 +186,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "10.852907",
+        "seconds": "11.041017",
         "completion": "0.0"
       }
     },
@@ -204,7 +204,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "9.22497095",
+        "seconds": "9.38486445",
         "completion": "0.0"
       }
     },
@@ -222,7 +222,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "15.1940698",
+        "seconds": "15.4574238",
         "completion": "0.0"
       }
     },
@@ -243,8 +243,8 @@
         "tokenizer": "Nova"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.000271322675"
+        "prompt": "0.000033123051",
+        "completion": "0.000276025425"
       }
     },
     "amazon/nova-lite-v1": {
@@ -262,8 +262,8 @@
         "tokenizer": "Nova"
       },
       "pricing": {
-        "prompt": "0.0000065117442",
-        "completion": "0.0000260469768"
+        "prompt": "0.0000066246102",
+        "completion": "0.0000264984408"
       }
     },
     "amazon/nova-micro-v1": {
@@ -280,8 +280,8 @@
         "tokenizer": "Nova"
       },
       "pricing": {
-        "prompt": "0.00000379851745",
-        "completion": "0.0000151940698"
+        "prompt": "0.00000386435595",
+        "completion": "0.0000154574238"
       }
     },
     "amazon/nova-premier-v1": {
@@ -299,9 +299,9 @@
         "tokenizer": "Nova"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.001356613375",
-        "input_cache_read": "0.00006783066875"
+        "prompt": "0.000276025425",
+        "completion": "0.001380127125",
+        "input_cache_read": "0.00006900635625"
       }
     },
     "amazon/nova-pro-v1": {
@@ -319,8 +319,8 @@
         "tokenizer": "Nova"
       },
       "pricing": {
-        "prompt": "0.000086823256",
-        "completion": "0.000347293024"
+        "prompt": "0.000088328136",
+        "completion": "0.000353312544"
       }
     },
     "anthracite-org/magnum-v4-72b": {
@@ -337,8 +337,8 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.00054264535"
+        "prompt": "0.000276025425",
+        "completion": "0.00055205085"
       }
     },
     "anthropic/claude-fable-5": {
@@ -357,11 +357,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.001248084305",
-        "completion": "0.006240421525",
-        "web_search": "1.248084305",
-        "input_cache_read": "0.0001248084305",
-        "input_cache_write": "0.00156010538125"
+        "prompt": "0.001269716955",
+        "completion": "0.006348584775",
+        "web_search": "1.269716955",
+        "input_cache_read": "0.0001269716955",
+        "input_cache_write": "0.00158714619375"
       }
     },
     "anthropic/claude-fable-5.1": {
@@ -380,11 +380,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.001248084305",
-        "completion": "0.006240421525",
-        "web_search": "1.248084305",
-        "input_cache_read": "0.000031202107625",
-        "input_cache_write": "0.00156010538125"
+        "prompt": "0.001269716955",
+        "completion": "0.006348584775",
+        "web_search": "1.269716955",
+        "input_cache_read": "0.000031742923875",
+        "input_cache_write": "0.00158714619375"
       }
     },
     "anthropic/claude-haiku-4.5": {
@@ -403,11 +403,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00010852907",
-        "completion": "0.00054264535",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000010852907",
-        "input_cache_write": "0.0001356613375"
+        "prompt": "0.00011041017",
+        "completion": "0.00055205085",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000011041017",
+        "input_cache_write": "0.0001380127125"
       }
     },
     "anthropic/claude-opus-4.1": {
@@ -426,11 +426,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00162793605",
-        "completion": "0.00813968025",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000162793605",
-        "input_cache_write": "0.0020349200625"
+        "prompt": "0.00165615255",
+        "completion": "0.00828076275",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000165615255",
+        "input_cache_write": "0.0020701906875"
       }
     },
     "anthropic/claude-opus-4.5": {
@@ -449,11 +449,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00054264535",
-        "completion": "0.00271322675",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000054264535",
-        "input_cache_write": "0.0006783066875"
+        "prompt": "0.00055205085",
+        "completion": "0.00276025425",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000055205085",
+        "input_cache_write": "0.0006900635625"
       }
     },
     "anthropic/claude-opus-4.6": {
@@ -472,11 +472,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00054264535",
-        "completion": "0.00271322675",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000054264535",
-        "input_cache_write": "0.0006783066875"
+        "prompt": "0.00055205085",
+        "completion": "0.00276025425",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000055205085",
+        "input_cache_write": "0.0006900635625"
       }
     },
     "anthropic/claude-opus-4.7": {
@@ -495,11 +495,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00054264535",
-        "completion": "0.00271322675",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000054264535",
-        "input_cache_write": "0.0006783066875"
+        "prompt": "0.00055205085",
+        "completion": "0.00276025425",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000055205085",
+        "input_cache_write": "0.0006900635625"
       }
     },
     "anthropic/claude-opus-4.8": {
@@ -518,11 +518,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00054264535",
-        "completion": "0.00271322675",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000054264535",
-        "input_cache_write": "0.0006783066875"
+        "prompt": "0.00055205085",
+        "completion": "0.00276025425",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000055205085",
+        "input_cache_write": "0.0006900635625"
       }
     },
     "anthropic/claude-opus-5": {
@@ -541,11 +541,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00054264535",
-        "completion": "0.00271322675",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000054264535",
-        "input_cache_write": "0.0006783066875"
+        "prompt": "0.00055205085",
+        "completion": "0.00276025425",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000055205085",
+        "input_cache_write": "0.0006900635625"
       }
     },
     "anthropic/claude-opus-5.5": {
@@ -564,11 +564,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00043411628",
-        "completion": "0.0021705814",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000021705814",
-        "input_cache_write": "0.00054264535"
+        "prompt": "0.00044164068",
+        "completion": "0.0022082034",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000022082034",
+        "input_cache_write": "0.00055205085"
       }
     },
     "anthropic/claude-sonnet-4": {
@@ -587,11 +587,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00032558721",
-        "completion": "0.00162793605",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000032558721",
-        "input_cache_write": "0.0004069840125"
+        "prompt": "0.00033123051",
+        "completion": "0.00165615255",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000033123051",
+        "input_cache_write": "0.0004140381375"
       }
     },
     "anthropic/claude-sonnet-4.5": {
@@ -610,11 +610,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00032558721",
-        "completion": "0.00162793605",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000032558721",
-        "input_cache_write": "0.0004069840125"
+        "prompt": "0.00033123051",
+        "completion": "0.00165615255",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000033123051",
+        "input_cache_write": "0.0004140381375"
       }
     },
     "anthropic/claude-sonnet-4.6": {
@@ -633,11 +633,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00032558721",
-        "completion": "0.00162793605",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000032558721",
-        "input_cache_write": "0.0004069840125"
+        "prompt": "0.00033123051",
+        "completion": "0.00165615255",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000033123051",
+        "input_cache_write": "0.0004140381375"
       }
     },
     "anthropic/claude-sonnet-5": {
@@ -656,11 +656,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000021705814",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000022082034",
+        "input_cache_write": "0.000276025425"
       }
     },
     "anthropic/claude-sonnet-5.5": {
@@ -679,11 +679,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000021705814",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000022082034",
+        "input_cache_write": "0.000276025425"
       }
     },
     "arcee-ai/trinity-large-thinking": {
@@ -700,9 +700,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000271322675",
-        "completion": "0.000086823256",
-        "input_cache_read": "0.0000065117442"
+        "prompt": "0.0000276025425",
+        "completion": "0.000088328136",
+        "input_cache_read": "0.0000066246102"
       }
     },
     "assemblyai/universal-3-5-pro": {
@@ -718,8 +718,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.01356613375",
-        "seconds": "0.01356613375",
+        "prompt": "0.01380127125",
+        "seconds": "0.01380127125",
         "completion": "0.0"
       }
     },
@@ -737,7 +737,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000054264535",
+        "prompt": "0.00000055205085",
         "completion": "0.0"
       }
     },
@@ -755,7 +755,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000010852907",
+        "prompt": "0.0000011041017",
         "completion": "0.0"
       }
     },
@@ -773,7 +773,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000010852907",
+        "prompt": "0.0000011041017",
         "completion": "0.0"
       }
     },
@@ -792,8 +792,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000455822094",
-        "completion": "0.0001356613375"
+        "prompt": "0.0000463722714",
+        "completion": "0.0001380127125"
       }
     },
     "black-forest-labs/flux-3-image": {
@@ -809,7 +809,7 @@
         ]
       },
       "pricing": {
-        "image_output": "4.44969187"
+        "image_output": "4.52681697"
       }
     },
     "black-forest-labs/flux-3-video": {
@@ -827,7 +827,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "18.4499419",
+        "seconds": "18.7697289",
         "completion": "0.0"
       }
     },
@@ -845,7 +845,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "3.2558721",
+        "seconds": "3.3123051",
         "completion": "0.0"
       }
     },
@@ -882,8 +882,8 @@
       "pricing": {
         "prompt": "0.0",
         "completion": "0.0",
-        "image_token": "0.001589781298828125",
-        "image_output": "0.001589781298828125"
+        "image_token": "0.001617336474609375",
+        "image_output": "0.001617336474609375"
       }
     },
     "black-forest-labs/flux.2-klein-4b": {
@@ -902,7 +902,7 @@
       "pricing": {
         "prompt": "0.0",
         "completion": "0.0",
-        "image_output": "0.0003709489697265625"
+        "image_output": "0.0003773785107421875"
       }
     },
     "black-forest-labs/flux.2-max": {
@@ -921,7 +921,7 @@
       "pricing": {
         "prompt": "0.0",
         "completion": "0.0",
-        "image_output": "0.0018547448486328124"
+        "image_output": "0.0018868925537109376"
       }
     },
     "black-forest-labs/flux.2-pro": {
@@ -940,7 +940,7 @@
       "pricing": {
         "prompt": "0.0",
         "completion": "0.0",
-        "image_output": "0.0007948906494140625"
+        "image_output": "0.0008086682373046875"
       }
     },
     "bytedance-seed/seed-1.6": {
@@ -959,8 +959,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000271322675",
-        "completion": "0.00021705814"
+        "prompt": "0.0000276025425",
+        "completion": "0.00022082034"
       }
     },
     "bytedance-seed/seed-1.6-flash": {
@@ -979,8 +979,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000813968025",
-        "completion": "0.000032558721"
+        "prompt": "0.00000828076275",
+        "completion": "0.000033123051"
       }
     },
     "bytedance-seed/seed-2-1-turbo": {
@@ -999,8 +999,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000054264535",
-        "completion": "0.000271322675"
+        "prompt": "0.000055205085",
+        "completion": "0.000276025425"
       }
     },
     "bytedance-seed/seed-2.0-code": {
@@ -1019,8 +1019,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000054264535",
-        "completion": "0.00032558721"
+        "prompt": "0.000055205085",
+        "completion": "0.00033123051"
       }
     },
     "bytedance-seed/seed-2.0-lite": {
@@ -1039,8 +1039,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000271322675",
-        "completion": "0.00021705814"
+        "prompt": "0.0000276025425",
+        "completion": "0.00022082034"
       }
     },
     "bytedance-seed/seed-2.0-mini": {
@@ -1059,8 +1059,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000043411628"
+        "prompt": "0.000011041017",
+        "completion": "0.000044164068"
       }
     },
     "bytedance-seed/seed-audio-1-0": {
@@ -1077,8 +1077,8 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "0.271322675",
-        "completion": "0.271322675"
+        "seconds": "0.276025425",
+        "completion": "0.276025425"
       }
     },
     "bytedance-seed/seedream-4.5": {
@@ -1095,7 +1095,7 @@
         ]
       },
       "pricing": {
-        "image_output": "4.3411628"
+        "image_output": "4.4164068"
       }
     },
     "bytedance-seed/seedream-5-0-flash": {
@@ -1111,7 +1111,7 @@
         ]
       },
       "pricing": {
-        "image_output": "1.95352326"
+        "image_output": "1.98738306"
       }
     },
     "bytedance-seed/seedream-5-0-lite": {
@@ -1127,7 +1127,7 @@
         ]
       },
       "pricing": {
-        "image_output": "3.79851745"
+        "image_output": "3.86435595"
       }
     },
     "bytedance-seed/seedream-5-0-pro": {
@@ -1143,7 +1143,7 @@
         ]
       },
       "pricing": {
-        "image_output": "4.88380815"
+        "image_output": "4.96845765"
       }
     },
     "bytedance/seedance-1-5-pro": {
@@ -1160,7 +1160,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "5.6261469888",
+        "seconds": "5.7236632128",
         "completion": "0.0"
       }
     },
@@ -1180,7 +1180,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "16.409595384",
+        "seconds": "16.694017704",
         "completion": "0.0"
       }
     },
@@ -1200,7 +1200,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "9.8457572304",
+        "seconds": "10.0164106224",
         "completion": "0.0"
       }
     },
@@ -1220,7 +1220,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "8.204797692",
+        "seconds": "8.347008852",
         "completion": "0.0"
       }
     },
@@ -1240,7 +1240,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "25.0832386584",
+        "seconds": "25.5179984904",
         "completion": "0.0"
       }
     },
@@ -1259,9 +1259,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000021705814",
-        "input_cache_read": "0.000010852907"
+        "prompt": "0.000011041017",
+        "completion": "0.000022082034",
+        "input_cache_read": "0.000011041017"
       }
     },
     "canopylabs/orpheus-3b-0.1-ft": {
@@ -1277,7 +1277,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00075970349",
+        "prompt": "0.00077287119",
         "completion": "0.0"
       }
     },
@@ -1295,7 +1295,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000260469768",
+        "prompt": "0.0000264984408",
         "completion": "0.0"
       }
     },
@@ -1313,7 +1313,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000097676163",
+        "prompt": "0.0000099369153",
         "completion": "0.0"
       }
     },
@@ -1331,8 +1331,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000021705814",
-        "completion": "0.000097676163"
+        "prompt": "0.000022082034",
+        "completion": "0.000099369153"
       }
     },
     "cohere/command-a": {
@@ -1349,8 +1349,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.0010852907"
+        "prompt": "0.000276025425",
+        "completion": "0.0011041017"
       }
     },
     "cohere/command-a-plus": {
@@ -1368,9 +1368,9 @@
         "tokenizer": "Cohere"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.000162793605",
-        "input_cache_read": "0.0000162793605"
+        "prompt": "0.000033123051",
+        "completion": "0.000165615255",
+        "input_cache_read": "0.0000165615255"
       }
     },
     "cohere/command-r-08-2024": {
@@ -1387,8 +1387,8 @@
         "tokenizer": "Cohere"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
-        "completion": "0.000065117442"
+        "prompt": "0.0000165615255",
+        "completion": "0.000066246102"
       }
     },
     "cohere/command-r-plus-08-2024": {
@@ -1405,8 +1405,8 @@
         "tokenizer": "Cohere"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.0010852907"
+        "prompt": "0.000276025425",
+        "completion": "0.0011041017"
       }
     },
     "cohere/command-r7b-12-2024": {
@@ -1423,8 +1423,8 @@
         "tokenizer": "Cohere"
       },
       "pricing": {
-        "prompt": "0.000004069840125",
-        "completion": "0.0000162793605"
+        "prompt": "0.000004140381375",
+        "completion": "0.0000165615255"
       }
     },
     "cohere/rerank-4-fast": {
@@ -1442,7 +1442,7 @@
       "pricing": {
         "prompt": "0.0",
         "completion": "0.0",
-        "search_units": "0.21705814"
+        "search_units": "0.22082034"
       }
     },
     "cohere/rerank-4-pro": {
@@ -1460,7 +1460,7 @@
       "pricing": {
         "prompt": "0.0",
         "completion": "0.0",
-        "search_units": "0.271322675"
+        "search_units": "0.276025425"
       }
     },
     "cohere/rerank-v3.5": {
@@ -1478,7 +1478,7 @@
       "pricing": {
         "prompt": "0.0",
         "completion": "0.0",
-        "search_units": "0.10852907"
+        "search_units": "0.11041017"
       }
     },
     "deepgram/aura-2": {
@@ -1494,7 +1494,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0032558721",
+        "prompt": "0.0033123051",
         "completion": "0.0"
       }
     },
@@ -1511,7 +1511,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00488380815",
+        "prompt": "0.00496845765",
         "completion": "0.0"
       }
     },
@@ -1528,8 +1528,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0077779166833369506",
-        "seconds": "0.0077779166833369506",
+        "prompt": "0.007912728850003681",
+        "seconds": "0.007912728850003681",
         "completion": "0.0"
       }
     },
@@ -1547,8 +1547,8 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000347293024",
-        "completion": "0.0000965908723"
+        "prompt": "0.0000353312544",
+        "completion": "0.0000982650513"
       }
     },
     "deepseek/deepseek-chat-v3-0324": {
@@ -1565,8 +1565,8 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000271322675",
-        "completion": "0.00010852907"
+        "prompt": "0.0000276025425",
+        "completion": "0.00011041017"
       }
     },
     "deepseek/deepseek-chat-v3.1": {
@@ -1583,9 +1583,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000271322675",
-        "completion": "0.0001031026165",
-        "input_cache_read": "0.0000141087791"
+        "prompt": "0.0000276025425",
+        "completion": "0.0001048896615",
+        "input_cache_read": "0.0000143533221"
       }
     },
     "deepseek/deepseek-r1": {
@@ -1602,8 +1602,8 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000075970349",
-        "completion": "0.000271322675"
+        "prompt": "0.000077287119",
+        "completion": "0.000276025425"
       }
     },
     "deepseek/deepseek-r1-0528": {
@@ -1620,9 +1620,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000054264535",
-        "completion": "0.0002333375005",
-        "input_cache_read": "0.0000379851745"
+        "prompt": "0.000055205085",
+        "completion": "0.0002373818655",
+        "input_cache_read": "0.0000386435595"
       }
     },
     "deepseek/deepseek-v3.1-terminus": {
@@ -1639,8 +1639,8 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000293028489",
-        "completion": "0.00010852907"
+        "prompt": "0.0000298107459",
+        "completion": "0.00011041017"
       }
     },
     "deepseek/deepseek-v3.1-terminus:exacto": {
@@ -1657,8 +1657,8 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000293028489",
-        "completion": "0.00010852907"
+        "prompt": "0.0000298107459",
+        "completion": "0.00011041017"
       }
     },
     "deepseek/deepseek-v3.2": {
@@ -1675,9 +1675,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000022660869816",
-        "completion": "0.000033600600072",
-        "input_cache_read": "0.000002344227912"
+        "prompt": "0.000023053643496",
+        "completion": "0.000034182988632",
+        "input_cache_read": "0.000002384859672"
       }
     },
     "deepseek/deepseek-v3.2-exp": {
@@ -1694,8 +1694,8 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000293028489",
-        "completion": "0.0000444969187"
+        "prompt": "0.0000298107459",
+        "completion": "0.0000452681697"
       }
     },
     "deepseek/deepseek-v4-flash": {
@@ -1712,9 +1712,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000005241954081",
-        "completion": "0.000010483908162",
-        "input_cache_read": "0.0000010483908162"
+        "prompt": "0.000005332811211",
+        "completion": "0.000010665622422",
+        "input_cache_read": "0.0000010665622422"
       }
     },
     "deepseek/deepseek-v4-flash-0731": {
@@ -1731,9 +1731,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000005252806988",
-        "completion": "0.000015758420964",
-        "input_cache_read": "0.0000001671347678"
+        "prompt": "0.000005343852228",
+        "completion": "0.000016031556684",
+        "input_cache_read": "0.0000001700316618"
       }
     },
     "deepseek/deepseek-v4-flash-vision-exp": {
@@ -1751,9 +1751,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000023398867492",
-        "completion": "0.000070196602476",
-        "input_cache_read": "0.0000007445094202"
+        "prompt": "0.000023804432652",
+        "completion": "0.000071413297956",
+        "input_cache_read": "0.0000007574137662"
       }
     },
     "deepseek/deepseek-v4-pro": {
@@ -1770,9 +1770,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000317252177424",
-        "completion": "0.0000634504354848",
-        "input_cache_read": "0.0000026437681452"
+        "prompt": "0.0000322751008944",
+        "completion": "0.0000645502017888",
+        "input_cache_read": "0.0000026895917412"
       }
     },
     "deepseek/deepseek-v4-pro-0813": {
@@ -1789,9 +1789,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000036115696151808",
-        "completion": "0.000300847444142336",
-        "input_cache_read": "0.000011406492080256"
+        "prompt": "0.000061216344623616",
+        "completion": "0.000306061937615616",
+        "input_cache_read": "0.000011604197195136"
       }
     },
     "deepseek/deepseek-v4.1-flash": {
@@ -1809,9 +1809,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00001074437793",
-        "completion": "0.00002148875586",
-        "input_cache_read": "0.000002148875586"
+        "prompt": "0.00001093060683",
+        "completion": "0.00002186121366",
+        "input_cache_read": "0.000002186121366"
       }
     },
     "fireworks/ember-1": {
@@ -1829,9 +1829,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00032558721",
-        "completion": "0.00162793605",
-        "input_cache_read": "0.000032558721"
+        "prompt": "0.00033123051",
+        "completion": "0.00165615255",
+        "input_cache_read": "0.000033123051"
       }
     },
     "fish-audio/s1": {
@@ -1847,7 +1847,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00162793605",
+        "prompt": "0.00165615255",
         "completion": "0.0"
       }
     },
@@ -1864,7 +1864,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00162793605",
+        "prompt": "0.00165615255",
         "completion": "0.0"
       }
     },
@@ -1881,7 +1881,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00162793605",
+        "prompt": "0.00165615255",
         "completion": "0.0"
       }
     },
@@ -1898,8 +1898,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.010852907",
-        "seconds": "0.010852907",
+        "prompt": "0.011041017",
+        "seconds": "0.011041017",
         "completion": "0.0"
       }
     },
@@ -1916,8 +1916,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.010852907",
-        "seconds": "0.010852907",
+        "prompt": "0.011041017",
+        "seconds": "0.011041017",
         "completion": "0.0"
       }
     },
@@ -1934,8 +1934,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.02894108533336951",
-        "seconds": "0.02894108533336951",
+        "prompt": "0.029442712000036803",
+        "seconds": "0.029442712000036803",
         "completion": "0.0"
       }
     },
@@ -1957,15 +1957,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.00010852907",
-        "image": "0.000032558721",
-        "prompt": "0.000032558721",
-        "completion": "0.000271322675",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.0000032558721",
-        "input_audio_cache": "0.000010852907",
-        "input_cache_write": "0.000009044089166666667",
-        "internal_reasoning": "0.000271322675"
+        "audio": "0.00011041017",
+        "image": "0.000033123051",
+        "prompt": "0.000033123051",
+        "completion": "0.000276025425",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.0000033123051",
+        "input_audio_cache": "0.000011041017",
+        "input_cache_write": "0.0000092008475",
+        "internal_reasoning": "0.000276025425"
       }
     },
     "google/gemini-2.5-flash-image": {
@@ -1984,16 +1984,16 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.00010852907",
-        "image": "0.000032558721",
-        "prompt": "0.000032558721",
-        "completion": "0.000271322675",
-        "web_search": "1.51940698",
-        "image_output": "0.0032558721",
-        "input_cache_read": "0.0000032558721",
-        "input_audio_cache": "0.000010852907",
-        "input_cache_write": "0.000009044089166666667",
-        "internal_reasoning": "0.000271322675"
+        "audio": "0.00011041017",
+        "image": "0.000033123051",
+        "prompt": "0.000033123051",
+        "completion": "0.000276025425",
+        "web_search": "1.54574238",
+        "image_output": "0.0033123051",
+        "input_cache_read": "0.0000033123051",
+        "input_audio_cache": "0.000011041017",
+        "input_cache_write": "0.0000092008475",
+        "internal_reasoning": "0.000276025425"
       }
     },
     "google/gemini-2.5-flash-lite": {
@@ -2014,15 +2014,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.000032558721",
-        "image": "0.000010852907",
-        "prompt": "0.000010852907",
-        "completion": "0.000043411628",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.0000010852907",
-        "input_audio_cache": "0.0000032558721",
-        "input_cache_write": "0.000009044089166666667",
-        "internal_reasoning": "0.000043411628"
+        "audio": "0.000033123051",
+        "image": "0.000011041017",
+        "prompt": "0.000011041017",
+        "completion": "0.000044164068",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.0000011041017",
+        "input_audio_cache": "0.0000033123051",
+        "input_cache_write": "0.0000092008475",
+        "internal_reasoning": "0.000044164068"
       }
     },
     "google/gemini-2.5-pro": {
@@ -2043,15 +2043,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.00014922747125",
-        "image": "0.00014922747125",
-        "prompt": "0.00014922747125",
-        "completion": "0.00119381977",
-        "web_search": "1.671347678",
-        "input_cache_read": "0.000014922747125",
-        "input_audio_cache": "0.000014922747125",
-        "input_cache_write": "0.000044768241375",
-        "internal_reasoning": "0.00119381977"
+        "audio": "0.00015181398375",
+        "image": "0.00015181398375",
+        "prompt": "0.00015181398375",
+        "completion": "0.00121451187",
+        "web_search": "1.700316618",
+        "input_cache_read": "0.000015181398375",
+        "input_audio_cache": "0.000015181398375",
+        "input_cache_write": "0.000045544195125",
+        "internal_reasoning": "0.00121451187"
       }
     },
     "google/gemini-2.5-pro-preview": {
@@ -2071,15 +2071,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.0001356613375",
-        "image": "0.0001356613375",
-        "prompt": "0.0001356613375",
-        "completion": "0.0010852907",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.00001356613375",
-        "input_audio_cache": "0.00001356613375",
-        "input_cache_write": "0.00004069840125",
-        "internal_reasoning": "0.0010852907"
+        "audio": "0.0001380127125",
+        "image": "0.0001380127125",
+        "prompt": "0.0001380127125",
+        "completion": "0.0011041017",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.00001380127125",
+        "input_audio_cache": "0.00001380127125",
+        "input_cache_write": "0.00004140381375",
+        "internal_reasoning": "0.0011041017"
       }
     },
     "google/gemini-3-flash-preview": {
@@ -2100,15 +2100,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.00010852907",
-        "image": "0.000054264535",
-        "prompt": "0.000054264535",
-        "completion": "0.00032558721",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.0000054264535",
-        "input_audio_cache": "0.000010852907",
-        "input_cache_write": "0.000009044089166666667",
-        "internal_reasoning": "0.00032558721"
+        "audio": "0.00011041017",
+        "image": "0.000055205085",
+        "prompt": "0.000055205085",
+        "completion": "0.00033123051",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.0000055205085",
+        "input_audio_cache": "0.000011041017",
+        "input_cache_write": "0.0000092008475",
+        "internal_reasoning": "0.00033123051"
       }
     },
     "google/gemini-3-pro-image": {
@@ -2127,16 +2127,16 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.00021705814",
-        "image": "0.00021705814",
-        "prompt": "0.00021705814",
-        "completion": "0.00130234884",
-        "web_search": "1.51940698",
-        "image_output": "0.0130234884",
-        "input_cache_read": "0.000021705814",
-        "input_audio_cache": "0.000021705814",
-        "input_cache_write": "0.00004069840125",
-        "internal_reasoning": "0.00130234884"
+        "audio": "0.00022082034",
+        "image": "0.00022082034",
+        "prompt": "0.00022082034",
+        "completion": "0.00132492204",
+        "web_search": "1.54574238",
+        "image_output": "0.0132492204",
+        "input_cache_read": "0.000022082034",
+        "input_audio_cache": "0.000022082034",
+        "input_cache_write": "0.00004140381375",
+        "internal_reasoning": "0.00132492204"
       }
     },
     "google/gemini-3-pro-image-preview": {
@@ -2155,16 +2155,16 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.00021705814",
-        "image": "0.00021705814",
-        "prompt": "0.00021705814",
-        "completion": "0.00130234884",
-        "web_search": "1.51940698",
-        "image_output": "0.0130234884",
-        "input_cache_read": "0.000021705814",
-        "input_audio_cache": "0.000021705814",
-        "input_cache_write": "0.00004069840125",
-        "internal_reasoning": "0.00130234884"
+        "audio": "0.00022082034",
+        "image": "0.00022082034",
+        "prompt": "0.00022082034",
+        "completion": "0.00132492204",
+        "web_search": "1.54574238",
+        "image_output": "0.0132492204",
+        "input_cache_read": "0.000022082034",
+        "input_audio_cache": "0.000022082034",
+        "input_cache_write": "0.00004140381375",
+        "internal_reasoning": "0.00132492204"
       }
     },
     "google/gemini-3.1-flash-image": {
@@ -2183,10 +2183,10 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "prompt": "0.000054264535",
-        "completion": "0.00032558721",
-        "web_search": "1.51940698",
-        "image_output": "0.0065117442"
+        "prompt": "0.000055205085",
+        "completion": "0.00033123051",
+        "web_search": "1.54574238",
+        "image_output": "0.0066246102"
       }
     },
     "google/gemini-3.1-flash-image-preview": {
@@ -2205,10 +2205,10 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "prompt": "0.000054264535",
-        "completion": "0.00032558721",
-        "web_search": "1.51940698",
-        "image_output": "0.0065117442"
+        "prompt": "0.000055205085",
+        "completion": "0.00033123051",
+        "web_search": "1.54574238",
+        "image_output": "0.0066246102"
       }
     },
     "google/gemini-3.1-flash-lite": {
@@ -2229,15 +2229,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.000054264535",
-        "image": "0.0000271322675",
-        "prompt": "0.0000271322675",
-        "completion": "0.000162793605",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.00000271322675",
-        "input_audio_cache": "0.0000054264535",
-        "input_cache_write": "0.000009044089166666667",
-        "internal_reasoning": "0.000162793605"
+        "audio": "0.000055205085",
+        "image": "0.0000276025425",
+        "prompt": "0.0000276025425",
+        "completion": "0.000165615255",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.00000276025425",
+        "input_audio_cache": "0.0000055205085",
+        "input_cache_write": "0.0000092008475",
+        "internal_reasoning": "0.000165615255"
       }
     },
     "google/gemini-3.1-flash-lite-image": {
@@ -2256,10 +2256,10 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "prompt": "0.0000271322675",
-        "completion": "0.000162793605",
-        "web_search": "1.51940698",
-        "image_output": "0.0032558721"
+        "prompt": "0.0000276025425",
+        "completion": "0.000165615255",
+        "web_search": "1.54574238",
+        "image_output": "0.0033123051"
       }
     },
     "google/gemini-3.1-flash-lite-preview": {
@@ -2280,15 +2280,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.000054264535",
-        "image": "0.0000271322675",
-        "prompt": "0.0000271322675",
-        "completion": "0.000162793605",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.00000271322675",
-        "input_audio_cache": "0.0000054264535",
-        "input_cache_write": "0.000009044089166666667",
-        "internal_reasoning": "0.000162793605"
+        "audio": "0.000055205085",
+        "image": "0.0000276025425",
+        "prompt": "0.0000276025425",
+        "completion": "0.000165615255",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.00000276025425",
+        "input_audio_cache": "0.0000055205085",
+        "input_cache_write": "0.0000092008475",
+        "internal_reasoning": "0.000165615255"
       }
     },
     "google/gemini-3.1-flash-tts-preview": {
@@ -2304,8 +2304,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00010852907",
-        "completion": "0.0021705814"
+        "prompt": "0.00011041017",
+        "completion": "0.0022082034"
       }
     },
     "google/gemini-3.1-pro-preview": {
@@ -2326,15 +2326,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.00021705814",
-        "image": "0.00021705814",
-        "prompt": "0.00021705814",
-        "completion": "0.00130234884",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.000021705814",
-        "input_audio_cache": "0.000021705814",
-        "input_cache_write": "0.00004069840125",
-        "internal_reasoning": "0.00130234884"
+        "audio": "0.00022082034",
+        "image": "0.00022082034",
+        "prompt": "0.00022082034",
+        "completion": "0.00132492204",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.000022082034",
+        "input_audio_cache": "0.000022082034",
+        "input_cache_write": "0.00004140381375",
+        "internal_reasoning": "0.00132492204"
       }
     },
     "google/gemini-3.1-pro-preview-customtools": {
@@ -2355,15 +2355,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.00021705814",
-        "image": "0.00021705814",
-        "prompt": "0.00021705814",
-        "completion": "0.00130234884",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.000021705814",
-        "input_audio_cache": "0.000021705814",
-        "input_cache_write": "0.00004069840125",
-        "internal_reasoning": "0.00130234884"
+        "audio": "0.00022082034",
+        "image": "0.00022082034",
+        "prompt": "0.00022082034",
+        "completion": "0.00132492204",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.000022082034",
+        "input_audio_cache": "0.000022082034",
+        "input_cache_write": "0.00004140381375",
+        "internal_reasoning": "0.00132492204"
       }
     },
     "google/gemini-3.5-flash": {
@@ -2384,15 +2384,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.00032558721",
-        "image": "0.000162793605",
-        "prompt": "0.000162793605",
-        "completion": "0.00097676163",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.0000162793605",
-        "input_audio_cache": "0.000032558721",
-        "input_cache_write": "0.000009044089166666667",
-        "internal_reasoning": "0.00097676163"
+        "audio": "0.00033123051",
+        "image": "0.000165615255",
+        "prompt": "0.000165615255",
+        "completion": "0.00099369153",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.0000165615255",
+        "input_audio_cache": "0.000033123051",
+        "input_cache_write": "0.0000092008475",
+        "internal_reasoning": "0.00099369153"
       }
     },
     "google/gemini-3.5-flash-lite": {
@@ -2413,15 +2413,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.000032558721",
-        "image": "0.000032558721",
-        "prompt": "0.000032558721",
-        "completion": "0.000271322675",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.0000032558721",
-        "input_audio_cache": "0.0000032558721",
-        "input_cache_write": "0.000009044089166666667",
-        "internal_reasoning": "0.000271322675"
+        "audio": "0.000033123051",
+        "image": "0.000033123051",
+        "prompt": "0.000033123051",
+        "completion": "0.000276025425",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.0000033123051",
+        "input_audio_cache": "0.0000033123051",
+        "input_cache_write": "0.0000092008475",
+        "internal_reasoning": "0.000276025425"
       }
     },
     "google/gemini-3.5-transcribe": {
@@ -2437,8 +2437,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00130234884"
+        "prompt": "0.00022082034",
+        "completion": "0.00132492204"
       }
     },
     "google/gemini-3.6-flash": {
@@ -2459,15 +2459,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.0000813968025",
-        "image": "0.0000813968025",
-        "prompt": "0.0000813968025",
-        "completion": "0.0004069840125",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.00000813968025",
-        "input_audio_cache": "0.00000813968025",
-        "input_cache_write": "0.000004522044583333333",
-        "internal_reasoning": "0.0004069840125"
+        "audio": "0.0000828076275",
+        "image": "0.0000828076275",
+        "prompt": "0.0000828076275",
+        "completion": "0.0004140381375",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.00000828076275",
+        "input_audio_cache": "0.00000828076275",
+        "input_cache_write": "0.00000460042375",
+        "internal_reasoning": "0.0004140381375"
       }
     },
     "google/gemini-3.7-flash": {
@@ -2488,15 +2488,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.0000813968025",
-        "image": "0.0000813968025",
-        "prompt": "0.0000813968025",
-        "completion": "0.0004069840125",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.00000813968025",
-        "input_audio_cache": "0.00000813968025",
-        "input_cache_write": "0.000004522044583333333",
-        "internal_reasoning": "0.0004069840125"
+        "audio": "0.0000828076275",
+        "image": "0.0000828076275",
+        "prompt": "0.0000828076275",
+        "completion": "0.0004140381375",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.00000828076275",
+        "input_audio_cache": "0.00000828076275",
+        "input_cache_write": "0.00000460042375",
+        "internal_reasoning": "0.0004140381375"
       }
     },
     "google/gemini-3.8-flash": {
@@ -2517,15 +2517,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.0000813968025",
-        "image": "0.0000813968025",
-        "prompt": "0.0000813968025",
-        "completion": "0.0004069840125",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.00000813968025",
-        "input_audio_cache": "0.00000813968025",
-        "input_cache_write": "0.000004522044583333333",
-        "internal_reasoning": "0.0004069840125"
+        "audio": "0.0000828076275",
+        "image": "0.0000828076275",
+        "prompt": "0.0000828076275",
+        "completion": "0.0004140381375",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.00000828076275",
+        "input_audio_cache": "0.00000828076275",
+        "input_cache_write": "0.00000460042375",
+        "internal_reasoning": "0.0004140381375"
       }
     },
     "google/gemini-3.8-flash-lite-tts": {
@@ -2541,8 +2541,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.000054264535",
-        "completion": "0.00065117442"
+        "prompt": "0.000055205085",
+        "completion": "0.00066246102"
       }
     },
     "google/gemini-3.8-flash-tts": {
@@ -2558,8 +2558,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.000054264535",
-        "completion": "0.00097676163"
+        "prompt": "0.000055205085",
+        "completion": "0.00099369153"
       }
     },
     "google/gemini-embedding-001": {
@@ -2576,7 +2576,7 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
+        "prompt": "0.0000165615255",
         "completion": "0.0"
       }
     },
@@ -2598,9 +2598,9 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.000705438955",
-        "image": "0.0000488380815",
-        "prompt": "0.000021705814",
+        "audio": "0.000717666105",
+        "image": "0.0000496845765",
+        "prompt": "0.000022082034",
         "completion": "0.0"
       }
     },
@@ -2622,9 +2622,9 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.000705438955",
-        "image": "0.0000488380815",
-        "prompt": "0.000021705814",
+        "audio": "0.000717666105",
+        "image": "0.0000496845765",
+        "prompt": "0.000022082034",
         "completion": "0.0"
       }
     },
@@ -2642,8 +2642,8 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "prompt": "0.0000705438955",
-        "completion": "0.0000705438955"
+        "prompt": "0.0000717666105",
+        "completion": "0.0000717666105"
       }
     },
     "google/gemma-3-12b-it": {
@@ -2661,8 +2661,8 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "prompt": "0.0000054264535",
-        "completion": "0.0000162793605"
+        "prompt": "0.0000055205085",
+        "completion": "0.0000165615255"
       }
     },
     "google/gemma-3-27b-it": {
@@ -2680,8 +2680,8 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "prompt": "0.0000086823256",
-        "completion": "0.0000173646512"
+        "prompt": "0.0000088328136",
+        "completion": "0.0000176656272"
       }
     },
     "google/gemma-3-4b-it": {
@@ -2699,8 +2699,8 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "prompt": "0.0000054264535",
-        "completion": "0.000010852907"
+        "prompt": "0.0000055205085",
+        "completion": "0.000011041017"
       }
     },
     "google/gemma-4-26b-a4b-it": {
@@ -2719,9 +2719,9 @@
         "tokenizer": "Gemma"
       },
       "pricing": {
-        "prompt": "0.00000455822094",
-        "completion": "0.0000238763954",
-        "input_cache_read": "0.00000227911047"
+        "prompt": "0.00000463722714",
+        "completion": "0.0000242902374",
+        "input_cache_read": "0.00000231861357"
       }
     },
     "google/gemma-4-31b-it": {
@@ -2740,9 +2740,9 @@
         "tokenizer": "Gemma"
       },
       "pricing": {
-        "prompt": "0.0000097676163",
-        "completion": "0.0000368998838",
-        "input_cache_read": "0.0000054264535"
+        "prompt": "0.0000099369153",
+        "completion": "0.0000375394578",
+        "input_cache_read": "0.0000055205085"
       }
     },
     "google/lyria-3-clip-preview": {
@@ -2762,7 +2762,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "request": "4.3411628",
+        "request": "4.4164068",
         "completion": "0.0"
       }
     },
@@ -2783,7 +2783,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "request": "8.6823256",
+        "request": "8.8328136",
         "completion": "0.0"
       }
     },
@@ -2801,7 +2801,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "43.411628",
+        "seconds": "44.164068",
         "completion": "0.0"
       }
     },
@@ -2819,7 +2819,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "10.852907",
+        "seconds": "11.041017",
         "completion": "0.0"
       }
     },
@@ -2837,7 +2837,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "5.4264535",
+        "seconds": "5.5205085",
         "completion": "0.0"
       }
     },
@@ -2855,8 +2855,8 @@
         "tokenizer": "Llama2"
       },
       "pricing": {
-        "prompt": "0.0000086823256",
-        "completion": "0.0000119381977"
+        "prompt": "0.0000088328136",
+        "completion": "0.0000121451187"
       }
     },
     "hexgrad/kokoro-82m": {
@@ -2872,7 +2872,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000672880234",
+        "prompt": "0.0000684543054",
         "completion": "0.0"
       }
     },
@@ -2891,7 +2891,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "5.4264535",
+        "seconds": "5.5205085",
         "completion": "0.0"
       }
     },
@@ -2909,7 +2909,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "1.62793605",
+        "seconds": "1.65615255",
         "completion": "0.0"
       }
     },
@@ -2927,8 +2927,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000184499419",
-        "completion": "0.00001215525584"
+        "prompt": "0.00000187697289",
+        "completion": "0.00001236593904"
       }
     },
     "ibm-granite/granite-4.2-8b": {
@@ -2945,9 +2945,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.0000162793605",
-        "input_cache_read": "0.0000054264535"
+        "prompt": "0.000011041017",
+        "completion": "0.0000165615255",
+        "input_cache_read": "0.0000055205085"
       }
     },
     "inception/mercury-2": {
@@ -2964,9 +2964,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000271322675",
-        "completion": "0.0000813968025",
-        "input_cache_read": "0.00000271322675"
+        "prompt": "0.0000276025425",
+        "completion": "0.0000828076275",
+        "input_cache_read": "0.00000276025425"
       }
     },
     "inception/mercury-2.5": {
@@ -2983,9 +2983,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000043411628",
-        "completion": "0.0000162793605",
-        "input_cache_read": "0.00000043411628"
+        "prompt": "0.0000044164068",
+        "completion": "0.0000165615255",
+        "input_cache_read": "0.00000044164068"
       }
     },
     "inclusionai/ling-3.0-flash": {
@@ -3002,9 +3002,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000227911047",
-        "completion": "0.00000683733141",
-        "input_cache_read": "0.000000455822094"
+        "prompt": "0.00000231861357",
+        "completion": "0.00000695584071",
+        "input_cache_read": "0.000000463722714"
       }
     },
     "inclusionai/ling-3.0-flash-fin": {
@@ -3021,9 +3021,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000455822094",
-        "completion": "0.000013370781424",
-        "input_cache_read": "0.000000911644188"
+        "prompt": "0.00000463722714",
+        "completion": "0.000013602532944",
+        "input_cache_read": "0.000000927445428"
       }
     },
     "inclusionai/ling-3.0-flash-vl": {
@@ -3042,9 +3042,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000023930659935",
-        "completion": "0.0000070196602476",
-        "input_cache_read": "0.0000004786131987"
+        "prompt": "0.0000024345442485",
+        "completion": "0.0000071413297956",
+        "input_cache_read": "0.0000004869088497"
       }
     },
     "inclusionai/ling-3.1-flash": {
@@ -3104,9 +3104,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000054264535",
-        "completion": "0.0000249616861",
-        "input_cache_read": "0.0000054264535"
+        "prompt": "0.0000055205085",
+        "completion": "0.0000253943391",
+        "input_cache_read": "0.0000055205085"
       }
     },
     "inference-net/schematron-v2-turbo": {
@@ -3123,9 +3123,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000032558721",
-        "completion": "0.0000162793605",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.0000033123051",
+        "completion": "0.0000165615255",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "intfloat/e5-base-v2": {
@@ -3142,7 +3142,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000054264535",
+        "prompt": "0.00000055205085",
         "completion": "0.0"
       }
     },
@@ -3160,7 +3160,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000010852907",
+        "prompt": "0.0000011041017",
         "completion": "0.0"
       }
     },
@@ -3178,7 +3178,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000010852907",
+        "prompt": "0.0000011041017",
         "completion": "0.0"
       }
     },
@@ -3195,7 +3195,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00000455822094",
+        "prompt": "0.00000463722714",
         "completion": "0.0"
       }
     },
@@ -3212,7 +3212,7 @@
         ]
       },
       "pricing": {
-        "image_output": "6.5117442"
+        "image_output": "6.6246102"
       }
     },
     "krea/krea-2-medium": {
@@ -3228,7 +3228,7 @@
         ]
       },
       "pricing": {
-        "image_output": "3.2558721"
+        "image_output": "3.3123051"
       }
     },
     "krea/krea-2-medium-turbo": {
@@ -3244,7 +3244,7 @@
         ]
       },
       "pricing": {
-        "image_output": "1.62793605"
+        "image_output": "1.65615255"
       }
     },
     "kwaivgi/kling-v3.0-pro": {
@@ -3261,7 +3261,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "18.23288376",
+        "seconds": "18.54890856",
         "completion": "0.0"
       }
     },
@@ -3279,7 +3279,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "13.67466282",
+        "seconds": "13.91168142",
         "completion": "0.0"
       }
     },
@@ -3297,12 +3297,12 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "12.15525584",
+        "seconds": "12.36593904",
         "completion": "0.0"
       }
     },
     "liquid/d1": {
-      "name": "LiquidAI: D1",
+      "name": "LiquidAI: d1",
       "created": 1790878711,
       "context_length": 65536,
       "architecture": {
@@ -3314,9 +3314,9 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000043411628",
+        "prompt": "0.0000044164068",
         "completion": "0.0",
-        "input_cache_read": "0.0000043411628"
+        "input_cache_read": "0.0000044164068"
       }
     },
     "mancer/weaver": {
@@ -3333,8 +3333,8 @@
         "tokenizer": "Llama2"
       },
       "pricing": {
-        "prompt": "0.000043411628",
-        "completion": "0.0000813968025"
+        "prompt": "0.000044164068",
+        "completion": "0.0000828076275"
       }
     },
     "meituan/longcat-2.0": {
@@ -3351,9 +3351,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.000130234884",
-        "input_cache_read": "0.00000065117442"
+        "prompt": "0.000033123051",
+        "completion": "0.000132492204",
+        "input_cache_read": "0.00000066246102"
       }
     },
     "meta-llama/llama-3.1-70b-instruct": {
@@ -3370,8 +3370,8 @@
         "tokenizer": "Llama3"
       },
       "pricing": {
-        "prompt": "0.000043411628",
-        "completion": "0.000043411628"
+        "prompt": "0.000044164068",
+        "completion": "0.000044164068"
       }
     },
     "meta-llama/llama-3.1-8b-instruct": {
@@ -3388,8 +3388,8 @@
         "tokenizer": "Llama3"
       },
       "pricing": {
-        "prompt": "0.0000021705814",
-        "completion": "0.0000043411628"
+        "prompt": "0.0000022082034",
+        "completion": "0.0000044164068"
       }
     },
     "meta-llama/llama-3.2-1b-instruct": {
@@ -3406,8 +3406,8 @@
         "tokenizer": "Llama3"
       },
       "pricing": {
-        "prompt": "0.00000293028489",
-        "completion": "0.00002181434307"
+        "prompt": "0.00000298107459",
+        "completion": "0.00002219244417"
       }
     },
     "meta-llama/llama-3.2-3b-instruct": {
@@ -3424,8 +3424,8 @@
         "tokenizer": "Llama3"
       },
       "pricing": {
-        "prompt": "0.0000054264535",
-        "completion": "0.0000358145931"
+        "prompt": "0.0000055205085",
+        "completion": "0.0000364353561"
       }
     },
     "meta-llama/llama-3.3-70b-instruct": {
@@ -3442,8 +3442,8 @@
         "tokenizer": "Llama3"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.0000347293024"
+        "prompt": "0.000011041017",
+        "completion": "0.0000353312544"
       }
     },
     "meta-llama/llama-4-maverick": {
@@ -3461,8 +3461,8 @@
         "tokenizer": "Llama4"
       },
       "pricing": {
-        "prompt": "0.000020349200625",
-        "completion": "0.000070815218175"
+        "prompt": "0.000020701906875",
+        "completion": "0.000072042635925"
       }
     },
     "meta-llama/llama-4-scout": {
@@ -3480,8 +3480,8 @@
         "tokenizer": "Llama4"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000032558721"
+        "prompt": "0.000011041017",
+        "completion": "0.000033123051"
       }
     },
     "meta-llama/llama-guard-4-12b": {
@@ -3499,8 +3499,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000195352326",
-        "completion": "0.0000195352326"
+        "prompt": "0.0000198738306",
+        "completion": "0.0000198738306"
       }
     },
     "meta/muse-glimmer-30b": {
@@ -3518,9 +3518,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.000119381977",
-        "input_cache_read": "0.0000043411628"
+        "prompt": "0.000033123051",
+        "completion": "0.000121451187",
+        "input_cache_read": "0.0000044164068"
       }
     },
     "meta/muse-spark-1.1": {
@@ -3540,10 +3540,10 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00014922747125",
-        "completion": "0.00050737340225",
-        "web_search": "0.2984549425",
-        "input_cache_read": "0.00001790729655"
+        "prompt": "0.00015181398375",
+        "completion": "0.00051616754475",
+        "web_search": "0.3036279675",
+        "input_cache_read": "0.00001821767805"
       }
     },
     "meta/muse-spark-1.2": {
@@ -3563,10 +3563,10 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00014922747125",
-        "completion": "0.00050737340225",
-        "web_search": "0.2984549425",
-        "input_cache_read": "0.00001790729655"
+        "prompt": "0.00015181398375",
+        "completion": "0.00051616754475",
+        "web_search": "0.3036279675",
+        "input_cache_read": "0.00001821767805"
       }
     },
     "meta/muse-spark-1.2-contributor": {
@@ -3586,10 +3586,10 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000021705814",
-        "web_search": "0.271322675",
-        "input_cache_read": "0.00000021705814"
+        "prompt": "0.000011041017",
+        "completion": "0.000022082034",
+        "web_search": "0.276025425",
+        "input_cache_read": "0.00000022082034"
       }
     },
     "meta/muse-spark-1.3": {
@@ -3609,10 +3609,10 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0001356613375",
-        "completion": "0.0004612485475",
-        "web_search": "0.271322675",
-        "input_cache_read": "0.0000162793605"
+        "prompt": "0.0001380127125",
+        "completion": "0.0004692432225",
+        "web_search": "0.276025425",
+        "input_cache_read": "0.0000165615255"
       }
     },
     "meta/muse-spark-1.3-contributor": {
@@ -3632,10 +3632,10 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000021705814",
-        "web_search": "0.271322675",
-        "input_cache_read": "0.00000021705814"
+        "prompt": "0.000011041017",
+        "completion": "0.000022082034",
+        "web_search": "0.276025425",
+        "input_cache_read": "0.00000022082034"
       }
     },
     "meta/muse-voice-transcribe-1.0": {
@@ -3651,8 +3651,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0054264535",
-        "seconds": "0.0054264535",
+        "prompt": "0.0055205085",
+        "seconds": "0.0055205085",
         "completion": "0.0"
       }
     },
@@ -3669,10 +3669,10 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00054264535",
+        "prompt": "0.00055205085",
         "completion": "0.0",
-        "image_token": "0.00510086629",
-        "image_output": "0.00510086629"
+        "image_token": "0.00518927799",
+        "image_output": "0.00518927799"
       }
     },
     "microsoft/mai-image-2.5-pro": {
@@ -3688,7 +3688,7 @@
         ]
       },
       "pricing": {
-        "image_output": "0.01172113956"
+        "image_output": "0.01192429836"
       }
     },
     "microsoft/mai-image-2.6": {
@@ -3704,7 +3704,7 @@
         ]
       },
       "pricing": {
-        "image_output": "0.00412410466"
+        "image_output": "0.00419558646"
       }
     },
     "microsoft/mai-image-2.6-flash": {
@@ -3720,7 +3720,7 @@
         ]
       },
       "pricing": {
-        "image_output": "0.00206205233"
+        "image_output": "0.00209779323"
       }
     },
     "microsoft/mai-transcribe-1.5": {
@@ -3736,8 +3736,8 @@
         ]
       },
       "pricing": {
-        "prompt": "39.0704652",
-        "seconds": "0.010852907",
+        "prompt": "39.7476612",
+        "seconds": "0.011041017",
         "completion": "0.0"
       }
     },
@@ -3754,8 +3754,8 @@
         ]
       },
       "pricing": {
-        "prompt": "10.852907",
-        "seconds": "0.003014696388888889",
+        "prompt": "11.041017",
+        "seconds": "0.003066949166666667",
         "completion": "0.0"
       }
     },
@@ -3772,7 +3772,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00238763954",
+        "prompt": "0.00242902374",
         "completion": "0.0"
       }
     },
@@ -3789,7 +3789,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00162793605",
+        "prompt": "0.00165615255",
         "completion": "0.0"
       }
     },
@@ -3806,7 +3806,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00238763954",
+        "prompt": "0.00242902374",
         "completion": "0.0"
       }
     },
@@ -3823,7 +3823,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00162793605",
+        "prompt": "0.00165615255",
         "completion": "0.0"
       }
     },
@@ -3841,8 +3841,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000075970349",
-        "completion": "0.0000151940698"
+        "prompt": "0.0000077287119",
+        "completion": "0.0000154574238"
       }
     },
     "microsoft/wizardlm-2-8x22b": {
@@ -3859,8 +3859,8 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000672880234",
-        "completion": "0.0000672880234"
+        "prompt": "0.0000684543054",
+        "completion": "0.0000684543054"
       }
     },
     "minimax/hailuo-2.3": {
@@ -3877,7 +3877,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "8.866825019",
+        "seconds": "9.020510889",
         "completion": "0.0"
       }
     },
@@ -3897,7 +3897,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "14.1087791",
+        "seconds": "14.3533221",
         "completion": "0.0"
       }
     },
@@ -3915,7 +3915,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "8.6823256",
+        "seconds": "8.8328136",
         "completion": "0.0"
       }
     },
@@ -3934,8 +3934,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000021705814",
-        "completion": "0.000119381977"
+        "prompt": "0.000022082034",
+        "completion": "0.000121451187"
       }
     },
     "minimax/minimax-m1": {
@@ -3952,8 +3952,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000043411628",
-        "completion": "0.000238763954"
+        "prompt": "0.000044164068",
+        "completion": "0.000242902374"
       }
     },
     "minimax/minimax-m2": {
@@ -3970,8 +3970,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00002767491285",
-        "completion": "0.0001106996514"
+        "prompt": "0.00002815459335",
+        "completion": "0.0001126183734"
       }
     },
     "minimax/minimax-m2-her": {
@@ -3988,9 +3988,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.000130234884",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.000033123051",
+        "completion": "0.000132492204",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "minimax/minimax-m2.1": {
@@ -4007,9 +4007,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.000130234884",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.000033123051",
+        "completion": "0.000132492204",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "minimax/minimax-m2.5": {
@@ -4026,9 +4026,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000293028489",
-        "completion": "0.0001031026165",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.0000298107459",
+        "completion": "0.0001048896615",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "minimax/minimax-m2.7": {
@@ -4045,9 +4045,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000227911047",
-        "completion": "0.0000911644188",
-        "input_cache_read": "0.00000455822094"
+        "prompt": "0.0000231861357",
+        "completion": "0.0000927445428",
+        "input_cache_read": "0.00000463722714"
       }
     },
     "minimax/minimax-m3": {
@@ -4066,9 +4066,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000249616861",
-        "completion": "0.0001041879072",
-        "input_cache_read": "0.0000054264535"
+        "prompt": "0.0000253943391",
+        "completion": "0.0001059937632",
+        "input_cache_read": "0.0000055205085"
       }
     },
     "minimax/speech-2.8-hd": {
@@ -4084,7 +4084,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.010852907",
+        "prompt": "0.011041017",
         "completion": "0.0"
       }
     },
@@ -4101,7 +4101,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0065117442",
+        "prompt": "0.0066246102",
         "completion": "0.0"
       }
     },
@@ -4120,9 +4120,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.000097676163",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.000033123051",
+        "completion": "0.000099369153",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "mistralai/codestral-embed-2505": {
@@ -4139,7 +4139,7 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
+        "prompt": "0.0000165615255",
         "completion": "0.0"
       }
     },
@@ -4158,9 +4158,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000043411628",
-        "completion": "0.00021705814",
-        "input_cache_read": "0.0000043411628"
+        "prompt": "0.000044164068",
+        "completion": "0.00022082034",
+        "input_cache_read": "0.0000044164068"
       }
     },
     "mistralai/ministral-14b-2512": {
@@ -4178,9 +4178,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000021705814",
-        "completion": "0.000021705814",
-        "input_cache_read": "0.0000021705814"
+        "prompt": "0.000022082034",
+        "completion": "0.000022082034",
+        "input_cache_read": "0.0000022082034"
       }
     },
     "mistralai/ministral-3b-2512": {
@@ -4198,9 +4198,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000010852907",
-        "input_cache_read": "0.0000010852907"
+        "prompt": "0.000011041017",
+        "completion": "0.000011041017",
+        "input_cache_read": "0.0000011041017"
       }
     },
     "mistralai/ministral-8b-2512": {
@@ -4218,9 +4218,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
-        "completion": "0.0000162793605",
-        "input_cache_read": "0.00000162793605"
+        "prompt": "0.0000165615255",
+        "completion": "0.0000165615255",
+        "input_cache_read": "0.00000165615255"
       }
     },
     "mistralai/mistral-embed-2312": {
@@ -4237,7 +4237,7 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000010852907",
+        "prompt": "0.000011041017",
         "completion": "0.0"
       }
     },
@@ -4256,9 +4256,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00065117442",
-        "input_cache_read": "0.000021705814"
+        "prompt": "0.00022082034",
+        "completion": "0.00066246102",
+        "input_cache_read": "0.000022082034"
       }
     },
     "mistralai/mistral-large-2407": {
@@ -4276,9 +4276,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00065117442",
-        "input_cache_read": "0.000021705814"
+        "prompt": "0.00022082034",
+        "completion": "0.00066246102",
+        "input_cache_read": "0.000022082034"
       }
     },
     "mistralai/mistral-large-2512": {
@@ -4297,9 +4297,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000054264535",
-        "completion": "0.000162793605",
-        "input_cache_read": "0.0000054264535"
+        "prompt": "0.000055205085",
+        "completion": "0.000165615255",
+        "input_cache_read": "0.0000055205085"
       }
     },
     "mistralai/mistral-medium-3": {
@@ -4318,9 +4318,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000043411628",
-        "completion": "0.00021705814",
-        "input_cache_read": "0.0000043411628"
+        "prompt": "0.000044164068",
+        "completion": "0.00022082034",
+        "input_cache_read": "0.0000044164068"
       }
     },
     "mistralai/mistral-medium-3-5": {
@@ -4339,8 +4339,8 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000162793605",
-        "completion": "0.000813968025"
+        "prompt": "0.000165615255",
+        "completion": "0.000828076275"
       }
     },
     "mistralai/mistral-medium-3.1": {
@@ -4359,9 +4359,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000043411628",
-        "completion": "0.00021705814",
-        "input_cache_read": "0.0000043411628"
+        "prompt": "0.000044164068",
+        "completion": "0.00022082034",
+        "input_cache_read": "0.0000044164068"
       }
     },
     "mistralai/mistral-nemo": {
@@ -4378,8 +4378,8 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.00000195352326",
-        "completion": "0.0000032558721"
+        "prompt": "0.00000198738306",
+        "completion": "0.0000033123051"
       }
     },
     "mistralai/mistral-saba": {
@@ -4397,9 +4397,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000021705814",
-        "completion": "0.000065117442",
-        "input_cache_read": "0.0000021705814"
+        "prompt": "0.000022082034",
+        "completion": "0.000066246102",
+        "input_cache_read": "0.0000022082034"
       }
     },
     "mistralai/mistral-small-24b-instruct-2501": {
@@ -4416,8 +4416,8 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000054264535",
-        "completion": "0.0000086823256"
+        "prompt": "0.0000055205085",
+        "completion": "0.0000088328136"
       }
     },
     "mistralai/mistral-small-2603": {
@@ -4435,9 +4435,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
-        "completion": "0.000065117442",
-        "input_cache_read": "0.00000162793605"
+        "prompt": "0.0000165615255",
+        "completion": "0.000066246102",
+        "input_cache_read": "0.00000165615255"
       }
     },
     "mistralai/mistral-small-3.1-24b-instruct": {
@@ -4455,8 +4455,8 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.00003809370357",
-        "completion": "0.00006023363385"
+        "prompt": "0.00003875396967",
+        "completion": "0.00006127764435"
       }
     },
     "mistralai/mistral-small-3.2-24b-instruct": {
@@ -4474,8 +4474,8 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.00000813968025",
-        "completion": "0.000021705814"
+        "prompt": "0.00000828076275",
+        "completion": "0.000022082034"
       }
     },
     "mistralai/mixtral-8x22b-instruct": {
@@ -4493,9 +4493,9 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00065117442",
-        "input_cache_read": "0.000021705814"
+        "prompt": "0.00022082034",
+        "completion": "0.00066246102",
+        "input_cache_read": "0.000022082034"
       }
     },
     "mistralai/voxtral-mini-3b-2507": {
@@ -4511,8 +4511,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.001808821450969",
-        "seconds": "0.001808821450969",
+        "prompt": "0.001840173180339",
+        "seconds": "0.001840173180339",
         "completion": "0.0"
       }
     },
@@ -4529,8 +4529,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0054264535",
-        "seconds": "0.0054264535",
+        "prompt": "0.0055205085",
+        "seconds": "0.0055205085",
         "completion": "0.0"
       }
     },
@@ -4547,7 +4547,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00173646512",
+        "prompt": "0.00176656272",
         "completion": "0.0"
       }
     },
@@ -4567,11 +4567,11 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "audio": "0.010852907",
-        "prompt": "0.000010852907",
-        "seconds": "0.010852907",
-        "completion": "0.000032558721",
-        "input_cache_read": "0.0000010852907"
+        "audio": "0.011041017",
+        "prompt": "0.000011041017",
+        "seconds": "0.011041017",
+        "completion": "0.000033123051",
+        "input_cache_read": "0.0000011041017"
       }
     },
     "mistralai/voxtral-small-24b-2507-stt": {
@@ -4587,8 +4587,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0054264535",
-        "seconds": "0.0054264535",
+        "prompt": "0.0055205085",
+        "seconds": "0.0055205085",
         "completion": "0.0"
       }
     },
@@ -4606,8 +4606,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000618615699",
-        "completion": "0.000249616861"
+        "prompt": "0.0000629337969",
+        "completion": "0.000253943391"
       }
     },
     "moonshotai/kimi-k2-0905": {
@@ -4624,8 +4624,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000065117442",
-        "completion": "0.000271322675"
+        "prompt": "0.000066246102",
+        "completion": "0.000276025425"
       }
     },
     "moonshotai/kimi-k2-0905:exacto": {
@@ -4642,8 +4642,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000065117442",
-        "completion": "0.000271322675"
+        "prompt": "0.000066246102",
+        "completion": "0.000276025425"
       }
     },
     "moonshotai/kimi-k2-thinking": {
@@ -4660,9 +4660,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000065117442",
-        "completion": "0.000271322675",
-        "input_cache_read": "0.0000162793605"
+        "prompt": "0.000066246102",
+        "completion": "0.000276025425",
+        "input_cache_read": "0.0000165615255"
       }
     },
     "moonshotai/kimi-k2.5": {
@@ -4680,9 +4680,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000488380815",
-        "completion": "0.0002441904075",
-        "input_cache_read": "0.0000075970349"
+        "prompt": "0.0000496845765",
+        "completion": "0.0002484228825",
+        "input_cache_read": "0.0000077287119"
       }
     },
     "moonshotai/kimi-k2.6": {
@@ -4700,9 +4700,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00005046601755",
-        "completion": "0.0002658962215",
-        "input_cache_read": "0.000010581584325"
+        "prompt": "0.00005134072905",
+        "completion": "0.0002705049165",
+        "input_cache_read": "0.000010764991575"
       }
     },
     "moonshotai/kimi-k2.7-code": {
@@ -4720,9 +4720,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000077326962375",
-        "completion": "0.00032558721",
-        "input_cache_read": "0.000015465392475"
+        "prompt": "0.000078667246125",
+        "completion": "0.00033123051",
+        "input_cache_read": "0.000015733449225"
       }
     },
     "moonshotai/kimi-k3": {
@@ -4741,9 +4741,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000195352326",
-        "completion": "0.00097676163",
-        "input_cache_read": "0.0000195352326"
+        "prompt": "0.0002152998315",
+        "completion": "0.0010764991575",
+        "input_cache_read": "0.00002152998315"
       }
     },
     "morph/morph-v3-fast": {
@@ -4760,8 +4760,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000086823256",
-        "completion": "0.000130234884"
+        "prompt": "0.000088328136",
+        "completion": "0.000132492204"
       }
     },
     "morph/morph-v3-large": {
@@ -4778,8 +4778,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000097676163",
-        "completion": "0.000206205233"
+        "prompt": "0.000099369153",
+        "completion": "0.000209779323"
       }
     },
     "nex-agi/nex-n2.5-mini": {
@@ -4797,9 +4797,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00000271322675",
-        "completion": "0.000010852907",
-        "input_cache_read": "0.000000271322675"
+        "prompt": "0.00000276025425",
+        "completion": "0.000011041017",
+        "input_cache_read": "0.000000276025425"
       }
     },
     "nex-agi/nex-n2.5-pro": {
@@ -4817,9 +4817,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00000813968025",
-        "completion": "0.0000271322675",
-        "input_cache_read": "0.00000162793605"
+        "prompt": "0.00000828076275",
+        "completion": "0.0000276025425",
+        "input_cache_read": "0.00000165615255"
       }
     },
     "nousresearch/hermes-3-llama-3.1-405b": {
@@ -4836,8 +4836,8 @@
         "tokenizer": "Llama3"
       },
       "pricing": {
-        "prompt": "0.00010852907",
-        "completion": "0.00010852907"
+        "prompt": "0.00011041017",
+        "completion": "0.00011041017"
       }
     },
     "nousresearch/hermes-3-llama-3.1-70b": {
@@ -4854,8 +4854,8 @@
         "tokenizer": "Llama3"
       },
       "pricing": {
-        "prompt": "0.000075970349",
-        "completion": "0.000075970349"
+        "prompt": "0.000077287119",
+        "completion": "0.000077287119"
       }
     },
     "nousresearch/hermes-4-405b": {
@@ -4872,8 +4872,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00010852907",
-        "completion": "0.00032558721"
+        "prompt": "0.00011041017",
+        "completion": "0.00033123051"
       }
     },
     "nvidia/nemotron-3-nano-30b-a3b": {
@@ -4890,9 +4890,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000054264535",
-        "completion": "0.000021705814",
-        "input_cache_read": "0.00000271322675"
+        "prompt": "0.0000055205085",
+        "completion": "0.000022082034",
+        "input_cache_read": "0.00000276025425"
       }
     },
     "nvidia/nemotron-3-super-120b-a12b": {
@@ -4909,8 +4909,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000922497095",
-        "completion": "0.000043411628"
+        "prompt": "0.00000938486445",
+        "completion": "0.000044164068"
       }
     },
     "nvidia/nemotron-3-ultra-550b-a55b": {
@@ -4927,9 +4927,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000054264535",
-        "completion": "0.000238763954",
-        "input_cache_read": "0.000010852907"
+        "prompt": "0.000055205085",
+        "completion": "0.000242902374",
+        "input_cache_read": "0.000011041017"
       }
     },
     "nvidia/nemotron-3.5-asr-streaming-multilingual-0.6b": {
@@ -4945,8 +4945,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0003614018031",
-        "seconds": "0.0003614018031",
+        "prompt": "0.0003676658661",
+        "seconds": "0.0003676658661",
         "completion": "0.0"
       }
     },
@@ -4965,8 +4965,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000021705814",
-        "completion": "0.000021705814"
+        "prompt": "0.000022082034",
+        "completion": "0.000022082034"
       }
     },
     "nvidia/nemotron-3.5-lightning": {
@@ -4983,9 +4983,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000423263373",
-        "completion": "0.0000195352326",
-        "input_cache_read": "0.000002116316865"
+        "prompt": "0.00000541009833",
+        "completion": "0.0000154574238",
+        "input_cache_read": "0.000002705049165"
       }
     },
     "nvidia/parakeet-tdt-0.6b-v3": {
@@ -5001,8 +5001,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00271322675",
-        "seconds": "0.00271322675",
+        "prompt": "0.00276025425",
+        "seconds": "0.00276025425",
         "completion": "0.0"
       }
     },
@@ -5020,8 +5020,8 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000054264535",
-        "completion": "0.000162793605"
+        "prompt": "0.000055205085",
+        "completion": "0.000165615255"
       }
     },
     "openai/gpt-3.5-turbo-0613": {
@@ -5038,8 +5038,8 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00010852907",
-        "completion": "0.00021705814"
+        "prompt": "0.00011041017",
+        "completion": "0.00022082034"
       }
     },
     "openai/gpt-3.5-turbo-16k": {
@@ -5056,8 +5056,8 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00032558721",
-        "completion": "0.00043411628"
+        "prompt": "0.00033123051",
+        "completion": "0.00044164068"
       }
     },
     "openai/gpt-3.5-turbo-instruct": {
@@ -5074,8 +5074,8 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000162793605",
-        "completion": "0.00021705814"
+        "prompt": "0.000165615255",
+        "completion": "0.00022082034"
       }
     },
     "openai/gpt-4": {
@@ -5092,8 +5092,8 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0032558721",
-        "completion": "0.0065117442"
+        "prompt": "0.0033123051",
+        "completion": "0.0066246102"
       }
     },
     "openai/gpt-4-turbo": {
@@ -5111,8 +5111,8 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0010852907",
-        "completion": "0.0032558721"
+        "prompt": "0.0011041017",
+        "completion": "0.0033123051"
       }
     },
     "openai/gpt-4.1": {
@@ -5131,10 +5131,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00086823256",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000054264535"
+        "prompt": "0.00022082034",
+        "completion": "0.00088328136",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000055205085"
       }
     },
     "openai/gpt-4.1-mini": {
@@ -5153,10 +5153,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000043411628",
-        "completion": "0.000173646512",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000010852907"
+        "prompt": "0.000044164068",
+        "completion": "0.000176656272",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000011041017"
       }
     },
     "openai/gpt-4.1-nano": {
@@ -5175,10 +5175,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000043411628",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00000271322675"
+        "prompt": "0.000011041017",
+        "completion": "0.000044164068",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00000276025425"
       }
     },
     "openai/gpt-4o": {
@@ -5197,9 +5197,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.0010852907",
-        "input_cache_read": "0.0001356613375"
+        "prompt": "0.000276025425",
+        "completion": "0.0011041017",
+        "input_cache_read": "0.0001380127125"
       }
     },
     "openai/gpt-4o-2024-05-13": {
@@ -5218,8 +5218,8 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00054264535",
-        "completion": "0.00162793605"
+        "prompt": "0.00055205085",
+        "completion": "0.00165615255"
       }
     },
     "openai/gpt-4o-2024-08-06": {
@@ -5238,9 +5238,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.0010852907",
-        "input_cache_read": "0.0001356613375"
+        "prompt": "0.000276025425",
+        "completion": "0.0011041017",
+        "input_cache_read": "0.0001380127125"
       }
     },
     "openai/gpt-4o-2024-11-20": {
@@ -5259,9 +5259,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.0010852907",
-        "input_cache_read": "0.0001356613375"
+        "prompt": "0.000276025425",
+        "completion": "0.0011041017",
+        "input_cache_read": "0.0001380127125"
       }
     },
     "openai/gpt-4o-mini": {
@@ -5280,9 +5280,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
-        "completion": "0.000065117442",
-        "input_cache_read": "0.00000813968025"
+        "prompt": "0.0000165615255",
+        "completion": "0.000066246102",
+        "input_cache_read": "0.00000828076275"
       }
     },
     "openai/gpt-4o-mini-2024-07-18": {
@@ -5301,9 +5301,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
-        "completion": "0.000065117442",
-        "input_cache_read": "0.00000813968025"
+        "prompt": "0.0000165615255",
+        "completion": "0.000066246102",
+        "input_cache_read": "0.00000828076275"
       }
     },
     "openai/gpt-4o-mini-transcribe": {
@@ -5319,8 +5319,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0001356613375",
-        "completion": "0.00054264535"
+        "prompt": "0.0001380127125",
+        "completion": "0.00055205085"
       }
     },
     "openai/gpt-4o-transcribe": {
@@ -5336,8 +5336,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.0010852907"
+        "prompt": "0.000276025425",
+        "completion": "0.0011041017"
       }
     },
     "openai/gpt-4o:extended": {
@@ -5356,9 +5356,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.0010852907",
-        "input_cache_read": "0.0001356613375"
+        "prompt": "0.000276025425",
+        "completion": "0.0011041017",
+        "input_cache_read": "0.0001380127125"
       }
     },
     "openai/gpt-5": {
@@ -5377,10 +5377,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0001356613375",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00001356613375"
+        "prompt": "0.0001380127125",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00001380127125"
       }
     },
     "openai/gpt-5-image": {
@@ -5400,11 +5400,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0010852907",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "image_output": "0.0043411628",
-        "input_cache_read": "0.0001356613375"
+        "prompt": "0.0011041017",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "image_output": "0.0044164068",
+        "input_cache_read": "0.0001380127125"
       }
     },
     "openai/gpt-5-image-mini": {
@@ -5424,11 +5424,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.00021705814",
-        "web_search": "1.0852907",
-        "image_output": "0.00086823256",
-        "input_cache_read": "0.0000271322675"
+        "prompt": "0.000276025425",
+        "completion": "0.00022082034",
+        "web_search": "1.1041017",
+        "image_output": "0.00088328136",
+        "input_cache_read": "0.0000276025425"
       }
     },
     "openai/gpt-5-mini": {
@@ -5447,10 +5447,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0000271322675",
-        "completion": "0.00021705814",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00000271322675"
+        "prompt": "0.0000276025425",
+        "completion": "0.00022082034",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00000276025425"
       }
     },
     "openai/gpt-5-nano": {
@@ -5469,10 +5469,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0000054264535",
-        "completion": "0.000043411628",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00000054264535"
+        "prompt": "0.0000055205085",
+        "completion": "0.000044164068",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00000055205085"
       }
     },
     "openai/gpt-5-pro": {
@@ -5491,9 +5491,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00162793605",
-        "completion": "0.0130234884",
-        "web_search": "1.0852907"
+        "prompt": "0.00165615255",
+        "completion": "0.0132492204",
+        "web_search": "1.1041017"
       }
     },
     "openai/gpt-5.1": {
@@ -5512,10 +5512,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0001356613375",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00001356613375"
+        "prompt": "0.0001380127125",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00001380127125"
       }
     },
     "openai/gpt-5.1-codex": {
@@ -5533,10 +5533,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0001356613375",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.0000141087791"
+        "prompt": "0.0001380127125",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.0000143533221"
       }
     },
     "openai/gpt-5.1-codex-max": {
@@ -5554,10 +5554,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0001356613375",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00001356613375"
+        "prompt": "0.0001380127125",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00001380127125"
       }
     },
     "openai/gpt-5.1-codex-mini": {
@@ -5575,10 +5575,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0000271322675",
-        "completion": "0.00021705814",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.0000276025425",
+        "completion": "0.00022082034",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "openai/gpt-5.2": {
@@ -5597,10 +5597,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0001899258725",
-        "completion": "0.00151940698",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00001899258725"
+        "prompt": "0.0001932177975",
+        "completion": "0.00154574238",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00001932177975"
       }
     },
     "openai/gpt-5.2-chat": {
@@ -5619,10 +5619,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0001899258725",
-        "completion": "0.00151940698",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00001899258725"
+        "prompt": "0.0001932177975",
+        "completion": "0.00154574238",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00001932177975"
       }
     },
     "openai/gpt-5.2-codex": {
@@ -5640,10 +5640,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0001899258725",
-        "completion": "0.00151940698",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00001899258725"
+        "prompt": "0.0001932177975",
+        "completion": "0.00154574238",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00001932177975"
       }
     },
     "openai/gpt-5.2-pro": {
@@ -5662,9 +5662,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00227911047",
-        "completion": "0.01823288376",
-        "web_search": "1.0852907"
+        "prompt": "0.00231861357",
+        "completion": "0.01854890856",
+        "web_search": "1.1041017"
       }
     },
     "openai/gpt-5.3-codex": {
@@ -5683,10 +5683,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0001899258725",
-        "completion": "0.00151940698",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00001899258725"
+        "prompt": "0.0001932177975",
+        "completion": "0.00154574238",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00001932177975"
       }
     },
     "openai/gpt-5.4": {
@@ -5705,10 +5705,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.00162793605",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.0000271322675"
+        "prompt": "0.000276025425",
+        "completion": "0.00165615255",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.0000276025425"
       }
     },
     "openai/gpt-5.4-image-2": {
@@ -5728,11 +5728,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00086823256",
-        "completion": "0.00162793605",
-        "web_search": "1.0852907",
-        "image_output": "0.0032558721",
-        "input_cache_read": "0.00021705814"
+        "prompt": "0.00088328136",
+        "completion": "0.00165615255",
+        "web_search": "1.1041017",
+        "image_output": "0.0033123051",
+        "input_cache_read": "0.00022082034"
       }
     },
     "openai/gpt-5.4-mini": {
@@ -5751,10 +5751,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0000813968025",
-        "completion": "0.000488380815",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00000813968025"
+        "prompt": "0.0000828076275",
+        "completion": "0.000496845765",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00000828076275"
       }
     },
     "openai/gpt-5.4-nano": {
@@ -5773,10 +5773,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0000227911047",
-        "completion": "0.000142444404375",
-        "web_search": "1.139555235",
-        "input_cache_read": "0.00000227911047"
+        "prompt": "0.0000231861357",
+        "completion": "0.000144913348125",
+        "web_search": "1.159306785",
+        "input_cache_read": "0.00000231861357"
       }
     },
     "openai/gpt-5.4-pro": {
@@ -5795,9 +5795,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00390704652",
-        "completion": "0.02344227912",
-        "web_search": "1.30234884"
+        "prompt": "0.00397476612",
+        "completion": "0.02384859672",
+        "web_search": "1.32492204"
       }
     },
     "openai/gpt-5.5": {
@@ -5816,10 +5816,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00054264535",
-        "completion": "0.0032558721",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000054264535"
+        "prompt": "0.00055205085",
+        "completion": "0.0033123051",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000055205085"
       }
     },
     "openai/gpt-5.5-pro": {
@@ -5838,9 +5838,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00390704652",
-        "completion": "0.02344227912",
-        "web_search": "1.30234884"
+        "prompt": "0.00397476612",
+        "completion": "0.02384859672",
+        "web_search": "1.32492204"
       }
     },
     "openai/gpt-5.6-luna": {
@@ -5859,11 +5859,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000021705814",
-        "completion": "0.000130234884",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.0000021705814",
-        "input_cache_write": "0.0000271322675"
+        "prompt": "0.000022082034",
+        "completion": "0.000132492204",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.0000022082034",
+        "input_cache_write": "0.0000276025425"
       }
     },
     "openai/gpt-5.6-luna-pro": {
@@ -5882,11 +5882,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000021705814",
-        "completion": "0.000130234884",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.0000021705814",
-        "input_cache_write": "0.0000271322675"
+        "prompt": "0.000022082034",
+        "completion": "0.000132492204",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.0000022082034",
+        "input_cache_write": "0.0000276025425"
       }
     },
     "openai/gpt-5.6-sol": {
@@ -5905,11 +5905,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000021705814",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000022082034",
+        "input_cache_write": "0.000276025425"
       }
     },
     "openai/gpt-5.6-sol-pro": {
@@ -5928,11 +5928,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000227911047",
-        "completion": "0.001139555235",
-        "web_search": "1.139555235",
-        "input_cache_read": "0.0000227911047",
-        "input_cache_write": "0.00028488880875"
+        "prompt": "0.000231861357",
+        "completion": "0.001159306785",
+        "web_search": "1.159306785",
+        "input_cache_read": "0.0000231861357",
+        "input_cache_write": "0.00028982669625"
       }
     },
     "openai/gpt-5.6-terra": {
@@ -5951,11 +5951,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00130234884",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000021705814",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.00132492204",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000022082034",
+        "input_cache_write": "0.000276025425"
       }
     },
     "openai/gpt-5.6-terra-pro": {
@@ -5974,11 +5974,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000227911047",
-        "completion": "0.001367466282",
-        "web_search": "1.139555235",
-        "input_cache_read": "0.0000227911047",
-        "input_cache_write": "0.00028488880875"
+        "prompt": "0.000231861357",
+        "completion": "0.001391168142",
+        "web_search": "1.159306785",
+        "input_cache_read": "0.0000231861357",
+        "input_cache_write": "0.00028982669625"
       }
     },
     "openai/gpt-6-astra": {
@@ -5997,11 +5997,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0010852907",
-        "completion": "0.0054264535",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00010852907",
-        "input_cache_write": "0.001356613375"
+        "prompt": "0.0011041017",
+        "completion": "0.0055205085",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00011041017",
+        "input_cache_write": "0.001380127125"
       }
     },
     "openai/gpt-6-astra-pro": {
@@ -6020,11 +6020,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0010852907",
-        "completion": "0.0054264535",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00010852907",
-        "input_cache_write": "0.001356613375"
+        "prompt": "0.0011041017",
+        "completion": "0.0055205085",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00011041017",
+        "input_cache_write": "0.001380127125"
       }
     },
     "openai/gpt-6-luna": {
@@ -6043,11 +6043,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000054264535",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.0000010852907",
-        "input_cache_write": "0.00001356613375"
+        "prompt": "0.000011041017",
+        "completion": "0.000055205085",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.0000011041017",
+        "input_cache_write": "0.00001380127125"
       }
     },
     "openai/gpt-6-luna-pro": {
@@ -6066,11 +6066,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000054264535",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.0000010852907",
-        "input_cache_write": "0.00001356613375"
+        "prompt": "0.000011041017",
+        "completion": "0.000055205085",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.0000011041017",
+        "input_cache_write": "0.00001380127125"
       }
     },
     "openai/gpt-6-sol": {
@@ -6089,11 +6089,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000021705814",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000022082034",
+        "input_cache_write": "0.000276025425"
       }
     },
     "openai/gpt-6-sol-pro": {
@@ -6112,11 +6112,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000021705814",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000022082034",
+        "input_cache_write": "0.000276025425"
       }
     },
     "openai/gpt-6.1-sol": {
@@ -6135,11 +6135,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000010852907",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000011041017",
+        "input_cache_write": "0.000276025425"
       }
     },
     "openai/gpt-6.1-sol-pro": {
@@ -6158,11 +6158,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000010852907",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000011041017",
+        "input_cache_write": "0.000276025425"
       }
     },
     "openai/gpt-audio": {
@@ -6181,10 +6181,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "audio": "0.00347293024",
-        "prompt": "0.000271322675",
-        "completion": "0.0010852907",
-        "audio_output": "0.00694586048"
+        "audio": "0.00353312544",
+        "prompt": "0.000276025425",
+        "completion": "0.0011041017",
+        "audio_output": "0.00706625088"
       }
     },
     "openai/gpt-audio-mini": {
@@ -6203,10 +6203,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "audio": "0.000065117442",
-        "prompt": "0.000065117442",
-        "completion": "0.000260469768",
-        "audio_output": "0.000260469768"
+        "audio": "0.000066246102",
+        "prompt": "0.000066246102",
+        "completion": "0.000264984408",
+        "audio_output": "0.000264984408"
       }
     },
     "openai/gpt-chat-latest": {
@@ -6225,10 +6225,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00054264535",
-        "completion": "0.0032558721",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000054264535"
+        "prompt": "0.00055205085",
+        "completion": "0.0033123051",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000055205085"
       }
     },
     "openai/gpt-image-1": {
@@ -6244,11 +6244,11 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0010852907",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "image_output": "0.0043411628",
-        "input_cache_read": "0.0001356613375"
+        "prompt": "0.0011041017",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "image_output": "0.0044164068",
+        "input_cache_read": "0.0001380127125"
       }
     },
     "openai/gpt-image-1-mini": {
@@ -6264,11 +6264,11 @@
         ]
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.000271322675",
-        "web_search": "1.0852907",
-        "image_output": "0.00086823256",
-        "input_cache_read": "0.0000271322675"
+        "prompt": "0.000276025425",
+        "completion": "0.000276025425",
+        "web_search": "1.1041017",
+        "image_output": "0.00088328136",
+        "input_cache_read": "0.0000276025425"
       }
     },
     "openai/gpt-image-2": {
@@ -6284,11 +6284,11 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00086823256",
-        "completion": "0.00086823256",
-        "web_search": "1.0852907",
-        "image_output": "0.0032558721",
-        "input_cache_read": "0.00021705814"
+        "prompt": "0.00088328136",
+        "completion": "0.00088328136",
+        "web_search": "1.1041017",
+        "image_output": "0.0033123051",
+        "input_cache_read": "0.00022082034"
       }
     },
     "openai/gpt-image-2.5-flare": {
@@ -6304,7 +6304,7 @@
         ]
       },
       "pricing": {
-        "image_output": "0.0032558721"
+        "image_output": "0.0033123051"
       }
     },
     "openai/gpt-image-2.5-sunburst": {
@@ -6320,7 +6320,7 @@
         ]
       },
       "pricing": {
-        "image_output": "0.0032558721"
+        "image_output": "0.0033123051"
       }
     },
     "openai/gpt-oss-120b": {
@@ -6337,9 +6337,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0000032558721",
-        "completion": "0.0000184499419",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.0000033123051",
+        "completion": "0.0000187697289",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "openai/gpt-oss-120b:exacto": {
@@ -6356,9 +6356,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0000032558721",
-        "completion": "0.0000184499419",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.0000033123051",
+        "completion": "0.0000187697289",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "openai/gpt-oss-20b": {
@@ -6375,9 +6375,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000195352326",
-        "completion": "0.0000097676163",
-        "input_cache_read": "0.00000097676163"
+        "prompt": "0.00000198738306",
+        "completion": "0.0000099369153",
+        "input_cache_read": "0.00000099369153"
       }
     },
     "openai/gpt-oss-safeguard-20b": {
@@ -6394,9 +6394,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000813968025",
-        "completion": "0.000032558721",
-        "input_cache_read": "0.000004069840125"
+        "prompt": "0.00000828076275",
+        "completion": "0.000033123051",
+        "input_cache_read": "0.000004140381375"
       }
     },
     "openai/gpt-transcribe": {
@@ -6412,8 +6412,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00813968025",
-        "seconds": "0.00813968025",
+        "prompt": "0.00828076275",
+        "seconds": "0.00828076275",
         "completion": "0.0"
       }
     },
@@ -6433,10 +6433,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00162793605",
-        "completion": "0.0065117442",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000813968025"
+        "prompt": "0.00165615255",
+        "completion": "0.0066246102",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000828076275"
       }
     },
     "openai/o1-pro": {
@@ -6455,9 +6455,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0162793605",
-        "completion": "0.065117442",
-        "web_search": "1.0852907"
+        "prompt": "0.0165615255",
+        "completion": "0.066246102",
+        "web_search": "1.1041017"
       }
     },
     "openai/o3": {
@@ -6476,10 +6476,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00086823256",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000054264535"
+        "prompt": "0.00022082034",
+        "completion": "0.00088328136",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000055205085"
       }
     },
     "openai/o3-mini": {
@@ -6497,10 +6497,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000119381977",
-        "completion": "0.000477527908",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.0000596909885"
+        "prompt": "0.000121451187",
+        "completion": "0.000485804748",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.0000607255935"
       }
     },
     "openai/o3-mini-high": {
@@ -6518,10 +6518,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000119381977",
-        "completion": "0.000477527908",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.0000596909885"
+        "prompt": "0.000121451187",
+        "completion": "0.000485804748",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.0000607255935"
       }
     },
     "openai/o4-mini": {
@@ -6540,10 +6540,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000119381977",
-        "completion": "0.000477527908",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00002984549425"
+        "prompt": "0.000121451187",
+        "completion": "0.000485804748",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00003036279675"
       }
     },
     "openai/o4-mini-high": {
@@ -6562,10 +6562,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.000119381977",
-        "completion": "0.000477527908",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00002984549425"
+        "prompt": "0.000121451187",
+        "completion": "0.000485804748",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00003036279675"
       }
     },
     "openai/sora-2-pro": {
@@ -6582,7 +6582,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "32.558721",
+        "seconds": "33.123051",
         "completion": "0.0"
       }
     },
@@ -6600,7 +6600,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000141087791",
+        "prompt": "0.0000143533221",
         "completion": "0.0"
       }
     },
@@ -6618,7 +6618,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000021705814",
+        "prompt": "0.0000022082034",
         "completion": "0.0"
       }
     },
@@ -6636,7 +6636,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000010852907",
+        "prompt": "0.000011041017",
         "completion": "0.0"
       }
     },
@@ -6653,8 +6653,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.010852907",
-        "seconds": "0.010852907",
+        "prompt": "0.011041017",
+        "seconds": "0.011041017",
         "completion": "0.0"
       }
     },
@@ -6671,8 +6671,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.000813968025",
-        "seconds": "0.000813968025",
+        "prompt": "0.000828076275",
+        "seconds": "0.000828076275",
         "completion": "0.0"
       }
     },
@@ -6689,8 +6689,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0003614018031",
-        "seconds": "0.0003614018031",
+        "prompt": "0.0003676658661",
+        "seconds": "0.0003676658661",
         "completion": "0.0"
       }
     },
@@ -6710,8 +6710,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000195352326",
-        "completion": "0.000195352326"
+        "prompt": "0.0000198738306",
+        "completion": "0.000198738306"
       }
     },
     "perceptron/perceptron-mk1.5": {
@@ -6731,8 +6731,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000195352326",
-        "completion": "0.000195352326"
+        "prompt": "0.0000198738306",
+        "completion": "0.000198738306"
       }
     },
     "perplexity/pplx-decider-v1-27b": {
@@ -6749,7 +6749,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000043411628",
+        "prompt": "0.0000044164068",
         "completion": "0.0"
       }
     },
@@ -6767,7 +6767,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000043411628",
+        "prompt": "0.00000044164068",
         "completion": "0.0"
       }
     },
@@ -6785,7 +6785,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000043411628",
+        "prompt": "0.00000044164068",
         "completion": "0.0"
       }
     },
@@ -6803,7 +6803,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000032558721",
+        "prompt": "0.0000033123051",
         "completion": "0.0"
       }
     },
@@ -6821,7 +6821,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000032558721",
+        "prompt": "0.0000033123051",
         "completion": "0.0"
       }
     },
@@ -6840,9 +6840,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00010852907",
-        "completion": "0.00010852907",
-        "web_search": "0.54264535"
+        "prompt": "0.00011041017",
+        "completion": "0.00011041017",
+        "web_search": "0.55205085"
       }
     },
     "perplexity/sonar-deep-research": {
@@ -6859,10 +6859,10 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00086823256",
-        "web_search": "0.54264535",
-        "internal_reasoning": "0.00032558721"
+        "prompt": "0.00022082034",
+        "completion": "0.00088328136",
+        "web_search": "0.55205085",
+        "internal_reasoning": "0.00033123051"
       }
     },
     "perplexity/sonar-pro": {
@@ -6880,9 +6880,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00032558721",
-        "completion": "0.00162793605",
-        "web_search": "0.54264535"
+        "prompt": "0.00033123051",
+        "completion": "0.00165615255",
+        "web_search": "0.55205085"
       }
     },
     "perplexity/sonar-pro-search": {
@@ -6900,9 +6900,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00032558721",
-        "completion": "0.00162793605",
-        "web_search": "1.95352326"
+        "prompt": "0.00033123051",
+        "completion": "0.00165615255",
+        "web_search": "1.98738306"
       }
     },
     "perplexity/sonar-reasoning-pro": {
@@ -6920,9 +6920,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00086823256",
-        "web_search": "0.54264535"
+        "prompt": "0.00022082034",
+        "completion": "0.00088328136",
+        "web_search": "0.55205085"
       }
     },
     "poolside/laguna-s-2.1": {
@@ -6939,9 +6939,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000097676163",
-        "completion": "0.0000195352326",
-        "input_cache_read": "0.00000097676163"
+        "prompt": "0.0000099369153",
+        "completion": "0.0000198738306",
+        "input_cache_read": "0.00000099369153"
       }
     },
     "poolside/laguna-xs-2.1": {
@@ -6958,9 +6958,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000065117442",
-        "completion": "0.0000130234884",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.0000066246102",
+        "completion": "0.0000132492204",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "prism-ml/ternary-bonsai-2-27b": {
@@ -6978,9 +6978,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00000813968025",
-        "completion": "0.000054264535",
-        "input_cache_read": "0.000004069840125"
+        "prompt": "0.00000828076275",
+        "completion": "0.000055205085",
+        "input_cache_read": "0.000004140381375"
       }
     },
     "qwen/qwen-2.5-72b-instruct": {
@@ -6997,8 +6997,8 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000390704652",
-        "completion": "0.000043411628"
+        "prompt": "0.0000397476612",
+        "completion": "0.000044164068"
       }
     },
     "qwen/qwen-2.5-7b-instruct": {
@@ -7015,8 +7015,8 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000021705814"
+        "prompt": "0.000011041017",
+        "completion": "0.000022082034"
       }
     },
     "qwen/qwen-2.5-coder-32b-instruct": {
@@ -7033,8 +7033,8 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000716291862",
-        "completion": "0.00010852907"
+        "prompt": "0.0000728707122",
+        "completion": "0.00011041017"
       }
     },
     "qwen/qwen-audio-3.0-tts-flash": {
@@ -7050,7 +7050,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00162793605",
+        "prompt": "0.00165615255",
         "completion": "0.0"
       }
     },
@@ -7067,7 +7067,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0021705814",
+        "prompt": "0.0022082034",
         "completion": "0.0"
       }
     },
@@ -7084,7 +7084,7 @@
         ]
       },
       "pricing": {
-        "image_output": "3.2558721"
+        "image_output": "3.3123051"
       }
     },
     "qwen/qwen-image-3-pro": {
@@ -7100,7 +7100,7 @@
         ]
       },
       "pricing": {
-        "image_output": "4.3411628"
+        "image_output": "4.4164068"
       }
     },
     "qwen/qwen-plus": {
@@ -7117,10 +7117,10 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000282175582",
-        "completion": "0.0000846526746",
-        "input_cache_read": "0.00000564351164",
-        "input_cache_write": "0.00003527194775"
+        "prompt": "0.0000287066442",
+        "completion": "0.0000861199326",
+        "input_cache_read": "0.00000574132884",
+        "input_cache_write": "0.00003588330525"
       }
     },
     "qwen/qwen-plus-2025-07-28": {
@@ -7137,8 +7137,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000282175582",
-        "completion": "0.0000846526746"
+        "prompt": "0.0000287066442",
+        "completion": "0.0000861199326"
       }
     },
     "qwen/qwen-plus-2025-07-28:thinking": {
@@ -7155,8 +7155,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000282175582",
-        "completion": "0.0000846526746"
+        "prompt": "0.0000287066442",
+        "completion": "0.0000861199326"
       }
     },
     "qwen/qwen2.5-vl-72b-instruct": {
@@ -7174,9 +7174,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.000086823256",
-        "completion": "0.00010852907",
-        "input_cache_read": "0.000043411628"
+        "prompt": "0.000088328136",
+        "completion": "0.00011041017",
+        "input_cache_read": "0.000044164068"
       }
     },
     "qwen/qwen3-14b": {
@@ -7193,8 +7193,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.0000238763954"
+        "prompt": "0.000011041017",
+        "completion": "0.0000242902374"
       }
     },
     "qwen/qwen3-235b-a22b": {
@@ -7211,8 +7211,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00004938072685",
-        "completion": "0.0001975229074"
+        "prompt": "0.00005023662735",
+        "completion": "0.0002009465094"
       }
     },
     "qwen/qwen3-235b-a22b-2507": {
@@ -7229,9 +7229,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000009496293625",
-        "completion": "0.0000379851745",
-        "input_cache_read": "0.000001899258725"
+        "prompt": "0.000009660889875",
+        "completion": "0.0000386435595",
+        "input_cache_read": "0.000001932177975"
       }
     },
     "qwen/qwen3-235b-a22b-thinking-2507": {
@@ -7248,8 +7248,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000249616861",
-        "completion": "0.000249616861"
+        "prompt": "0.0000253943391",
+        "completion": "0.000253943391"
       }
     },
     "qwen/qwen3-30b-a3b": {
@@ -7266,8 +7266,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000130234884",
-        "completion": "0.000054264535"
+        "prompt": "0.0000132492204",
+        "completion": "0.000055205085"
       }
     },
     "qwen/qwen3-30b-a3b-instruct-2507": {
@@ -7284,8 +7284,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000052256747205",
-        "completion": "0.0000209515369635"
+        "prompt": "0.0000053162496855",
+        "completion": "0.0000213146833185"
       }
     },
     "qwen/qwen3-30b-a3b-thinking-2507": {
@@ -7302,8 +7302,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000021705814",
-        "completion": "0.000260469768"
+        "prompt": "0.000022082034",
+        "completion": "0.000264984408"
       }
     },
     "qwen/qwen3-32b": {
@@ -7320,8 +7320,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000086823256",
-        "completion": "0.0000303881396"
+        "prompt": "0.0000088328136",
+        "completion": "0.0000309148476"
       }
     },
     "qwen/qwen3-8b": {
@@ -7338,8 +7338,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00001269790119",
-        "completion": "0.00004938072685"
+        "prompt": "0.00001291798989",
+        "completion": "0.00005023662735"
       }
     },
     "qwen/qwen3-asr-0.6b": {
@@ -7355,8 +7355,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0003614018031",
-        "seconds": "0.0003614018031",
+        "prompt": "0.0003676658661",
+        "seconds": "0.0003676658661",
         "completion": "0.0"
       }
     },
@@ -7373,8 +7373,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.000813968025",
-        "seconds": "0.000813968025",
+        "prompt": "0.000828076275",
+        "seconds": "0.000828076275",
         "completion": "0.0"
       }
     },
@@ -7391,8 +7391,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00379851745",
-        "seconds": "0.00379851745",
+        "prompt": "0.00386435595",
+        "seconds": "0.00386435595",
         "completion": "0.0"
       }
     },
@@ -7410,9 +7410,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.00010852907",
-        "input_cache_read": "0.000010852907"
+        "prompt": "0.000033123051",
+        "completion": "0.00011041017",
+        "input_cache_read": "0.000011041017"
       }
     },
     "qwen/qwen3-coder-30b-a3b-instruct": {
@@ -7429,8 +7429,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000075970349",
-        "completion": "0.0000293028489"
+        "prompt": "0.0000077287119",
+        "completion": "0.0000298107459"
       }
     },
     "qwen/qwen3-coder-flash": {
@@ -7447,10 +7447,10 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00002116316865",
-        "completion": "0.00010581584325",
-        "input_cache_read": "0.00000423263373",
-        "input_cache_write": "0.0000264539608125"
+        "prompt": "0.00002152998315",
+        "completion": "0.00010764991575",
+        "input_cache_read": "0.00000430599663",
+        "input_cache_write": "0.0000269124789375"
       }
     },
     "qwen/qwen3-coder-next": {
@@ -7467,9 +7467,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000130234884",
-        "completion": "0.000086823256",
-        "input_cache_read": "0.0000075970349"
+        "prompt": "0.0000132492204",
+        "completion": "0.000088328136",
+        "input_cache_read": "0.0000077287119"
       }
     },
     "qwen/qwen3-coder-plus": {
@@ -7486,10 +7486,10 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000705438955",
-        "completion": "0.0003527194775",
-        "input_cache_read": "0.0000141087791",
-        "input_cache_write": "0.000088179869375"
+        "prompt": "0.0000717666105",
+        "completion": "0.0003588330525",
+        "input_cache_read": "0.0000143533221",
+        "input_cache_write": "0.000089708263125"
       }
     },
     "qwen/qwen3-coder:exacto": {
@@ -7506,9 +7506,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.00010852907",
-        "input_cache_read": "0.000010852907"
+        "prompt": "0.000033123051",
+        "completion": "0.00011041017",
+        "input_cache_read": "0.000011041017"
       }
     },
     "qwen/qwen3-embedding-4b": {
@@ -7525,7 +7525,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000021705814",
+        "prompt": "0.0000022082034",
         "completion": "0.0"
       }
     },
@@ -7543,7 +7543,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000010852907",
+        "prompt": "0.0000011041017",
         "completion": "0.0"
       }
     },
@@ -7561,10 +7561,10 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000846526746",
-        "completion": "0.000423263373",
-        "input_cache_read": "0.00001693053492",
-        "input_cache_write": "0.00010581584325"
+        "prompt": "0.0000861199326",
+        "completion": "0.000430599663",
+        "input_cache_read": "0.00001722398652",
+        "input_cache_write": "0.00010764991575"
       }
     },
     "qwen/qwen3-max-thinking": {
@@ -7581,8 +7581,8 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000846526746",
-        "completion": "0.000423263373"
+        "prompt": "0.0000861199326",
+        "completion": "0.000430599663"
       }
     },
     "qwen/qwen3-next-80b-a3b-instruct": {
@@ -7599,8 +7599,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000010581584325",
-        "completion": "0.0000846526746"
+        "prompt": "0.000010764991575",
+        "completion": "0.0000861199326"
       }
     },
     "qwen/qwen3-next-80b-a3b-thinking": {
@@ -7617,8 +7617,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
-        "completion": "0.000130234884"
+        "prompt": "0.0000165615255",
+        "completion": "0.000132492204"
       }
     },
     "qwen/qwen3-reranker-8b": {
@@ -7634,7 +7634,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.000021705814",
+        "prompt": "0.000022082034",
         "completion": "0.0"
       }
     },
@@ -7653,9 +7653,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000021705814",
-        "completion": "0.0000955055816",
-        "input_cache_read": "0.0000119381977"
+        "prompt": "0.000022082034",
+        "completion": "0.0000971609496",
+        "input_cache_read": "0.0000121451187"
       }
     },
     "qwen/qwen3-vl-235b-a22b-thinking": {
@@ -7673,8 +7673,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000043411628",
-        "completion": "0.00043411628"
+        "prompt": "0.000044164068",
+        "completion": "0.00044164068"
       }
     },
     "qwen/qwen3-vl-30b-a3b-instruct": {
@@ -7692,8 +7692,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000141087791",
-        "completion": "0.0000564351164"
+        "prompt": "0.0000143533221",
+        "completion": "0.0000574132884"
       }
     },
     "qwen/qwen3-vl-30b-a3b-thinking": {
@@ -7711,8 +7711,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000314734303",
-        "completion": "0.00010852907"
+        "prompt": "0.0000320189493",
+        "completion": "0.00011041017"
       }
     },
     "qwen/qwen3-vl-32b-instruct": {
@@ -7730,8 +7730,8 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00001128702328",
-        "completion": "0.00004514809312"
+        "prompt": "0.00001148265768",
+        "completion": "0.00004593063072"
       }
     },
     "qwen/qwen3-vl-8b-instruct": {
@@ -7749,8 +7749,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00001269790119",
-        "completion": "0.00004938072685"
+        "prompt": "0.00001291798989",
+        "completion": "0.00005023662735"
       }
     },
     "qwen/qwen3-vl-8b-thinking": {
@@ -7768,8 +7768,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000195352326",
-        "completion": "0.000227911047"
+        "prompt": "0.0000198738306",
+        "completion": "0.000231861357"
       }
     },
     "qwen/qwen3.5-122b-a10b": {
@@ -7788,8 +7788,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000282175582",
-        "completion": "0.0002257404656"
+        "prompt": "0.0000287066442",
+        "completion": "0.0002296531536"
       }
     },
     "qwen/qwen3.5-27b": {
@@ -7808,8 +7808,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00002116316865",
-        "completion": "0.0001693053492"
+        "prompt": "0.00002152998315",
+        "completion": "0.0001722398652"
       }
     },
     "qwen/qwen3.5-35b-a3b": {
@@ -7828,9 +7828,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000086823256",
-        "completion": "0.0000813968025",
-        "input_cache_read": "0.0000043411628"
+        "prompt": "0.0000088328136",
+        "completion": "0.0000828076275",
+        "input_cache_read": "0.0000044164068"
       }
     },
     "qwen/qwen3.5-397b-a17b": {
@@ -7849,8 +7849,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000423263373",
-        "completion": "0.0002539580238"
+        "prompt": "0.0000430599663",
+        "completion": "0.0002583597978"
       }
     },
     "qwen/qwen3.5-9b": {
@@ -7869,9 +7869,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000086823256",
-        "completion": "0.0000141087791",
-        "input_cache_read": "0.0000043411628"
+        "prompt": "0.0000088328136",
+        "completion": "0.0000143533221",
+        "input_cache_read": "0.0000044164068"
       }
     },
     "qwen/qwen3.5-flash-02-23": {
@@ -7890,8 +7890,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00000705438955",
-        "completion": "0.0000282175582"
+        "prompt": "0.00000717666105",
+        "completion": "0.0000287066442"
       }
     },
     "qwen/qwen3.5-plus-02-15": {
@@ -7910,8 +7910,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000282175582",
-        "completion": "0.0001693053492"
+        "prompt": "0.0000287066442",
+        "completion": "0.0001722398652"
       }
     },
     "qwen/qwen3.5-plus-20260420": {
@@ -7930,10 +7930,10 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.000195352326",
-        "input_cache_read": "0.0000032558721",
-        "input_cache_write": "0.00004069840125"
+        "prompt": "0.000033123051",
+        "completion": "0.000198738306",
+        "input_cache_read": "0.0000033123051",
+        "input_cache_write": "0.00004140381375"
       }
     },
     "qwen/qwen3.6-27b": {
@@ -7952,9 +7952,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.00021705814",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.000033123051",
+        "completion": "0.00022082034",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "qwen/qwen3.6-35b-a3b": {
@@ -7973,9 +7973,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000054264535",
-        "completion": "0.000075970349",
-        "input_cache_read": "0.00000271322675"
+        "prompt": "0.0000055205085",
+        "completion": "0.000077287119",
+        "input_cache_read": "0.00000276025425"
       }
     },
     "qwen/qwen3.6-flash": {
@@ -7994,10 +7994,10 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.000020349200625",
-        "completion": "0.00012209520375",
-        "input_cache_read": "0.0000020349200625",
-        "input_cache_write": "0.00002543650078125"
+        "prompt": "0.000020701906875",
+        "completion": "0.00012421144125",
+        "input_cache_read": "0.0000020701906875",
+        "input_cache_write": "0.00002587738359375"
       }
     },
     "qwen/qwen3.6-max-preview": {
@@ -8014,10 +8014,10 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00011145935489",
-        "completion": "0.00066875612934",
-        "input_cache_read": "0.000011145935489",
-        "input_cache_write": "0.0001393241936125"
+        "prompt": "0.00011339124459",
+        "completion": "0.00068034746754",
+        "input_cache_read": "0.000011339124459",
+        "input_cache_write": "0.0001417390557375"
       }
     },
     "qwen/qwen3.6-plus": {
@@ -8036,10 +8036,10 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00003527194775",
-        "completion": "0.0002116316865",
-        "input_cache_read": "0.000003527194775",
-        "input_cache_write": "0.0000440899346875"
+        "prompt": "0.00003588330525",
+        "completion": "0.0002152998315",
+        "input_cache_read": "0.000003588330525",
+        "input_cache_write": "0.0000448541315625"
       }
     },
     "qwen/qwen3.7-flash": {
@@ -8058,10 +8058,10 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000032558721",
-        "completion": "0.0000141087791",
-        "input_cache_read": "0.00000065117442",
-        "input_cache_write": "0.00000412410466"
+        "prompt": "0.0000033123051",
+        "completion": "0.0000143533221",
+        "input_cache_read": "0.00000066246102",
+        "input_cache_write": "0.00000419558646"
       }
     },
     "qwen/qwen3.7-max": {
@@ -8078,10 +8078,10 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00016008037825",
-        "completion": "0.00048024113475",
-        "input_cache_read": "0.00003201607565",
-        "input_cache_write": "0.0002001004728125"
+        "prompt": "0.00016285500075",
+        "completion": "0.00048856500225",
+        "input_cache_read": "0.00003257100015",
+        "input_cache_write": "0.0002035687509375"
       }
     },
     "qwen/qwen3.7-plus": {
@@ -8099,10 +8099,10 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000347293024",
-        "completion": "0.0001389172096",
-        "input_cache_read": "0.00000694586048",
-        "input_cache_write": "0.000043411628"
+        "prompt": "0.0000353312544",
+        "completion": "0.0001413250176",
+        "input_cache_read": "0.00000706625088",
+        "input_cache_write": "0.000044164068"
       }
     },
     "qwen/qwen3.8-2.4t-a95b": {
@@ -8119,9 +8119,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00065117442",
-        "input_cache_read": "0.000021705814"
+        "prompt": "0.00022082034",
+        "completion": "0.00066246102",
+        "input_cache_read": "0.000022082034"
       }
     },
     "qwen/qwen3.8-27b": {
@@ -8140,9 +8140,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.000021977136675",
-        "completion": "0.00019339880274",
-        "input_cache_read": "0.00000488380815"
+        "prompt": "0.0000165615255",
+        "completion": "0.00020701906875",
+        "input_cache_read": "0.000004140381375"
       }
     },
     "qwen/qwen3.8-flash": {
@@ -8161,10 +8161,10 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
-        "completion": "0.0000510086629",
-        "input_cache_read": "0.00000173646512",
-        "input_cache_write": "0.000021705814"
+        "prompt": "0.0000165615255",
+        "completion": "0.0000518927799",
+        "input_cache_read": "0.00000176656272",
+        "input_cache_write": "0.000022082034"
       }
     },
     "qwen/qwen3.8-max-0902": {
@@ -8183,10 +8183,10 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00065117442",
-        "input_cache_read": "0.0000271322675",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.00066246102",
+        "input_cache_read": "0.0000276025425",
+        "input_cache_write": "0.000276025425"
       }
     },
     "qwen/qwen3.8-max-prime": {
@@ -8205,9 +8205,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00043411628",
-        "completion": "0.00130234884",
-        "input_cache_read": "0.000054264535"
+        "prompt": "0.00044164068",
+        "completion": "0.00132492204",
+        "input_cache_read": "0.000055205085"
       }
     },
     "qwen/qwen3.8-omni-flash": {
@@ -8227,9 +8227,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
-        "completion": "0.0000510086629",
-        "input_cache_read": "0.00000173646512"
+        "prompt": "0.0000165615255",
+        "completion": "0.0000518927799",
+        "input_cache_read": "0.00000176656272"
       }
     },
     "recraft/recraft-v3": {
@@ -8245,7 +8245,7 @@
         ]
       },
       "pricing": {
-        "image_output": "4.3411628"
+        "image_output": "4.4164068"
       }
     },
     "recraft/recraft-v4": {
@@ -8261,7 +8261,7 @@
         ]
       },
       "pricing": {
-        "image_output": "4.3411628"
+        "image_output": "4.4164068"
       }
     },
     "recraft/recraft-v4-pro": {
@@ -8277,7 +8277,7 @@
         ]
       },
       "pricing": {
-        "image_output": "27.1322675"
+        "image_output": "27.6025425"
       }
     },
     "recraft/recraft-v4-pro-vector": {
@@ -8293,7 +8293,7 @@
         ]
       },
       "pricing": {
-        "image_output": "32.558721"
+        "image_output": "33.123051"
       }
     },
     "recraft/recraft-v4-styles": {
@@ -8309,7 +8309,7 @@
         ]
       },
       "pricing": {
-        "image_output": "3.79851745"
+        "image_output": "3.86435595"
       }
     },
     "recraft/recraft-v4-styles-pro": {
@@ -8325,7 +8325,7 @@
         ]
       },
       "pricing": {
-        "image_output": "10.852907"
+        "image_output": "11.041017"
       }
     },
     "recraft/recraft-v4-styles-pro-vector": {
@@ -8341,7 +8341,7 @@
         ]
       },
       "pricing": {
-        "image_output": "13.0234884"
+        "image_output": "13.2492204"
       }
     },
     "recraft/recraft-v4-styles-vector": {
@@ -8357,7 +8357,7 @@
         ]
       },
       "pricing": {
-        "image_output": "5.4264535"
+        "image_output": "5.5205085"
       }
     },
     "recraft/recraft-v4-vector": {
@@ -8373,7 +8373,7 @@
         ]
       },
       "pricing": {
-        "image_output": "8.6823256"
+        "image_output": "8.8328136"
       }
     },
     "recraft/recraft-v4.1": {
@@ -8389,7 +8389,7 @@
         ]
       },
       "pricing": {
-        "image_output": "3.79851745"
+        "image_output": "3.86435595"
       }
     },
     "recraft/recraft-v4.1-flash": {
@@ -8404,7 +8404,7 @@
         ]
       },
       "pricing": {
-        "image_output": "0.75970349"
+        "image_output": "0.77287119"
       }
     },
     "recraft/recraft-v4.1-pro": {
@@ -8420,7 +8420,7 @@
         ]
       },
       "pricing": {
-        "image_output": "22.7911047"
+        "image_output": "23.1861357"
       }
     },
     "recraft/recraft-v4.1-pro-vector": {
@@ -8436,7 +8436,7 @@
         ]
       },
       "pricing": {
-        "image_output": "32.558721"
+        "image_output": "33.123051"
       }
     },
     "recraft/recraft-v4.1-utility": {
@@ -8452,7 +8452,7 @@
         ]
       },
       "pricing": {
-        "image_output": "3.79851745"
+        "image_output": "3.86435595"
       }
     },
     "recraft/recraft-v4.1-utility-pro": {
@@ -8468,7 +8468,7 @@
         ]
       },
       "pricing": {
-        "image_output": "22.7911047"
+        "image_output": "23.1861357"
       }
     },
     "recraft/recraft-v4.1-vector": {
@@ -8484,7 +8484,7 @@
         ]
       },
       "pricing": {
-        "image_output": "8.6823256"
+        "image_output": "8.8328136"
       }
     },
     "reka/reka-edge": {
@@ -8503,8 +8503,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000010852907"
+        "prompt": "0.000011041017",
+        "completion": "0.000011041017"
       }
     },
     "rekaai/reka-edge": {
@@ -8523,8 +8523,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000010852907"
+        "prompt": "0.000011041017",
+        "completion": "0.000011041017"
       }
     },
     "rekaai/reka-flash-3": {
@@ -8541,8 +8541,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000021705814"
+        "prompt": "0.000011041017",
+        "completion": "0.000022082034"
       }
     },
     "relace/relace-apply-3": {
@@ -8559,8 +8559,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000922497095",
-        "completion": "0.0001356613375"
+        "prompt": "0.0000938486445",
+        "completion": "0.0001380127125"
       }
     },
     "relace/relace-search": {
@@ -8577,8 +8577,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00010852907",
-        "completion": "0.00032558721"
+        "prompt": "0.00011041017",
+        "completion": "0.00033123051"
       }
     },
     "respan/span-01": {
@@ -8594,7 +8594,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000021705814",
+        "prompt": "0.0000022082034",
         "completion": "0.0"
       }
     },
@@ -8612,7 +8612,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "30.3881396",
+        "seconds": "30.9148476",
         "completion": "0.0"
       }
     },
@@ -8630,7 +8630,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "13.0234884",
+        "seconds": "13.2492204",
         "completion": "0.0"
       }
     },
@@ -8650,10 +8650,10 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00065117442",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.0000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.00066246102",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.0000276025425"
       }
     },
     "sakana/fugu-ultra-v2": {
@@ -8672,10 +8672,10 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00054264535",
-        "completion": "0.0032558721",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000054264535"
+        "prompt": "0.00055205085",
+        "completion": "0.0033123051",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000055205085"
       }
     },
     "sakana/namazu": {
@@ -8694,11 +8694,11 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0001031026165",
-        "seconds": "0.003617635666666667",
-        "completion": "0.00043411628",
-        "web_search": "0.75970349",
-        "input_cache_read": "0.0000162793605"
+        "prompt": "0.0001048896615",
+        "seconds": "0.003680339",
+        "completion": "0.00044164068",
+        "web_search": "0.77287119",
+        "input_cache_read": "0.0000165615255"
       }
     },
     "sakana/sakana-namazu": {
@@ -8717,11 +8717,11 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0001031026165",
-        "seconds": "0.003617635666666667",
-        "completion": "0.00043411628",
-        "web_search": "0.75970349",
-        "input_cache_read": "0.0000162793605"
+        "prompt": "0.0001048896615",
+        "seconds": "0.003680339",
+        "completion": "0.00044164068",
+        "web_search": "0.77287119",
+        "input_cache_read": "0.0000165615255"
       }
     },
     "sao10k/l3-lunaris-8b": {
@@ -8738,8 +8738,8 @@
         "tokenizer": "Llama3"
       },
       "pricing": {
-        "prompt": "0.0000043411628",
-        "completion": "0.0000054264535"
+        "prompt": "0.0000044164068",
+        "completion": "0.0000055205085"
       }
     },
     "sao10k/l3.1-euryale-70b": {
@@ -8756,8 +8756,8 @@
         "tokenizer": "Llama3"
       },
       "pricing": {
-        "prompt": "0.0000922497095",
-        "completion": "0.0000922497095"
+        "prompt": "0.0000938486445",
+        "completion": "0.0000938486445"
       }
     },
     "sao10k/l3.3-euryale-70b": {
@@ -8774,8 +8774,8 @@
         "tokenizer": "Llama3"
       },
       "pricing": {
-        "prompt": "0.0000705438955",
-        "completion": "0.0000813968025"
+        "prompt": "0.0000717666105",
+        "completion": "0.0000828076275"
       }
     },
     "sentence-transformers/all-minilm-l12-v2": {
@@ -8792,7 +8792,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000054264535",
+        "prompt": "0.00000055205085",
         "completion": "0.0"
       }
     },
@@ -8810,7 +8810,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000054264535",
+        "prompt": "0.00000055205085",
         "completion": "0.0"
       }
     },
@@ -8828,7 +8828,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000054264535",
+        "prompt": "0.00000055205085",
         "completion": "0.0"
       }
     },
@@ -8846,7 +8846,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000054264535",
+        "prompt": "0.00000055205085",
         "completion": "0.0"
       }
     },
@@ -8864,7 +8864,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000054264535",
+        "prompt": "0.00000055205085",
         "completion": "0.0"
       }
     },
@@ -8881,7 +8881,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00075970349",
+        "prompt": "0.00077287119",
         "completion": "0.0"
       }
     },
@@ -8898,7 +8898,7 @@
         ]
       },
       "pricing": {
-        "image_output": "2.1705814"
+        "image_output": "2.2082034"
       }
     },
     "sourceful/riverflow-v2-pro": {
@@ -8914,7 +8914,7 @@
         ]
       },
       "pricing": {
-        "image_output": "16.2793605"
+        "image_output": "16.5615255"
       }
     },
     "sourceful/riverflow-v2.5-fast": {
@@ -8930,7 +8930,7 @@
         ]
       },
       "pricing": {
-        "image_output": "2.06205233"
+        "image_output": "2.09779323"
       }
     },
     "sourceful/riverflow-v2.5-pro": {
@@ -8946,27 +8946,7 @@
         ]
       },
       "pricing": {
-        "image_output": "14.1087791"
-      }
-    },
-    "stealth/space-bunny-alpha": {
-      "name": "Space Bunny Alpha",
-      "created": 1790174884,
-      "context_length": 1000000,
-      "architecture": {
-        "input_modalities": [
-          "text",
-          "image",
-          "video"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other"
-      },
-      "pricing": {
-        "prompt": "0.0",
-        "completion": "0.0"
+        "image_output": "14.3533221"
       }
     },
     "stepfun/step-3.5-flash": {
@@ -8983,8 +8963,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000010852907",
-        "completion": "0.000032558721"
+        "prompt": "0.000011041017",
+        "completion": "0.000033123051"
       }
     },
     "stepfun/step-3.7-flash": {
@@ -9003,9 +8983,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000021705814",
-        "completion": "0.0001248084305",
-        "input_cache_read": "0.0000043411628"
+        "prompt": "0.000022082034",
+        "completion": "0.0001269716955",
+        "input_cache_read": "0.0000044164068"
       }
     },
     "tencent/hunyuan-a13b-instruct": {
@@ -9022,8 +9002,24 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000151940698",
-        "completion": "0.0000618615699"
+        "prompt": "0.0000154574238",
+        "completion": "0.0000629337969"
+      }
+    },
+    "tencent/hy-image-v3.5-preview": {
+      "name": "Tencent: Hy Image 3.5 Preview",
+      "created": 1791232017,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "image"
+        ]
+      },
+      "pricing": {
+        "image_output": "0.000176656272"
       }
     },
     "tencent/hy-mt2-1.8b": {
@@ -9040,8 +9036,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000477527908",
-        "completion": "0.00001920964539"
+        "prompt": "0.00000485804748",
+        "completion": "0.00001954260009"
       }
     },
     "tencent/hy-mt2-30b-a3b": {
@@ -9058,8 +9054,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000803115118",
-        "completion": "0.00003201607565"
+        "prompt": "0.00000817035258",
+        "completion": "0.00003257100015"
       }
     },
     "tencent/hy-mt2-7b": {
@@ -9076,8 +9072,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000803115118",
-        "completion": "0.00003201607565"
+        "prompt": "0.00000817035258",
+        "completion": "0.00003257100015"
       }
     },
     "tencent/hy3": {
@@ -9094,9 +9090,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000141087791",
-        "completion": "0.0000575204071",
-        "input_cache_read": "0.00000358145931"
+        "prompt": "0.0000143533221",
+        "completion": "0.0000585173901",
+        "input_cache_read": "0.00000364353561"
       }
     },
     "tencent/hy3-preview": {
@@ -9113,9 +9109,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000195352326",
-        "completion": "0.000065117442",
-        "input_cache_read": "0.0000065117442"
+        "prompt": "0.0000198738306",
+        "completion": "0.000066246102",
+        "input_cache_read": "0.0000066246102"
       }
     },
     "tencent/hy4-preview": {
@@ -9132,9 +9128,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00009051324438",
-        "completion": "0.00027143120407",
-        "input_cache_read": "0.00000455822094"
+        "prompt": "0.00009208208178",
+        "completion": "0.00027613583517",
+        "input_cache_read": "0.00000463722714"
       }
     },
     "thedrummer/cydonia-24b-v4.1": {
@@ -9151,9 +9147,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.000054264535",
-        "input_cache_read": "0.0000162793605"
+        "prompt": "0.000033123051",
+        "completion": "0.000055205085",
+        "input_cache_read": "0.0000165615255"
       }
     },
     "thedrummer/skyfall-36b-v2": {
@@ -9170,9 +9166,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000596909885",
-        "completion": "0.000086823256",
-        "input_cache_read": "0.0000271322675"
+        "prompt": "0.0000607255935",
+        "completion": "0.000088328136",
+        "input_cache_read": "0.0000276025425"
       }
     },
     "thedrummer/unslopnemo-12b": {
@@ -9189,8 +9185,8 @@
         "tokenizer": "Mistral"
       },
       "pricing": {
-        "prompt": "0.000043411628",
-        "completion": "0.000043411628"
+        "prompt": "0.000044164068",
+        "completion": "0.000044164068"
       }
     },
     "thenlper/gte-base": {
@@ -9207,7 +9203,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00000054264535",
+        "prompt": "0.00000055205085",
         "completion": "0.0"
       }
     },
@@ -9225,7 +9221,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000010852907",
+        "prompt": "0.0000011041017",
         "completion": "0.0"
       }
     },
@@ -9245,9 +9241,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0001031026165",
-        "completion": "0.0004395427335",
-        "input_cache_read": "0.0000173646512"
+        "prompt": "0.0001048896615",
+        "completion": "0.0004471611885",
+        "input_cache_read": "0.0000176656272"
       }
     },
     "thinkingmachines/inkling-small": {
@@ -9266,9 +9262,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000488380815",
-        "completion": "0.000130234884",
-        "input_cache_read": "0.000010852907"
+        "prompt": "0.0000496845765",
+        "completion": "0.000132492204",
+        "input_cache_read": "0.000011041017"
       }
     },
     "togethercomputer/tev1-4b-experimental": {
@@ -9284,7 +9280,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00000455822094",
+        "prompt": "0.00000463722714",
         "completion": "0.0"
       }
     },
@@ -9301,7 +9297,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00000455822094",
+        "prompt": "0.00000463722714",
         "completion": "0.0"
       }
     },
@@ -9320,9 +9316,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000271322675",
-        "completion": "0.000813968025",
-        "input_cache_read": "0.0000271322675"
+        "prompt": "0.000276025425",
+        "completion": "0.000828076275",
+        "input_cache_read": "0.0000276025425"
       }
     },
     "unbiased/pareto-26.10-preview": {
@@ -9340,9 +9336,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000086823256",
-        "completion": "0.000347293024",
-        "input_cache_read": "0.0000032558721"
+        "prompt": "0.000088328136",
+        "completion": "0.000353312544",
+        "input_cache_read": "0.0000033123051"
       }
     },
     "undi95/remm-slerp-l2-13b": {
@@ -9359,8 +9355,8 @@
         "tokenizer": "Llama2"
       },
       "pricing": {
-        "prompt": "0.0000379851745",
-        "completion": "0.0000705438955"
+        "prompt": "0.0000386435595",
+        "completion": "0.0000717666105"
       }
     },
     "upstage/solar-decide": {
@@ -9376,9 +9372,9 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000054264535",
+        "prompt": "0.0000055205085",
         "completion": "0.0",
-        "input_cache_read": "0.0000054264535"
+        "input_cache_read": "0.0000055205085"
       }
     },
     "upstage/solar-mini4": {
@@ -9395,9 +9391,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000054264535",
-        "completion": "0.000021705814",
-        "input_cache_read": "0.00000054264535"
+        "prompt": "0.0000055205085",
+        "completion": "0.000022082034",
+        "input_cache_read": "0.00000055205085"
       }
     },
     "upstage/solar-pro-3": {
@@ -9414,9 +9410,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000162793605",
-        "completion": "0.000065117442",
-        "input_cache_read": "0.00000162793605"
+        "prompt": "0.0000165615255",
+        "completion": "0.000066246102",
+        "input_cache_read": "0.00000165615255"
       }
     },
     "upstage/solar-pro4": {
@@ -9433,9 +9429,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000097676163",
-        "completion": "0.0000390704652",
-        "input_cache_read": "0.00000195352326"
+        "prompt": "0.0000099369153",
+        "completion": "0.0000397476612",
+        "input_cache_read": "0.00000198738306"
       }
     },
     "voyageai/rerank-2.5": {
@@ -9451,7 +9447,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000054264535",
+        "prompt": "0.0000055205085",
         "completion": "0.0"
       }
     },
@@ -9468,7 +9464,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000021705814",
+        "prompt": "0.0000022082034",
         "completion": "0.0"
       }
     },
@@ -9485,7 +9481,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000054264535",
+        "prompt": "0.0000055205085",
         "completion": "0.0"
       }
     },
@@ -9502,7 +9498,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0000021705814",
+        "prompt": "0.0000022082034",
         "completion": "0.0"
       }
     },
@@ -9520,7 +9516,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000065117442",
+        "prompt": "0.0000066246102",
         "completion": "0.0"
       }
     },
@@ -9538,7 +9534,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000130234884",
+        "prompt": "0.0000132492204",
         "completion": "0.0"
       }
     },
@@ -9556,7 +9552,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000021705814",
+        "prompt": "0.0000022082034",
         "completion": "0.0"
       }
     },
@@ -9574,7 +9570,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000130234884",
+        "prompt": "0.0000132492204",
         "completion": "0.0"
       }
     },
@@ -9593,7 +9589,7 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000130234884",
+        "prompt": "0.0000132492204",
         "completion": "0.0"
       }
     },
@@ -9611,8 +9607,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000065117442",
-        "completion": "0.00065117442"
+        "prompt": "0.000066246102",
+        "completion": "0.00066246102"
       }
     },
     "x-ai/grok-4.20": {
@@ -9631,10 +9627,10 @@
         "tokenizer": "Grok"
       },
       "pricing": {
-        "prompt": "0.0001356613375",
-        "completion": "0.000271322675",
-        "web_search": "0.54264535",
-        "input_cache_read": "0.000021705814"
+        "prompt": "0.0001380127125",
+        "completion": "0.000276025425",
+        "web_search": "0.55205085",
+        "input_cache_read": "0.000022082034"
       }
     },
     "x-ai/grok-4.20-multi-agent": {
@@ -9653,10 +9649,10 @@
         "tokenizer": "Grok"
       },
       "pricing": {
-        "prompt": "0.0001356613375",
-        "completion": "0.000271322675",
-        "web_search": "0.54264535",
-        "input_cache_read": "0.000021705814"
+        "prompt": "0.0001380127125",
+        "completion": "0.000276025425",
+        "web_search": "0.55205085",
+        "input_cache_read": "0.000022082034"
       }
     },
     "x-ai/grok-4.3": {
@@ -9675,10 +9671,10 @@
         "tokenizer": "Grok"
       },
       "pricing": {
-        "prompt": "0.00014922747125",
-        "completion": "0.0002984549425",
-        "web_search": "0.596909885",
-        "input_cache_read": "0.0000238763954"
+        "prompt": "0.00015181398375",
+        "completion": "0.0003036279675",
+        "web_search": "0.607255935",
+        "input_cache_read": "0.0000242902374"
       }
     },
     "x-ai/grok-4.5": {
@@ -9697,10 +9693,10 @@
         "tokenizer": "Grok"
       },
       "pricing": {
-        "prompt": "0.000227911047",
-        "completion": "0.000683733141",
-        "web_search": "0.5697776175",
-        "input_cache_read": "0.00003418665705"
+        "prompt": "0.000231861357",
+        "completion": "0.000695584071",
+        "web_search": "0.5796533925",
+        "input_cache_read": "0.00003477920355"
       }
     },
     "x-ai/grok-4.6": {
@@ -9719,10 +9715,10 @@
         "tokenizer": "Grok"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00065117442",
-        "web_search": "0.54264535",
-        "input_cache_read": "0.000054264535"
+        "prompt": "0.00022082034",
+        "completion": "0.00066246102",
+        "web_search": "0.55205085",
+        "input_cache_read": "0.000055205085"
       }
     },
     "x-ai/grok-4.7": {
@@ -9741,10 +9737,10 @@
         "tokenizer": "Grok"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00065117442",
-        "web_search": "0.54264535",
-        "input_cache_read": "0.000054264535"
+        "prompt": "0.00022082034",
+        "completion": "0.00066246102",
+        "web_search": "0.55205085",
+        "input_cache_read": "0.000055205085"
       }
     },
     "x-ai/grok-build-0.1": {
@@ -9763,10 +9759,10 @@
         "tokenizer": "Grok"
       },
       "pricing": {
-        "prompt": "0.00010852907",
-        "completion": "0.00021705814",
-        "web_search": "0.54264535",
-        "input_cache_read": "0.000021705814"
+        "prompt": "0.00011041017",
+        "completion": "0.00022082034",
+        "web_search": "0.55205085",
+        "input_cache_read": "0.000022082034"
       }
     },
     "x-ai/grok-imagine-image-2.0": {
@@ -9782,7 +9778,7 @@
         ]
       },
       "pricing": {
-        "image_output": "4.3411628"
+        "image_output": "4.4164068"
       }
     },
     "x-ai/grok-imagine-image-quality": {
@@ -9798,7 +9794,7 @@
         ]
       },
       "pricing": {
-        "image_output": "5.4264535"
+        "image_output": "5.5205085"
       }
     },
     "x-ai/grok-imagine-video": {
@@ -9815,7 +9811,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "5.4264535",
+        "seconds": "5.5205085",
         "completion": "0.0"
       }
     },
@@ -9833,7 +9829,7 @@
       },
       "pricing": {
         "prompt": "0.0",
-        "seconds": "8.6823256",
+        "seconds": "8.8328136",
         "completion": "0.0"
       }
     },
@@ -9850,8 +9846,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.0030146963888913005",
-        "seconds": "0.0030146963888913005",
+        "prompt": "0.00306694916666912",
+        "seconds": "0.00306694916666912",
         "completion": "0.0"
       }
     },
@@ -9868,7 +9864,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00162793605",
+        "prompt": "0.00165615255",
         "completion": "0.0"
       }
     },
@@ -9889,9 +9885,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00001291495933",
-        "completion": "0.00002582991866",
-        "input_cache_read": "0.0000002767491285"
+        "prompt": "0.00001313881023",
+        "completion": "0.00002627762046",
+        "input_cache_read": "0.0000002815459335"
       }
     },
     "xiaomi/mimo-v2.5-pro": {
@@ -9908,9 +9904,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000033047101815",
-        "completion": "0.00006609420363",
-        "input_cache_read": "0.000000303881396"
+        "prompt": "0.000033619896765",
+        "completion": "0.00006723979353",
+        "input_cache_read": "0.000000309148476"
       }
     },
     "xiaomi/mimo-v2.6-flash": {
@@ -9930,9 +9926,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00001237231398",
-        "completion": "0.00002734932564",
-        "input_cache_read": "0.000000271322675"
+        "prompt": "0.000011041017",
+        "completion": "0.0000309148476",
+        "input_cache_read": "0.0000055205085"
       }
     },
     "xiaomi/mimo-v2.6-pro": {
@@ -9952,9 +9948,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000466675001",
-        "completion": "0.0000944202909",
-        "input_cache_read": "0.000000390704652"
+        "prompt": "0.0000474763731",
+        "completion": "0.0000960568479",
+        "input_cache_read": "0.000000397476612"
       }
     },
     "xiaomi/mimo-v2.6-pro-ultraspeed": {
@@ -9974,9 +9970,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0004721014545",
-        "completion": "0.000944202909",
-        "input_cache_read": "0.00000390704652"
+        "prompt": "0.0004802842395",
+        "completion": "0.000960568479",
+        "input_cache_read": "0.00000397476612"
       }
     },
     "yandex/aliceai-llm": {
@@ -9994,9 +9990,9 @@
       },
       "pricing": {
         "image": "0.0",
-        "prompt": "0.000643316915332",
+        "prompt": "0.000654467323692",
         "request": "0.0",
-        "completion": "0.001543967108541",
+        "completion": "0.001570728201471",
         "web_search": "0.0",
         "image_output": "0.0",
         "internal_reasoning": "0.0"
@@ -10017,12 +10013,12 @@
       },
       "pricing": {
         "image": "0.0",
-        "prompt": "0.000128661212485",
+        "prompt": "0.000130891256535",
         "request": "0.0",
-        "completion": "0.000257333277877",
+        "completion": "0.000261793554087",
         "web_search": "0.0",
         "image_output": "0.0",
-        "input_cache_read": "0.0000321658457666",
+        "input_cache_read": "0.0000327233661846",
         "internal_reasoning": "0.0"
       }
     },
@@ -10041,9 +10037,9 @@
       },
       "pricing": {
         "image": "0.0",
-        "prompt": "0.000257333277877",
+        "prompt": "0.000261793554087",
         "request": "0.0",
-        "completion": "0.000257333277877",
+        "completion": "0.000261793554087",
         "web_search": "0.0",
         "image_output": "0.0",
         "internal_reasoning": "0.0"
@@ -10064,9 +10060,9 @@
       },
       "pricing": {
         "image": "0.0",
-        "prompt": "0.001543967108541",
+        "prompt": "0.001570728201471",
         "request": "0.0",
-        "completion": "0.001543967108541",
+        "completion": "0.001570728201471",
         "web_search": "0.0",
         "image_output": "0.0",
         "internal_reasoning": "0.0"
@@ -10087,9 +10083,9 @@
       },
       "pricing": {
         "image": "0.0",
-        "prompt": "0.001029311405694",
+        "prompt": "0.001047152134314",
         "request": "0.0",
-        "completion": "0.001029311405694",
+        "completion": "0.001047152134314",
         "web_search": "0.0",
         "image_output": "0.0",
         "internal_reasoning": "0.0"
@@ -10109,9 +10105,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000065117442",
-        "completion": "0.000238763954",
-        "input_cache_read": "0.0000119381977"
+        "prompt": "0.000066246102",
+        "completion": "0.000242902374",
+        "input_cache_read": "0.0000121451187"
       }
     },
     "z-ai/glm-4.5-air": {
@@ -10128,9 +10124,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000141087791",
-        "completion": "0.0000922497095",
-        "input_cache_read": "0.00000271322675"
+        "prompt": "0.0000143533221",
+        "completion": "0.0000938486445",
+        "input_cache_read": "0.00000276025425"
       }
     },
     "z-ai/glm-4.5v": {
@@ -10148,9 +10144,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000065117442",
-        "completion": "0.000195352326",
-        "input_cache_read": "0.0000119381977"
+        "prompt": "0.000066246102",
+        "completion": "0.000198738306",
+        "input_cache_read": "0.0000121451187"
       }
     },
     "z-ai/glm-4.6": {
@@ -10167,9 +10163,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000466675001",
-        "completion": "0.0001899258725",
-        "input_cache_read": "0.0000086823256"
+        "prompt": "0.0000474763731",
+        "completion": "0.0001932177975",
+        "input_cache_read": "0.0000088328136"
       }
     },
     "z-ai/glm-4.6:exacto": {
@@ -10186,9 +10182,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000466675001",
-        "completion": "0.0001899258725",
-        "input_cache_read": "0.0000086823256"
+        "prompt": "0.0000474763731",
+        "completion": "0.0001932177975",
+        "input_cache_read": "0.0000088328136"
       }
     },
     "z-ai/glm-4.6v": {
@@ -10207,9 +10203,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000032558721",
-        "completion": "0.000097676163",
-        "input_cache_read": "0.0000054264535"
+        "prompt": "0.000033123051",
+        "completion": "0.000099369153",
+        "input_cache_read": "0.0000055205085"
       }
     },
     "z-ai/glm-4.7": {
@@ -10226,9 +10222,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000043411628",
-        "completion": "0.0001899258725",
-        "input_cache_read": "0.0000086823256"
+        "prompt": "0.000044164068",
+        "completion": "0.0001932177975",
+        "input_cache_read": "0.0000088328136"
       }
     },
     "z-ai/glm-4.7-flash": {
@@ -10245,9 +10241,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000065117442",
-        "completion": "0.000043411628",
-        "input_cache_read": "0.0000010852907"
+        "prompt": "0.0000066246102",
+        "completion": "0.000044164068",
+        "input_cache_read": "0.0000011041017"
       }
     },
     "z-ai/glm-5": {
@@ -10264,9 +10260,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000065117442",
-        "completion": "0.0002083758144",
-        "input_cache_read": "0.0000130234884"
+        "prompt": "0.000066246102",
+        "completion": "0.0002119875264",
+        "input_cache_read": "0.0000132492204"
       }
     },
     "z-ai/glm-5-turbo": {
@@ -10283,9 +10279,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000130234884",
-        "completion": "0.00043411628",
-        "input_cache_read": "0.0000260469768"
+        "prompt": "0.000132492204",
+        "completion": "0.00044164068",
+        "input_cache_read": "0.0000264984408"
       }
     },
     "z-ai/glm-5.1": {
@@ -10302,9 +10298,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00010483908162",
-        "completion": "0.00032949425652",
-        "input_cache_read": "0.000019470115158"
+        "prompt": "0.00010665622422",
+        "completion": "0.00033520527612",
+        "input_cache_read": "0.000019807584498"
       }
     },
     "z-ai/glm-5.2": {
@@ -10321,9 +10317,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000061047601875",
-        "completion": "0.000195352326",
-        "input_cache_read": "0.00001139555235"
+        "prompt": "0.000062105720625",
+        "completion": "0.000198738306",
+        "input_cache_read": "0.00001159306785"
       }
     },
     "z-ai/glm-5.3": {
@@ -10340,9 +10336,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000455822094",
-        "completion": "0.0001432583724",
-        "input_cache_read": "0.00000846526746"
+        "prompt": "0.0000463722714",
+        "completion": "0.0001457414244",
+        "input_cache_read": "0.00000861199326"
       }
     },
     "z-ai/glm-5.3-flash": {
@@ -10361,9 +10357,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000008953648275",
-        "completion": "0.00002984549425",
-        "input_cache_read": "0.000001790729655"
+        "prompt": "0.000009108839025",
+        "completion": "0.00003036279675",
+        "input_cache_read": "0.000001821767805"
       }
     },
     "z-ai/glm-5.3-flashx": {
@@ -10382,9 +10378,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00004417133149",
-        "completion": "0.00014922747125",
-        "input_cache_read": "0.00001074437793"
+        "prompt": "0.00004493693919",
+        "completion": "0.00015181398375",
+        "input_cache_read": "0.00001093060683"
       }
     },
     "z-ai/glm-5.3-prime": {
@@ -10401,9 +10397,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000303881396",
-        "completion": "0.000955055816",
-        "input_cache_read": "0.0000607762792"
+        "prompt": "0.000309148476",
+        "completion": "0.000971609496",
+        "input_cache_read": "0.0000618296952"
       }
     },
     "z-ai/glm-5v-turbo": {
@@ -10422,9 +10418,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000130234884",
-        "completion": "0.00043411628",
-        "input_cache_read": "0.0000260469768"
+        "prompt": "0.000132492204",
+        "completion": "0.00044164068",
+        "input_cache_read": "0.0000264984408"
       }
     },
     "~anthropic/claude-fable-latest": {
@@ -10443,11 +10439,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.001248084305",
-        "completion": "0.006240421525",
-        "web_search": "1.248084305",
-        "input_cache_read": "0.000031202107625",
-        "input_cache_write": "0.00156010538125"
+        "prompt": "0.001269716955",
+        "completion": "0.006348584775",
+        "web_search": "1.269716955",
+        "input_cache_read": "0.000031742923875",
+        "input_cache_write": "0.00158714619375"
       }
     },
     "~anthropic/claude-haiku-latest": {
@@ -10466,11 +10462,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00010852907",
-        "completion": "0.00054264535",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000010852907",
-        "input_cache_write": "0.0001356613375"
+        "prompt": "0.00011041017",
+        "completion": "0.00055205085",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000011041017",
+        "input_cache_write": "0.0001380127125"
       }
     },
     "~anthropic/claude-opus-latest": {
@@ -10489,11 +10485,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00043411628",
-        "completion": "0.0021705814",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000021705814",
-        "input_cache_write": "0.00054264535"
+        "prompt": "0.00044164068",
+        "completion": "0.0022082034",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000022082034",
+        "input_cache_write": "0.00055205085"
       }
     },
     "~anthropic/claude-sonnet-latest": {
@@ -10512,11 +10508,11 @@
         "tokenizer": "Claude"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000021705814",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000022082034",
+        "input_cache_write": "0.000276025425"
       }
     },
     "~deepseek/deepseek-v4-flash-latest": {
@@ -10534,9 +10530,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00001074437793",
-        "completion": "0.00002148875586",
-        "input_cache_read": "0.000002148875586"
+        "prompt": "0.00001093060683",
+        "completion": "0.00002186121366",
+        "input_cache_read": "0.000002186121366"
       }
     },
     "~deepseek/deepseek-v4-pro-latest": {
@@ -10553,9 +10549,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000036115696151808",
-        "completion": "0.000300847444142336",
-        "input_cache_read": "0.000011406492080256"
+        "prompt": "0.000061216344623616",
+        "completion": "0.000306061937615616",
+        "input_cache_read": "0.000011604197195136"
       }
     },
     "~google/gemini-flash-latest": {
@@ -10576,15 +10572,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.0000813968025",
-        "image": "0.0000813968025",
-        "prompt": "0.0000813968025",
-        "completion": "0.0004069840125",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.00000813968025",
-        "input_audio_cache": "0.00000813968025",
-        "input_cache_write": "0.000004522044583333333",
-        "internal_reasoning": "0.0004069840125"
+        "audio": "0.0000828076275",
+        "image": "0.0000828076275",
+        "prompt": "0.0000828076275",
+        "completion": "0.0004140381375",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.00000828076275",
+        "input_audio_cache": "0.00000828076275",
+        "input_cache_write": "0.00000460042375",
+        "internal_reasoning": "0.0004140381375"
       }
     },
     "~google/gemini-pro-latest": {
@@ -10605,15 +10601,15 @@
         "tokenizer": "Gemini"
       },
       "pricing": {
-        "audio": "0.00021705814",
-        "image": "0.00021705814",
-        "prompt": "0.00021705814",
-        "completion": "0.00130234884",
-        "web_search": "1.51940698",
-        "input_cache_read": "0.000021705814",
-        "input_audio_cache": "0.000021705814",
-        "input_cache_write": "0.00004069840125",
-        "internal_reasoning": "0.00130234884"
+        "audio": "0.00022082034",
+        "image": "0.00022082034",
+        "prompt": "0.00022082034",
+        "completion": "0.00132492204",
+        "web_search": "1.54574238",
+        "input_cache_read": "0.000022082034",
+        "input_audio_cache": "0.000022082034",
+        "input_cache_write": "0.00004140381375",
+        "internal_reasoning": "0.00132492204"
       }
     },
     "~moonshotai/kimi-latest": {
@@ -10632,9 +10628,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000195352326",
-        "completion": "0.00097676163",
-        "input_cache_read": "0.0000195352326"
+        "prompt": "0.0002152998315",
+        "completion": "0.0010764991575",
+        "input_cache_read": "0.00002152998315"
       }
     },
     "~openai/gpt-latest": {
@@ -10653,11 +10649,11 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.0010852907",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.000010852907",
-        "input_cache_write": "0.000271322675"
+        "prompt": "0.00022082034",
+        "completion": "0.0011041017",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.000011041017",
+        "input_cache_write": "0.000276025425"
       }
     },
     "~openai/gpt-mini-latest": {
@@ -10676,10 +10672,10 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.0000813968025",
-        "completion": "0.000488380815",
-        "web_search": "1.0852907",
-        "input_cache_read": "0.00000813968025"
+        "prompt": "0.0000828076275",
+        "completion": "0.000496845765",
+        "web_search": "1.1041017",
+        "input_cache_read": "0.00000828076275"
       }
     },
     "~typesafe/jev-latest": {
@@ -10695,7 +10691,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00000455822094",
+        "prompt": "0.00000463722714",
         "completion": "0.0"
       }
     },
@@ -10715,10 +10711,10 @@
         "tokenizer": "Grok"
       },
       "pricing": {
-        "prompt": "0.00021705814",
-        "completion": "0.00065117442",
-        "web_search": "0.54264535",
-        "input_cache_read": "0.000054264535"
+        "prompt": "0.00022082034",
+        "completion": "0.00066246102",
+        "web_search": "0.55205085",
+        "input_cache_read": "0.000055205085"
       }
     },
     "~z-ai/glm-flash-latest": {
@@ -10737,9 +10733,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000008953648275",
-        "completion": "0.00002984549425",
-        "input_cache_read": "0.000001790729655"
+        "prompt": "0.000009108839025",
+        "completion": "0.00003036279675",
+        "input_cache_read": "0.000001821767805"
       }
     },
     "~z-ai/glm-latest": {
@@ -10756,9 +10752,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000455822094",
-        "completion": "0.0001432583724",
-        "input_cache_read": "0.00000846526746"
+        "prompt": "0.0000463722714",
+        "completion": "0.0001457414244",
+        "input_cache_read": "0.00000861199326"
       }
     }
   },
@@ -10832,7 +10828,8 @@
       "Anthropic Claude Opus 4.7 [топ код/агент, 549/2744 ₽]",
       "Anthropic Claude Opus 4.7 [топ код/агент, 543/2716 ₽]",
       "Anthropic Claude Opus 4.7 [топ код/агент, 541/2705 ₽]",
-      "Anthropic Claude Opus 4.7 [топ код/агент, 543/2713 ₽]"
+      "Anthropic Claude Opus 4.7 [топ код/агент, 543/2713 ₽]",
+      "Anthropic Claude Opus 4.7 [топ код/агент, 552/2760 ₽]"
     ],
     "qwen/qwen3.6-plus": [
       "Qwen 3.6 Plus",
@@ -10878,7 +10875,8 @@
       "DeepSeek V4 Pro [reasoning, 53/106 ₽]",
       "DeepSeek V4 Pro [reasoning, 29/57 ₽]",
       "DeepSeek V4 Pro [reasoning, 27/54 ₽]",
-      "DeepSeek V4 Pro [reasoning, 32/63 ₽]"
+      "DeepSeek V4 Pro [reasoning, 32/63 ₽]",
+      "DeepSeek V4 Pro [reasoning, 32/65 ₽]"
     ],
     "minimax/minimax-m2.7": [
       "MiniMax M2.7",
@@ -10965,7 +10963,8 @@
       "GPT-5.2-Codex [код/агент, 192/1537 ₽]",
       "GPT-5.2-Codex [код/агент, 190/1521 ₽]",
       "GPT-5.2-Codex [код/агент, 189/1515 ₽]",
-      "GPT-5.2-Codex [код/агент, 190/1519 ₽]"
+      "GPT-5.2-Codex [код/агент, 190/1519 ₽]",
+      "GPT-5.2-Codex [код/агент, 193/1546 ₽]"
     ],
     "qwen/qwen3-coder-next": [
       "Qwen 3 Coder Next",
