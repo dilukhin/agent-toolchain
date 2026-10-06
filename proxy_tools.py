@@ -306,6 +306,38 @@ def _opencode_launch_args(version: str | None, argv: list[str]) -> list[str]:
     return ["--standalone", *argv]
 
 
+def _codex_launch_args(argv: list[str]) -> list[str]:
+    """Keep the interactive Codex server inside the lifetime of our proxy."""
+    subcommands = {
+        "agents", "exec", "e", "review", "login", "logout", "mcp", "plugin",
+        "app-server", "remote-control", "completion", "update", "doctor",
+        "sandbox", "debug", "apply", "a", "resume", "queue", "archive",
+        "delete", "migrate-rollouts", "unarchive", "fork", "cloud", "features",
+        "help", "exec-server",
+    }
+    value_flags = {
+        "-c", "--config", "-i", "--image", "-m", "--model", "--local-provider",
+        "-p", "--profile", "-s", "--sandbox", "-C", "--cd", "--add-dir",
+        "-a", "--ask-for-approval", "--remote-auth-token-env",
+    }
+    index = 0
+    while index < len(argv):
+        arg = argv[index]
+        if arg == "--":
+            break
+        if arg in {"--no-daemon", "--remote", "-h", "--help", "-V", "--version"} or arg.startswith("--remote="):
+            return argv
+        if arg in value_flags:
+            index += 2
+            continue
+        if not arg.startswith("-"):
+            if arg in subcommands:
+                return argv
+            break
+        index += 1
+    return ["--no-daemon", *argv]
+
+
 def launch(command: str, argv: list[str]) -> int:
     emit_identity(command + "-proxied", read_identity(Path(__file__).resolve().parent, bundled=True))
     inventory = external_cli_inventory(ExternalCliSpec(command, command.title()))
@@ -313,6 +345,8 @@ def launch(command: str, argv: list[str]) -> int:
         print(f"{command}: no executable found", file=sys.stderr)
         return 127
     child_args = _opencode_launch_args(inventory.active.version, argv) if command == "opencode" else argv
+    if command == "codex":
+        child_args = _codex_launch_args(argv)
     record = load_cache().get("tools", {}).get(command)
     if record and cache_fresh(record):
         message = advisory(inventory, record)

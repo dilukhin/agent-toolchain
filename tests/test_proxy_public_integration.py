@@ -231,6 +231,10 @@ class PublicProxyIntegrationTests(unittest.TestCase):
                         socket.create_connection((bridge.hostname, bridge.port), timeout=0.25)
                 os.environ.pop("FAKE_VERSION")
 
+                interactive = subprocess.run([str(public_paths[1]), "-m", "gpt-test"], cwd=root, env=os.environ, check=False)
+                self.assertEqual(interactive.returncode, 37)
+                self.assertEqual(json.loads(result.read_text(encoding="utf-8"))["argv"], ["--no-daemon", "-m", "gpt-test"])
+
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as unavailable:
                     unavailable.bind(("127.0.0.1", 0))
                     os.environ["AGENT_TOOLCHAIN_SOCKS_PORT"] = str(unavailable.getsockname()[1])
