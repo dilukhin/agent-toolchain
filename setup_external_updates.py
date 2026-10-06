@@ -404,7 +404,7 @@ def routerai_status_advisory(
                 f"последняя успешная проверка была {_age_text(age)} назад."
             )
         elif age <= ROUTERAI_CURRENT_MAX_AGE:
-            lines.append(f"RouterAI: цены актуальны, каталог проверен {_age_text(age)} назад.")
+            lines.append(f"RouterAI: каталог проверен {_age_text(age)} назад.")
         elif age <= ROUTERAI_STALE_MAX_AGE:
             lines.append(
                 f"RouterAI: цены последний раз подтверждались {_age_text(age)} назад."
@@ -427,28 +427,29 @@ def routerai_status_advisory(
         if isinstance(published, dict) and isinstance(published.get("catalog_observed_at"), str)
         else None
     )
+    installed_ts = _parse_utc(installed_observed_at)
+    published_ts = _parse_utc(published_at)
+    update_available = installed_ts is not None and published_ts is not None and published_ts > installed_ts
     candidate = status.get("candidate")
     if isinstance(candidate, dict):
         candidate_at = candidate.get("catalog_observed_at")
         if isinstance(candidate_at, str) and _parse_utc(candidate_at) is not None:
             if published_at is None or (_parse_utc(candidate_at) or 0) > (_parse_utc(published_at) or 0):
-                pr = candidate.get("pr_number")
                 validation = candidate.get("validation")
-                suffix = f" PR #{pr}." if isinstance(pr, int) else "."
                 if validation == "success":
-                    lines.append("Обнаружены более новые цены RouterAI; кандидат проверен и ожидает слияния" + suffix)
+                    lines.append(
+                        "Найдено обновление, ожидающее публикации в основной ветке agent-toolchain."
+                    )
                 elif validation == "failed":
-                    lines.append("Обнаружены более новые цены RouterAI, но кандидат не прошёл проверку" + suffix)
+                    lines.append("Найдено обновление каталога RouterAI, но оно не прошло проверку перед публикацией.")
                 else:
-                    lines.append("Обнаружены более новые цены RouterAI; кандидат ещё проверяется" + suffix)
+                    lines.append("Найдено обновление каталога RouterAI; перед публикацией оно проходит проверку.")
+                if installed_ts is not None and published_ts is not None and not update_available:
+                    lines.append("Сейчас обновление не требуется.")
 
-    installed_ts = _parse_utc(installed_observed_at)
-    published_ts = _parse_utc(published_at)
-    if installed_ts is not None and published_ts is not None and published_ts > installed_ts:
-        lines.append(
-            "В main уже опубликованы более новые цены. Обновить установленный toolchain: "
-            "toolchainctl update --apply"
-        )
+    if update_available:
+        lines.append("RouterAI: доступно обновление каталога.")
+        lines.append("Выполните: toolchainctl update --apply")
 
     if meta.get("fetch_error") and status is not None:
         fetched_at = float(meta.get("fetched_at") or 0.0)
