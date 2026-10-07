@@ -47,7 +47,7 @@ class RouterAiStatusTests(unittest.TestCase):
             now=now,
         )
         self.assertEqual(len(lines), 1)
-        self.assertIn("цены актуальны", lines[0])
+        self.assertEqual(lines[0], "RouterAI: каталог проверен 6 ч. назад.")
 
     def test_failed_attempt_preserves_last_good_meaning(self) -> None:
         status = self._status()
@@ -84,7 +84,11 @@ class RouterAiStatusTests(unittest.TestCase):
             installed_observed_at="2026-08-28T15:22:09Z",
             now=now,
         )
-        self.assertIn("toolchainctl update --apply", "\n".join(lines))
+        self.assertEqual(lines[-2:], [
+            "RouterAI: доступно обновление каталога.",
+            "Выполните: toolchainctl update --apply",
+        ])
+        self.assertNotIn("Сейчас обновление не требуется.", lines)
 
     def test_candidate_is_reported_without_replacing_published_data(self) -> None:
         status = self._status()
@@ -102,8 +106,61 @@ class RouterAiStatusTests(unittest.TestCase):
             now=now,
         )
         text = "\n".join(lines)
-        self.assertIn("более новые цены", text)
-        self.assertIn("PR #31", text)
+        self.assertEqual(lines, [
+            "RouterAI: каталог проверен 7 ч. назад.",
+            "Найдено обновление, ожидающее публикации в основной ветке agent-toolchain.",
+            "Сейчас обновление не требуется.",
+        ])
+        self.assertNotIn("цены актуальны", text)
+        self.assertNotIn("toolchainctl update", text)
+        self.assertNotIn("PR", text)
+
+    def test_pending_candidate_does_not_hide_published_update(self) -> None:
+        status = self._status()
+        status["published"]["catalog_observed_at"] = "2026-08-29T09:00:00Z"
+        status["candidate"] = {
+            "catalog_observed_at": "2026-08-29T10:00:00Z",
+            "validation": "success",
+        }
+        lines = updates.routerai_status_advisory(
+            status,
+            installed_observed_at="2026-08-28T15:22:09Z",
+            now=updates._parse_utc("2026-08-29T11:00:00Z"),
+        )
+        self.assertIn("Выполните: toolchainctl update --apply", lines)
+        self.assertNotIn("Сейчас обновление не требуется.", lines)
+
+    def test_unpublished_candidate_never_suggests_installation(self) -> None:
+        for validation in ("pending", "failed"):
+            with self.subTest(validation=validation):
+                status = self._status()
+                status["candidate"] = {
+                    "catalog_observed_at": "2026-08-29T10:00:00Z",
+                    "validation": validation,
+                    "pr_number": 31,
+                }
+                lines = updates.routerai_status_advisory(
+                    status,
+                    installed_observed_at="2026-08-28T15:22:09Z",
+                    now=updates._parse_utc("2026-08-29T11:00:00Z"),
+                )
+                self.assertIn("Сейчас обновление не требуется.", lines)
+                self.assertNotIn("toolchainctl update", "\n".join(lines))
+                self.assertNotIn("PR", "\n".join(lines))
+
+    def test_unknown_installed_catalog_does_not_claim_no_update_required(self) -> None:
+        status = self._status()
+        status["candidate"] = {
+            "catalog_observed_at": "2026-08-29T10:00:00Z",
+            "validation": "success",
+        }
+        lines = updates.routerai_status_advisory(
+            status,
+            installed_observed_at=None,
+            now=updates._parse_utc("2026-08-29T11:00:00Z"),
+        )
+        self.assertNotIn("Сейчас обновление не требуется.", lines)
+        self.assertNotIn("toolchainctl update", "\n".join(lines))
 
     def test_cache_fallback_survives_remote_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
