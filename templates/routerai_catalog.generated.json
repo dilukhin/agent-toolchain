@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-10-17T07:47:16Z",
+  "observed_at": "2026-10-18T08:01:04Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -1332,7 +1332,7 @@
         ]
       },
       "pricing": {
-        "prompt": "0.00000206535719",
+        "prompt": "0.00000228276321",
         "completion": "0.0"
       }
     },
@@ -1751,9 +1751,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00000283519190682",
-        "completion": "0.00000567038381364",
-        "input_cache_read": "0.000000567038381364"
+        "prompt": "0.00000142009612264",
+        "completion": "0.000002996202805232",
+        "input_cache_read": "0.000000299520273754"
       }
     },
     "deepseek/deepseek-v4-flash-0731": {
@@ -1770,9 +1770,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00000715526693024",
-        "completion": "0.00002146580079072",
-        "input_cache_read": "0.000000227667584144"
+        "prompt": "0.00000082266437968",
+        "completion": "0.000017172640632576",
+        "input_cache_read": "0.000000182110152653"
       }
     },
     "deepseek/deepseek-v4-flash-vision-exp": {
@@ -1809,9 +1809,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00002854823670426",
-        "completion": "0.00005709647340852",
-        "input_cache_read": "0.00000236494268556"
+        "prompt": "0.0000270050887743",
+        "completion": "0.0000540101775486",
+        "input_cache_read": "0.0000022371079458"
       }
     },
     "deepseek/deepseek-v4-pro-0813": {
@@ -1828,9 +1828,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00003153865650936",
-        "completion": "0.00009461596952808",
-        "input_cache_read": "0.000001003502707116"
+        "prompt": "0.00002028919941048",
+        "completion": "0.00006086759823144",
+        "input_cache_read": "0.000000645565435788"
       }
     },
     "deepseek/deepseek-v4.1-flash": {
@@ -1848,9 +1848,29 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00001076159799",
-        "completion": "0.00002152319598",
-        "input_cache_read": "0.000002152319598"
+        "prompt": "0.0000077483505528",
+        "completion": "0.000017218556784",
+        "input_cache_read": "0.0000001913172976"
+      }
+    },
+    "deepseek/deepseek-v4.1-flash-1017": {
+      "name": "DeepSeek: DeepSeek V4.1 Flash 1017",
+      "created": 1792225624,
+      "context_length": 1048576,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "DeepSeek"
+      },
+      "pricing": {
+        "prompt": "0.000011718184478",
+        "completion": "0.000035154553434",
+        "input_cache_read": "0.00000035154553434"
       }
     },
     "elevenlabs/eleven-flash-v2": {
@@ -7351,24 +7371,6 @@
         "completion": "0.0"
       }
     },
-    "perplexity/pplx-decider-v1.1-27b": {
-      "name": "Perplexity: Decider V1.1 27B",
-      "created": 1791387700,
-      "context_length": 262144,
-      "architecture": {
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "output_modalities": [
-          "decisions"
-        ]
-      },
-      "pricing": {
-        "prompt": "0.0000021740602",
-        "completion": "0.0"
-      }
-    },
     "perplexity/pplx-decider-v1.2": {
       "name": "Perplexity: Decider V1.2",
       "created": 1792183495,
@@ -9929,6 +9931,26 @@
         "completion": "0.0"
       }
     },
+    "unbiased/pareto-26.10": {
+      "name": "Pareto 26.10",
+      "created": 1792073620,
+      "context_length": 1048576,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other"
+      },
+      "pricing": {
+        "prompt": "0.000086962408",
+        "completion": "0.000347849632",
+        "input_cache_read": "0.0000032610903"
+      }
+    },
     "unbiased/pareto-26.9": {
       "name": "Pareto 26.9",
       "created": 1791930537,
@@ -11001,9 +11023,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000008967998325",
-        "completion": "0.00002989332775",
-        "input_cache_read": "0.000001793599665"
+        "prompt": "0.000005739518928",
+        "completion": "0.0000239146622",
+        "input_cache_read": "0.000000717439866"
       }
     },
     "z-ai/glm-5.3-flashx": {
@@ -11160,8 +11182,8 @@
       }
     },
     "~deepseek/deepseek-v4-flash-latest": {
-      "name": "DeepSeek: DeepSeek V4.1 Flash",
-      "created": 1789021285,
+      "name": "DeepSeek: DeepSeek V4.1 Flash 1017",
+      "created": 1792225624,
       "context_length": 1048576,
       "architecture": {
         "input_modalities": [
@@ -11174,9 +11196,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00001076159799",
-        "completion": "0.00002152319598",
-        "input_cache_read": "0.000002152319598"
+        "prompt": "0.000011718184478",
+        "completion": "0.000035154553434",
+        "input_cache_read": "0.00000035154553434"
       }
     },
     "~deepseek/deepseek-v4-pro-latest": {
@@ -11193,9 +11215,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00003153865650936",
-        "completion": "0.00009461596952808",
-        "input_cache_read": "0.000001003502707116"
+        "prompt": "0.00002028919941048",
+        "completion": "0.00006086759823144",
+        "input_cache_read": "0.000000645565435788"
       }
     },
     "~google/gemini-flash-latest": {
@@ -11378,9 +11400,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000008967998325",
-        "completion": "0.00002989332775",
-        "input_cache_read": "0.000001793599665"
+        "prompt": "0.000005739518928",
+        "completion": "0.0000239146622",
+        "input_cache_read": "0.000000717439866"
       }
     },
     "~z-ai/glm-latest": {
