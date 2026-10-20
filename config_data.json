@@ -211,10 +211,10 @@
       "ssh_relay": {
         "source": "git",
         "repo": "https://github.com/dilukhin/ssh_relay.git",
-        "ref": "48c9cd968d7edf1e68d08abf3d308f5abf1bebd6",
+        "branch": "main",
         "project_directory": "ssh_relay",
         "runtime": "python-venv",
-        "update_policy": "pinned-tested",
+        "update_policy": "follow-branch",
         "entrypoints": [
           "ssh_relay"
         ],

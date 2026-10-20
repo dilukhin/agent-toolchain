@@ -117,12 +117,12 @@ Bootstrap публикует core атомарно из staging-каталога
 
 | Tool | Production command | Production source | Runtime |
 |---|---|---|---|
-| `ssh_relay` | `ssh_relay` | принятый commit (`pinned-tested`) | отдельный non-editable Python venv |
+| `ssh_relay` | `ssh_relay` | `main` (`follow-branch`) | отдельный non-editable Python venv |
 | `agent-safe` | `safe` | `master` (`follow-branch`) | отдельный non-editable Python venv |
 | `tunnelctl` | `tunnelctl` | точный проверенный commit (`pinned-tested`) | собранный из исходников Go binary |
 | `proxy-tools` | `opencode-proxied`, `codex-proxied` | текущий core | встроенный runtime |
 
-Для `ssh_relay` действует `pinned-tested`: `toolchainctl update --apply` сверяет установленную версию с точным `ref` из `config_data.json`, а не с текущим `ssh_relay/main`. После приёмки очередного выпуска необходимо отдельно обновить закреплённый SHA в `agent-toolchain`. Новый runtime размещается рядом с прежним; уже работающий daemon не перезапускается и после обновления должен быть перезапущен пользователем перед испытанием новых функций.
+Для `ssh_relay` действует `follow-branch`: во время `toolchainctl update --apply` определяется текущий HEAD проверенной ветки `ssh_relay/main`, фиксируется один точный SHA для установки программы и принадлежащих ей навыков. Обновление происходит по явному запуску команды, а не в фоне. Если источник недоступен, обновление не выполняется. Новый runtime устанавливается отдельно от прежнего; уже работающий daemon не перезапускается автоматически и перед проверкой новых функций должен быть перезапущен пользователем.
 
 В начале одного reconciliation-run production branch разрешается ровно один раз в точный 40-hex commit SHA. Этот SHA становится immutable execution identity для runtime и принадлежащих tool skills. Если branch изменился после resolution, новый commit относится к следующему запуску.
 
