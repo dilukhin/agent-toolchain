@@ -154,7 +154,7 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
 
         ssh_relay = tools["ssh_relay"]
         self.assertEqual(ssh_relay["update_policy"], "pinned-tested")
-        self.assertEqual(ssh_relay["ref"], "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
+        self.assertEqual(ssh_relay["ref"], "48c9cd968d7edf1e68d08abf3d308f5abf1bebd6")
         self.assertNotIn("branch", ssh_relay)
 
         agent_safe = tools["agent-safe"]
@@ -170,7 +170,7 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
             parsed, error = setup_tools.parse_tool_specs(config["managed_environment"])
         self.assertIsNone(error)
         self.assertEqual(parsed["ssh_relay"].update_policy, "pinned-tested")
-        self.assertEqual(parsed["ssh_relay"].ref, "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
+        self.assertEqual(parsed["ssh_relay"].ref, "48c9cd968d7edf1e68d08abf3d308f5abf1bebd6")
         self.assertEqual(parsed["agent-safe"].update_policy, "follow-branch")
 
         proxy_tools = tools["proxy-tools"]

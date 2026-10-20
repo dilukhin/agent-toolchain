@@ -105,7 +105,7 @@ class ToolSpecTests(unittest.TestCase):
 
         raw_ssh = env["tools"]["ssh_relay"]
         self.assertEqual(raw_ssh["update_policy"], "pinned-tested")
-        self.assertEqual(raw_ssh["ref"], "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
+        self.assertEqual(raw_ssh["ref"], "48c9cd968d7edf1e68d08abf3d308f5abf1bebd6")
         self.assertNotIn("branch", raw_ssh)
 
         raw_safe = env["tools"]["agent-safe"]
@@ -121,7 +121,7 @@ class ToolSpecTests(unittest.TestCase):
         self.assertEqual(ssh.update_policy, "pinned-tested")
         self.assertIsNone(ssh.tracking_branch)
         self.assertEqual(ssh.runtime, "python-venv")
-        self.assertEqual(ssh.ref, "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
+        self.assertEqual(ssh.ref, "48c9cd968d7edf1e68d08abf3d308f5abf1bebd6")
         self.assertEqual(ssh.entrypoints, ("ssh_relay",))
         self.assertIn(("ssh_relay", "doctor"), tuple(check.argv for check in ssh.health_contract))
 
@@ -129,7 +129,7 @@ class ToolSpecTests(unittest.TestCase):
         self.assertIsNone(_validate_supported_spec(ssh))
         self.assertEqual(
             _pip_source(ssh),
-            "git+https://github.com/dilukhin/ssh_relay.git@5a8d26f965fc09dc462e6558d821afafe6ebfefb",
+            "git+https://github.com/dilukhin/ssh_relay.git@48c9cd968d7edf1e68d08abf3d308f5abf1bebd6",
         )
 
         safe = parsed["agent-safe"]
