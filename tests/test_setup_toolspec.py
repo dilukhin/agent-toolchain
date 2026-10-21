@@ -114,6 +114,11 @@ class ToolSpecTests(unittest.TestCase):
         self.assertEqual(raw_safe["branch"], "master")
         self.assertNotIn("ref", raw_safe)
 
+        raw_tunnel = env["tools"]["tunnelctl"]
+        self.assertEqual(raw_tunnel["update_policy"], "follow-branch")
+        self.assertEqual(raw_tunnel["branch"], "main")
+        self.assertNotIn("ref", raw_tunnel)
+
         with mock.patch("setup_tools._resolve_github_branch",
                         side_effect=AssertionError("parsing must not perform network I/O")):
             parsed, error = parse_tool_specs(env)
@@ -131,15 +136,18 @@ class ToolSpecTests(unittest.TestCase):
         from setup_managed_tools import _pip_source, _validate_supported_spec
 
         def resolve(repo: str, branch: str) -> str:
-            self.assertEqual(repo, "https://github.com/dilukhin/" +
-                             ("ssh_relay.git" if branch == "main" else "agent-safe.git"))
-            self.assertIn(branch, ("main", "master"))
-            return ("a" if branch == "main" else "b") * 40
+            expected = {
+                ("https://github.com/dilukhin/ssh_relay.git", "main"): "a" * 40,
+                ("https://github.com/dilukhin/agent-safe.git", "master"): "b" * 40,
+                ("https://github.com/dilukhin/tunnelctl.git", "main"): "c" * 40,
+            }
+            self.assertIn((repo, branch), expected)
+            return expected[(repo, branch)]
 
         with mock.patch("setup_tools._resolve_github_branch", side_effect=resolve) as resolver:
             execution, error = resolve_tool_specs(parsed)
         self.assertIsNone(error)
-        self.assertEqual(resolver.call_count, 2)
+        self.assertEqual(resolver.call_count, 3)
         checked = execution["ssh_relay"]
         self.assertEqual(checked.ref, "a" * 40)
         self.assertEqual(checked.update_policy, "pinned-tested")
@@ -158,8 +166,14 @@ class ToolSpecTests(unittest.TestCase):
         self.assertEqual(proxy.source, "builtin")
         self.assertEqual(proxy.entrypoints, ("opencode-proxied", "codex-proxied"))
         tunnel = parsed["tunnelctl"]
-        self.assertEqual(tunnel.update_policy, "pinned-tested")
-        self.assertEqual(tunnel.ref, "cbfee60c498c34fe20396e19ef90d3c01460e3b5")
+        self.assertEqual(tunnel.update_policy, "follow-branch")
+        self.assertEqual(tunnel.tracking_branch, "main")
+        self.assertIsNone(tunnel.ref)
+        installed_tunnel = execution["tunnelctl"]
+        self.assertEqual(installed_tunnel.update_policy, "pinned-tested")
+        self.assertEqual(installed_tunnel.ref, "c" * 40)
+        self.assertEqual(installed_tunnel.runtime, "go-binary")
+        self.assertIsNone(_validate_supported_spec(installed_tunnel))
 
 
 if __name__ == "__main__":

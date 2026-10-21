@@ -1,4 +1,4 @@
-"""Ownership and read-only regressions for the pinned tunnelctl binary."""
+"""Ownership and read-only regressions for the exact-ref tunnelctl binary."""
 from __future__ import annotations
 
 import hashlib

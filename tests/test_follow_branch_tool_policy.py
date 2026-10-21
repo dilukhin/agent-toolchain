@@ -148,7 +148,7 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         self.assertIn("exact ref {spec.ref[:12]} with verified payload hashes", sources["skills"])
         self.assertIn("managed ToolSpec phase already reconciled this tool from an exact ref", sources["adapter"])
 
-    def test_repository_policy_follows_ssh_relay_and_agent_safe(self) -> None:
+    def test_repository_policy_follows_all_first_party_git_tools(self) -> None:
         config = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
         tools = config["managed_environment"]["tools"]
 
@@ -162,6 +162,11 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         self.assertEqual(agent_safe["branch"], "master")
         self.assertNotIn("ref", agent_safe)
 
+        tunnelctl = tools["tunnelctl"]
+        self.assertEqual(tunnelctl["update_policy"], "follow-branch")
+        self.assertEqual(tunnelctl["branch"], "main")
+        self.assertNotIn("ref", tunnelctl)
+
         with mock.patch.object(
             setup_tools,
             "_resolve_github_branch",
@@ -174,6 +179,9 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         self.assertEqual(parsed["ssh_relay"].tracking_branch, "main")
         self.assertIsNone(parsed["ssh_relay"].ref)
         self.assertEqual(parsed["agent-safe"].update_policy, "follow-branch")
+        self.assertEqual(parsed["tunnelctl"].update_policy, "follow-branch")
+        self.assertEqual(parsed["tunnelctl"].tracking_branch, "main")
+        self.assertIsNone(parsed["tunnelctl"].ref)
 
         proxy_tools = tools["proxy-tools"]
         self.assertEqual(proxy_tools["update_policy"], "bundled-with-setup")
