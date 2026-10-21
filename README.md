@@ -119,8 +119,10 @@ Bootstrap публикует core атомарно из staging-каталога
 |---|---|---|---|
 | `ssh_relay` | `ssh_relay` | `main` (`follow-branch`) | отдельный non-editable Python venv |
 | `agent-safe` | `safe` | `master` (`follow-branch`) | отдельный non-editable Python venv |
-| `tunnelctl` | `tunnelctl` | точный проверенный commit (`pinned-tested`) | собранный из исходников Go binary |
+| `tunnelctl` | `tunnelctl` | `main` (`follow-branch`) | собранный из исходников Go binary |
 | `proxy-tools` | `opencode-proxied`, `codex-proxied` | текущий core | встроенный runtime |
+
+Для всех отдельных собственных Git-инструментов (`ssh_relay/main`, `agent-safe/master`, `tunnelctl/main`) действует `follow-branch`: во время `toolchainctl update --apply` определяется текущий HEAD рабочей ветки каждого репозитория и фиксируется точный SHA для установки. Обновление выполняется только по явной команде, не в фоне. Если ветку не удалось подтвердить, изменения установленных инструментов не выполняются. Новые runtime публикуются отдельно от прежних и проходят штатные проверки перед переключением. Работающие процессы `ssh_relay` и туннели `tunnelctl` автоматически не перезапускаются.
 
 В начале одного reconciliation-run production branch разрешается ровно один раз в точный 40-hex commit SHA. Этот SHA становится immutable execution identity для runtime и принадлежащих tool skills. Если branch изменился после resolution, новый commit относится к следующему запуску.
 
@@ -128,7 +130,7 @@ Bootstrap публикует core атомарно из staging-каталога
 
 Developer checkouts `~/projects/ssh_relay` и `~/projects/agent-safe` могут существовать, быть dirty или вообще отсутствовать: это не должно менять production runtime.
 
-`tunnelctl` собирается из временной чистой копии точного commit и публикуется как отдельный versioned binary. Для первого `apply` нужны Git, Go 1.22+ и OpenSSH client; они не устанавливаются автоматически. Проверка выполняет `tunnelctl --version` из установленного binary и `ssh -V`, не запускает туннель и не меняет его автозапуск. Изменение уже запущенного процесса не производится; запуск и переключение управляются отдельными командами `tunnelctl`.
+`tunnelctl` собирается из временной чистой копии SHA, однократно полученного из `tunnelctl/main`, и публикуется как отдельный versioned binary. Для первого `apply` нужны Git, Go 1.22+ и OpenSSH client; они не устанавливаются автоматически. Проверка выполняет `tunnelctl --version` из установленного binary и `ssh -V`, не запускает туннель и не меняет его автозапуск. Изменение уже запущенного процесса не производится; запуск и переключение управляются отдельными командами `tunnelctl`.
 
 ### Skills из того же exact ref
 
@@ -230,7 +232,7 @@ Windows:
 
 ## Что пока не реализовано
 
-Python managed-tool deployer поддерживает `git + python-venv` с policy `follow-branch` и `pinned-tested`; Go binary deployer поддерживает проверенный `tunnelctl` по `pinned-tested` exact commit.
+Python managed-tool deployer поддерживает `git + python-venv` с policy `follow-branch` и `pinned-tested`; Go binary deployer принимает точный SHA `tunnelctl`, полученный через `follow-branch` или указанный явно по `pinned-tested`.
 
 Пока **не** подключены как реальные managed tools:
 

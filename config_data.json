@@ -211,10 +211,10 @@
       "ssh_relay": {
         "source": "git",
         "repo": "https://github.com/dilukhin/ssh_relay.git",
-        "ref": "5a8d26f965fc09dc462e6558d821afafe6ebfefb",
+        "branch": "main",
         "project_directory": "ssh_relay",
         "runtime": "python-venv",
-        "update_policy": "pinned-tested",
+        "update_policy": "follow-branch",
         "entrypoints": [
           "ssh_relay"
         ],
@@ -246,10 +246,10 @@
       "tunnelctl": {
         "source": "git",
         "repo": "https://github.com/dilukhin/tunnelctl.git",
-        "ref": "cbfee60c498c34fe20396e19ef90d3c01460e3b5",
+        "branch": "main",
         "project_directory": "tunnelctl",
         "runtime": "go-binary",
-        "update_policy": "pinned-tested",
+        "update_policy": "follow-branch",
         "entrypoints": ["tunnelctl"],
         "health_contract": [{"argv": ["tunnelctl", "--version"]}],
         "platforms": ["windows", "linux"]

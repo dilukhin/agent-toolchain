@@ -148,30 +148,40 @@ class FollowBranchToolPolicyTests(unittest.TestCase):
         self.assertIn("exact ref {spec.ref[:12]} with verified payload hashes", sources["skills"])
         self.assertIn("managed ToolSpec phase already reconciled this tool from an exact ref", sources["adapter"])
 
-    def test_repository_policy_pins_ssh_relay_and_follows_agent_safe(self) -> None:
+    def test_repository_policy_follows_all_first_party_git_tools(self) -> None:
         config = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
         tools = config["managed_environment"]["tools"]
 
         ssh_relay = tools["ssh_relay"]
-        self.assertEqual(ssh_relay["update_policy"], "pinned-tested")
-        self.assertEqual(ssh_relay["ref"], "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
-        self.assertNotIn("branch", ssh_relay)
+        self.assertEqual(ssh_relay["update_policy"], "follow-branch")
+        self.assertEqual(ssh_relay["branch"], "main")
+        self.assertNotIn("ref", ssh_relay)
 
         agent_safe = tools["agent-safe"]
         self.assertEqual(agent_safe["update_policy"], "follow-branch")
         self.assertEqual(agent_safe["branch"], "master")
         self.assertNotIn("ref", agent_safe)
 
+        tunnelctl = tools["tunnelctl"]
+        self.assertEqual(tunnelctl["update_policy"], "follow-branch")
+        self.assertEqual(tunnelctl["branch"], "main")
+        self.assertNotIn("ref", tunnelctl)
+
         with mock.patch.object(
             setup_tools,
             "_resolve_github_branch",
-            side_effect=AssertionError("repository policy validation must not access the network"),
-        ):
+            side_effect=AssertionError("policy parsing must not use the network"),
+        ) as resolver:
             parsed, error = setup_tools.parse_tool_specs(config["managed_environment"])
         self.assertIsNone(error)
-        self.assertEqual(parsed["ssh_relay"].update_policy, "pinned-tested")
-        self.assertEqual(parsed["ssh_relay"].ref, "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
+        resolver.assert_not_called()
+        self.assertEqual(parsed["ssh_relay"].update_policy, "follow-branch")
+        self.assertEqual(parsed["ssh_relay"].tracking_branch, "main")
+        self.assertIsNone(parsed["ssh_relay"].ref)
         self.assertEqual(parsed["agent-safe"].update_policy, "follow-branch")
+        self.assertEqual(parsed["tunnelctl"].update_policy, "follow-branch")
+        self.assertEqual(parsed["tunnelctl"].tracking_branch, "main")
+        self.assertIsNone(parsed["tunnelctl"].ref)
 
         proxy_tools = tools["proxy-tools"]
         self.assertEqual(proxy_tools["update_policy"], "bundled-with-setup")
