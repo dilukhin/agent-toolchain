@@ -1,4 +1,5 @@
 name: Refresh RouterAI catalog
+run-name: RouterAI catalog refresh contract-v1
 
 on:
   push:
@@ -6,6 +7,8 @@ on:
       - main
     paths:
       - templates/routerai_catalog.generated.json
+      - .github/workflows/routerai_catalog.yml
+      - scripts/update_routerai_refresh_status.py
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
@@ -34,6 +37,7 @@ jobs:
       catalog_changed: ${{ steps.summary.outputs.catalog_changed }}
       validation_status: ${{ steps.summary.outputs.validation_status }}
       candidate_sha: ${{ steps.summary.outputs.candidate_sha }}
+      candidate_required: ${{ steps.summary.outputs.candidate_required }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -94,11 +98,12 @@ jobs:
           python3 -m py_compile \
             ./scripts/update_routerai_catalog.py \
             ./scripts/check_routerai_owned_diff.py \
-            ./scripts/update_routerai_refresh_status.py
+            ./scripts/update_routerai_refresh_status.py \
+            ./scripts/routerai_operational_watchdog.py
           python3 ./scripts/update_routerai_catalog.py --verify-generated
           python3 ./tests/run_migration_ci.py
 
-      - name: Commit generated changes
+      - name: Commit and publish generated candidate
         id: commit
         shell: bash
         run: |
@@ -118,20 +123,27 @@ jobs:
           echo "local_sha=$local_sha" >> "$GITHUB_OUTPUT"
 
           if git diff --quiet origin/main...HEAD; then
+            echo "candidate_required=0" >> "$GITHUB_OUTPUT"
             echo "push_required=0" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "candidate_required=1" >> "$GITHUB_OUTPUT"
 
           if [[ "$BRANCH_EXISTED" == "1" && "$local_sha" == "$REMOTE_BRANCH_SHA" ]]; then
             echo "push_required=0" >> "$GITHUB_OUTPUT"
-            exit 0
+          else
+            git push origin "HEAD:refs/heads/$BRANCH"
+            echo "push_required=1" >> "$GITHUB_OUTPUT"
           fi
 
-          git push origin "HEAD:refs/heads/$BRANCH"
-          echo "push_required=1" >> "$GITHUB_OUTPUT"
+          remote_sha="$(git ls-remote origin "refs/heads/$BRANCH" | awk '{print $1}')"
+          if [[ -z "$remote_sha" || "$remote_sha" != "$local_sha" ]]; then
+            echo "Published RouterAI candidate read-back mismatch: local=$local_sha remote=${remote_sha:-missing}" >&2
+            exit 4
+          fi
 
       - name: Open or reuse pull request
-        if: steps.commit.outputs.push_required == '1'
+        if: steps.commit.outputs.candidate_required == '1'
         id: pr
         shell: bash
         run: |
@@ -145,27 +157,64 @@ jobs:
               --body "Статус и описание будут заполнены финализатором автоматического обновления.")"
             number="${url##*/}"
           fi
+
+          candidate_sha="${{ steps.commit.outputs.local_sha }}"
+          verified="$(gh pr view "$number" --json state,baseRefName,headRefName,headRefOid --jq \
+            "select(.state == \"OPEN\" and .baseRefName == \"main\" and .headRefName == \"$BRANCH\" and .headRefOid == \"$candidate_sha\") | .headRefOid")"
+          if [[ "$verified" != "$candidate_sha" ]]; then
+            echo "RouterAI candidate PR read-back does not match expected branch/SHA" >&2
+            exit 4
+          fi
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
-      - name: Dispatch and wait for full Windows/Linux validation
-        if: steps.commit.outputs.push_required == '1'
+      - name: Resolve and verify full Windows/Linux validation
         id: validation
         shell: bash
+        env:
+          CANDIDATE_REQUIRED: ${{ steps.commit.outputs.candidate_required }}
         run: |
           set -euo pipefail
-          candidate_sha="${{ steps.commit.outputs.local_sha }}"
-          gh workflow run validate.yml --ref "$BRANCH"
+          target_ref="$BRANCH"
+          target_sha="${{ steps.commit.outputs.local_sha }}"
+          if [[ "$CANDIDATE_REQUIRED" != "1" ]]; then
+            target_ref="main"
+            target_sha="$(git rev-parse origin/main)"
+          fi
+
+          existing_run_id="$(
+            gh run list \
+              --workflow validate.yml \
+              --branch "$target_ref" \
+              --limit 100 \
+              --json databaseId,headSha,status,conclusion \
+              --jq "[.[] | select(.headSha == \"$target_sha\" and .status == \"completed\" and .conclusion == \"success\")][0].databaseId // empty"
+          )"
+          if [[ -n "$existing_run_id" ]]; then
+            echo "run_id=$existing_run_id" >> "$GITHUB_OUTPUT"
+            echo "reused=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          before_max="$(
+            gh run list \
+              --workflow validate.yml \
+              --branch "$target_ref" \
+              --limit 100 \
+              --json databaseId,headSha \
+              --jq "[.[] | select(.headSha == \"$target_sha\") | .databaseId] | max // 0"
+          )"
+          gh workflow run validate.yml --ref "$target_ref"
 
           run_id=""
           for _ in $(seq 1 30); do
             run_id="$(
               gh run list \
                 --workflow validate.yml \
-                --branch "$BRANCH" \
+                --branch "$target_ref" \
                 --event workflow_dispatch \
                 --limit 20 \
                 --json databaseId,headSha \
-                --jq "[.[] | select(.headSha == \"$candidate_sha\")][0].databaseId // empty"
+                --jq "[.[] | select(.headSha == \"$target_sha\" and .databaseId > $before_max)][0].databaseId // empty"
             )"
             if [[ -n "$run_id" ]]; then
               break
@@ -173,10 +222,11 @@ jobs:
             sleep 2
           done
           if [[ -z "$run_id" ]]; then
-            echo "Could not locate dispatched validate.yml run for $candidate_sha" >&2
+            echo "Could not locate newly dispatched validate.yml run for $target_sha" >&2
             exit 3
           fi
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "reused=0" >> "$GITHUB_OUTPUT"
           gh run watch "$run_id" --exit-status
 
       - name: Summarize refresh attempt
@@ -190,7 +240,7 @@ jobs:
           COMMIT_OUTCOME: ${{ steps.commit.outcome }}
           PR_OUTCOME: ${{ steps.pr.outcome }}
           VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
-          PUSH_REQUIRED: ${{ steps.commit.outputs.push_required }}
+          CANDIDATE_REQUIRED: ${{ steps.commit.outputs.candidate_required }}
           SOURCE_CHECK_AT: ${{ steps.refresh.outputs.checked_at }}
           CATALOG_CHANGED: ${{ steps.refresh.outputs.catalog_changed }}
           CANDIDATE_SHA: ${{ steps.commit.outputs.local_sha }}
@@ -221,16 +271,16 @@ jobs:
             phase="publish-candidate"
             code="candidate-publish"
             summary="Не удалось безопасно сформировать или опубликовать ветку-кандидат RouterAI."
-          elif [[ "$PUSH_REQUIRED" == "1" && "$PR_OUTCOME" != "success" ]]; then
+          elif [[ "$CANDIDATE_REQUIRED" == "1" && "$PR_OUTCOME" != "success" ]]; then
             status="failed"
             phase="pull-request"
             code="pull-request"
-            summary="Не удалось создать или переиспользовать pull request обновления RouterAI."
-          elif [[ "$PUSH_REQUIRED" == "1" && "$VALIDATION_OUTCOME" != "success" ]]; then
+            summary="Не удалось создать, переиспользовать или подтвердить pull request обновления RouterAI."
+          elif [[ "$VALIDATION_OUTCOME" != "success" ]]; then
             status="failed"
             phase="full-validation"
             code="full-validation"
-            summary="Кандидат RouterAI не прошёл полную Windows/Linux проверку."
+            summary="Точное состояние RouterAI не имеет подтверждённой успешной Windows/Linux проверки."
           fi
 
           validation="unchanged"
@@ -249,7 +299,9 @@ jobs:
             echo "catalog_changed=${CATALOG_CHANGED:-unknown}"
             echo "validation_status=$validation"
             echo "candidate_sha=${CANDIDATE_SHA:-}"
+            echo "candidate_required=${CANDIDATE_REQUIRED:-unknown}"
           } >> "$GITHUB_OUTPUT"
+
 
   publish-status:
     if: always()
@@ -324,6 +376,9 @@ jobs:
             --published-main-sha "$(git rev-parse HEAD)"
             --attempt-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             --trigger "${{ github.event_name }}"
+            --run-id "${{ github.run_id }}"
+            --run-attempt "${{ github.run_attempt }}"
+            --completion-contract 1
             --attempt-status "${ATTEMPT_STATUS:-failed}"
             --phase "${PHASE:-unknown}"
             --catalog-changed "${CATALOG_CHANGED:-unknown}"
@@ -358,13 +413,6 @@ jobs:
           echo "status_out=$status_out" >> "$GITHUB_OUTPUT"
           echo "pr_body=$pr_body" >> "$GITHUB_OUTPUT"
 
-      - name: Update RouterAI PR summary
-        if: steps.status.outputs.pr_number != ''
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh pr edit "${{ steps.status.outputs.pr_number }}" --body-file "${{ steps.status.outputs.pr_body }}"
-
       - name: Publish managed status branch
         shell: bash
         run: |
@@ -379,8 +427,40 @@ jobs:
 
           cp "$status_out" routerai-refresh-status.json
           git add routerai-refresh-status.json
-          if git diff --cached --quiet; then
-            exit 0
+          if ! git diff --cached --quiet; then
+            git commit -m "Record RouterAI refresh status"
+            git push origin "HEAD:refs/heads/$STATUS_BRANCH"
           fi
-          git commit -m "Record RouterAI refresh status"
-          git push origin "HEAD:refs/heads/$STATUS_BRANCH"
+
+          git fetch origin "refs/heads/$STATUS_BRANCH:refs/remotes/origin/$STATUS_BRANCH"
+          git show "origin/$STATUS_BRANCH:routerai-refresh-status.json" > "$RUNNER_TEMP/routerai-status-readback.json"
+          cmp "$status_out" "$RUNNER_TEMP/routerai-status-readback.json"
+
+      - name: Update RouterAI PR summary
+        if: steps.status.outputs.pr_number != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh pr edit "${{ steps.status.outputs.pr_number }}" --body-file "${{ steps.status.outputs.pr_body }}"
+
+  confirm-complete:
+    name: Confirm complete RouterAI refresh
+    if: always()
+    needs:
+      - refresh
+      - publish-status
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify completion contract
+        shell: bash
+        env:
+          REFRESH_RESULT: ${{ needs.refresh.result }}
+          STATUS_RESULT: ${{ needs.publish-status.result }}
+          ATTEMPT_STATUS: ${{ needs.refresh.outputs.attempt_status }}
+        run: |
+          set -euo pipefail
+          if [[ "$REFRESH_RESULT" != "success" || "$STATUS_RESULT" != "success" || "$ATTEMPT_STATUS" != "success" ]]; then
+            echo "RouterAI full refresh contract not satisfied: refresh=$REFRESH_RESULT status=$STATUS_RESULT attempt=$ATTEMPT_STATUS" >&2
+            exit 1
+          fi
+          echo "RouterAI full refresh contract satisfied for run $GITHUB_RUN_ID attempt $GITHUB_RUN_ATTEMPT."
