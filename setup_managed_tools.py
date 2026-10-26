@@ -301,7 +301,7 @@ def _install_go_release(spec: ToolSpec, reporter: Reporter) -> Path | None:
         return None
     git, go = shutil.which("git"), shutil.which("go")
     if not git or not go:
-        reporter.add(f"{spec.name} runtime", STATE_FAILED, "Git and Go 1.22+ are required to build pinned tunnelctl source. MANUAL ACTION REQUIRED: on Ubuntu/Debian run toolchainctl apply --install-needed (or install git, golang-go and openssh-client manually)")
+        reporter.add(f"{spec.name} runtime", STATE_FAILED, "Git and Go 1.22+ are required to build exact-ref tunnelctl source. MANUAL ACTION REQUIRED: on Ubuntu/Debian run toolchainctl apply --install-needed (or install git, golang-go and openssh-client manually)")
         return None
     try:
         version = run([go, "version"], timeout=10)

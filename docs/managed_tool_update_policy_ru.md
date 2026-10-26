@@ -63,9 +63,12 @@ Reconciler:
 
 - `ssh_relay` — `follow-branch`, production branch `main`;
 - `agent-safe` — `follow-branch`, production branch `master` (текущий default/production branch upstream);
-- `proxy-tools` — `bundled-with-setup`.
+- `tunnelctl` — `follow-branch`, production branch `main`;
+- `proxy-tools` — `bundled-with-setup` (поставляются вместе с `agent-toolchain/main`, собственного Git-источника не имеют).
 
-`tunnelctl` и `bundle` включаются в managed registry только после реализации соответствующей runtime family; при добавлении source policy выбирается по фактическому upstream distribution contract.
+Все зарегистрированные собственные инструменты с источником `git` следуют рабочим веткам. При этом `bundle` упоминается в конфигурации только как внешний вспомогательный проект, а не как управляемый инструмент: `toolchainctl update --apply` его не устанавливает и не обновляет. Сторонние зависимости, в том числе BMAD, регулируются отдельными правилами.
+
+Для `go-binary` (`tunnelctl`) разрешение ветки также происходит однократно до установки. Сборка выполняется из чистой копии точного SHA; новая исполняемая программа проходит `tunnelctl --version` и проверку доступности OpenSSH до переключения управляемой команды. Работающие туннели не перезапускаются автоматически.
 
 ## 5. Diagnostic identity
 

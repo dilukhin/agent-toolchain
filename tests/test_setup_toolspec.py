@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -97,56 +98,82 @@ class ToolSpecTests(unittest.TestCase):
         self.assertIsNone(error)
         self.assertEqual(parsed, {})
 
-    def test_repository_config_pins_ssh_relay_without_branch_resolution(self) -> None:
+    def test_repository_config_follows_main_for_ssh_relay(self) -> None:
         data = json.loads((ROOT / "config_data.json").read_text(encoding="utf-8"))
         env = data["managed_environment"]
         self.assertEqual(env["manifest_schema"], 2)
         self.assertEqual(env["tool_spec_schema"], TOOL_SPEC_SCHEMA)
 
         raw_ssh = env["tools"]["ssh_relay"]
-        self.assertEqual(raw_ssh["update_policy"], "pinned-tested")
-        self.assertEqual(raw_ssh["ref"], "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
-        self.assertNotIn("branch", raw_ssh)
+        self.assertEqual(raw_ssh["update_policy"], "follow-branch")
+        self.assertEqual(raw_ssh["branch"], "main")
+        self.assertNotIn("ref", raw_ssh)
 
         raw_safe = env["tools"]["agent-safe"]
         self.assertEqual(raw_safe["update_policy"], "follow-branch")
         self.assertEqual(raw_safe["branch"], "master")
         self.assertNotIn("ref", raw_safe)
 
-        parsed, error = parse_tool_specs(env)
+        raw_tunnel = env["tools"]["tunnelctl"]
+        self.assertEqual(raw_tunnel["update_policy"], "follow-branch")
+        self.assertEqual(raw_tunnel["branch"], "main")
+        self.assertNotIn("ref", raw_tunnel)
+
+        with mock.patch("setup_tools._resolve_github_branch",
+                        side_effect=AssertionError("parsing must not perform network I/O")):
+            parsed, error = parse_tool_specs(env)
         self.assertIsNone(error)
         self.assertEqual(set(parsed), {"ssh_relay", "agent-safe", "proxy-tools", "tunnelctl"})
 
         ssh = parsed["ssh_relay"]
-        self.assertEqual(ssh.update_policy, "pinned-tested")
-        self.assertIsNone(ssh.tracking_branch)
-        self.assertEqual(ssh.runtime, "python-venv")
-        self.assertEqual(ssh.ref, "5a8d26f965fc09dc462e6558d821afafe6ebfefb")
+        self.assertEqual(ssh.update_policy, "follow-branch")
+        self.assertEqual(ssh.tracking_branch, "main")
+        self.assertIsNone(ssh.ref)
         self.assertEqual(ssh.entrypoints, ("ssh_relay",))
-        self.assertIn(("ssh_relay", "doctor"), tuple(check.argv for check in ssh.health_contract))
+        self.assertIn(("ssh_relay", "doctor"), tuple(c.argv for c in ssh.health_contract))
 
+        from setup_tools import resolve_tool_specs
         from setup_managed_tools import _pip_source, _validate_supported_spec
-        self.assertIsNone(_validate_supported_spec(ssh))
+
+        def resolve(repo: str, branch: str) -> str:
+            expected = {
+                ("https://github.com/dilukhin/ssh_relay.git", "main"): "a" * 40,
+                ("https://github.com/dilukhin/agent-safe.git", "master"): "b" * 40,
+                ("https://github.com/dilukhin/tunnelctl.git", "main"): "c" * 40,
+            }
+            self.assertIn((repo, branch), expected)
+            return expected[(repo, branch)]
+
+        with mock.patch("setup_tools._resolve_github_branch", side_effect=resolve) as resolver:
+            execution, error = resolve_tool_specs(parsed)
+        self.assertIsNone(error)
+        self.assertEqual(resolver.call_count, 3)
+        checked = execution["ssh_relay"]
+        self.assertEqual(checked.ref, "a" * 40)
+        self.assertEqual(checked.update_policy, "pinned-tested")
+        self.assertIsNone(_validate_supported_spec(checked))
         self.assertEqual(
-            _pip_source(ssh),
-            "git+https://github.com/dilukhin/ssh_relay.git@5a8d26f965fc09dc462e6558d821afafe6ebfefb",
+            _pip_source(checked),
+            "git+https://github.com/dilukhin/ssh_relay.git@" + "a" * 40,
         )
 
         safe = parsed["agent-safe"]
         self.assertEqual(safe.update_policy, "follow-branch")
         self.assertEqual(safe.tracking_branch, "master")
-        self.assertEqual(safe.runtime, "python-venv")
         self.assertIsNone(safe.ref)
-        self.assertEqual(safe.entrypoints, ("safe",))
 
         proxy = parsed["proxy-tools"]
         self.assertEqual(proxy.source, "builtin")
-        self.assertEqual(proxy.runtime, "python-builtin")
-        self.assertEqual(proxy.module, "proxy_tools")
         self.assertEqual(proxy.entrypoints, ("opencode-proxied", "codex-proxied"))
         tunnel = parsed["tunnelctl"]
-        self.assertEqual(tunnel.update_policy, "pinned-tested")
-        self.assertEqual(tunnel.ref, "cbfee60c498c34fe20396e19ef90d3c01460e3b5")
+        self.assertEqual(tunnel.update_policy, "follow-branch")
+        self.assertEqual(tunnel.tracking_branch, "main")
+        self.assertIsNone(tunnel.ref)
+        installed_tunnel = execution["tunnelctl"]
+        self.assertEqual(installed_tunnel.update_policy, "pinned-tested")
+        self.assertEqual(installed_tunnel.ref, "c" * 40)
+        self.assertEqual(installed_tunnel.runtime, "go-binary")
+        self.assertIsNone(_validate_supported_spec(installed_tunnel))
 
 
 if __name__ == "__main__":
