@@ -212,6 +212,22 @@ class ContractTests(unittest.TestCase):
                 publisher.publish(api, candidate, sha=SHA, run_id=7, at="2026-10-29T12:01:00Z")
             self.assertFalse(any(method in {"POST", "PATCH"} and path.startswith("git/refs") for method, path, _ in api.calls))
 
+    def test_retry_after_published_ref_is_idempotent(self):
+        candidate = self.candidate()
+        previous = prices.approve(candidate, None, candidate_sha=SHA, run_id=7, at=AT)
+        api = FakeAPI(previous)
+        head, actual = publisher.publish(api, candidate, sha=SHA, run_id=7, at="2026-10-28T12:02:00Z")
+        self.assertEqual((head, actual), ("old", previous))
+        self.assertFalse(any(method in {"POST", "PATCH"} for method, _, _ in api.calls))
+
+    def test_exponent_bomb_and_duplicate_json_cannot_be_used(self):
+        payload = {"data": [{"id": "synthetic/asr", "pricing": {"seconds": "1e999999999"}}]}
+        record = catalog.normalize_catalog(payload)["synthetic/asr"]
+        self.assertNotIn("pricing", record)
+        self.assertTrue(record["pricing_incomplete"])
+        with self.assertRaises(catalog.CatalogError):
+            catalog._unique_object([("pricing", {}), ("pricing", {})])
+
     def test_fixture_matches_documented_contract(self):
         path = ROOT / "tests/fixtures/routerai_prices_published.json"
         document = json.loads(path.read_text(encoding="utf-8"))

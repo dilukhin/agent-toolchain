@@ -62,9 +62,18 @@ def _emit(text: str, *, stream: TextIO | None = None) -> None:
     stream.write((text + "\n").encode("ascii", errors="backslashreplace").decode("ascii"))
 
 
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise CatalogError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
 def _load(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"), parse_float=Decimal)
+        value = json.loads(path.read_text(encoding="utf-8"), parse_float=Decimal, object_pairs_hook=_unique_object)
     except (OSError, json.JSONDecodeError) as exc:
         raise CatalogError(f"cannot load {path}: {exc}") from exc
     if not isinstance(value, dict):
@@ -99,7 +108,7 @@ def _fetch(url: str = MODELS_URL) -> dict[str, Any]:
     if len(raw) > MAX_RESPONSE_BYTES:
         raise CatalogError(f"RouterAI catalog exceeds {MAX_RESPONSE_BYTES} bytes")
     try:
-        value = json.loads(raw.decode("utf-8"), parse_float=Decimal)
+        value = json.loads(raw.decode("utf-8"), parse_float=Decimal, object_pairs_hook=_unique_object)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CatalogError(f"RouterAI catalog is not valid UTF-8 JSON: {exc}") from exc
     if not isinstance(value, dict):
@@ -115,7 +124,7 @@ def _pricing(value: Any) -> dict[str, str]:
         try:
             if isinstance(raw, (str, int, Decimal)) and not isinstance(raw, bool):
                 value = Decimal(raw)
-                if value.is_finite() and value >= 0:
+                if value.is_finite() and value >= 0 and -60 <= value.adjusted() <= 18 and len(value.as_tuple().digits) <= 60:
                     result[str(key)] = format(value, "f")
         except InvalidOperation:
             pass

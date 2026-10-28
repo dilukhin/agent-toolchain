@@ -97,7 +97,10 @@ def _rates(endpoint: dict) -> tuple[dict, dict, bool]:
             # json decoding must use Decimal, never float, including endpoint data.
             if isinstance(raw, bool) or not isinstance(raw, (str, int, Decimal)):
                 raise PriceError("invalid price type")
-            text = format(Decimal(raw), "f")
+            number = Decimal(raw)
+            if not number.is_finite() or not -60 <= number.adjusted() <= 18 or len(number.as_tuple().digits) > 60:
+                raise PriceError("price magnitude or precision unsupported")
+            text = format(number, "f")
             amount(text)
         except (InvalidOperation, PriceError):
             complete = False
