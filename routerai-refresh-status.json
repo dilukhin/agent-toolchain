@@ -2,29 +2,25 @@
   "_managed_notice": "НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ. Этот файл и ветка automation/routerai-status полностью принадлежат автоматизации обновления RouterAI. Здесь хранится машинно-читаемое состояние последней попытки, последней успешной проверки, опубликованных данных и кандидата. Подробности, решённые проблемы и схема повторного применения: docs/routerai_refresh_status_design_ru.md. Штатный ручной запуск полного обновления: gh workflow run routerai_catalog.yml --repo dilukhin/agent-toolchain --ref main",
   "schema": 1,
   "owner": "agent-toolchain:routerai-status:v1",
-  "updated_at": "2026-10-28T20:33:22Z",
+  "updated_at": "2026-10-28T20:49:47Z",
   "published": {
     "catalog_observed_at": "2026-08-29T07:50:20Z",
-    "main_sha": "215187133a0a4041020921910caffcf9e708bdd1"
+    "main_sha": "3c1ae88b20a9e075ab47160bac772f1330681012"
   },
   "last_successful_check": {
-    "at": "2026-10-28T09:39:29Z",
+    "at": "2026-10-28T20:43:20Z",
     "catalog_changed": true
   },
   "last_attempt": {
-    "at": "2026-10-28T20:33:22Z",
+    "at": "2026-10-28T20:49:47Z",
     "trigger": "push",
-    "status": "failed",
-    "phase": "fetch-routerai",
-    "error": {
-      "code": "routerai-refresh",
-      "summary": "Не удалось получить или обработать актуальный каталог RouterAI.",
-      "advice": "Повторите штатное обновление. Если ошибка повторяется, проверьте доступность/ответ RouterAI и журнал GitHub Actions."
-    }
+    "status": "success",
+    "phase": "complete",
+    "error": null
   },
   "candidate": {
-    "catalog_observed_at": "2026-10-28T09:39:29Z",
-    "branch_sha": "9356f55f5c4d84f76930e36f5234660b27296cfd",
+    "catalog_observed_at": "2026-10-28T20:43:18Z",
+    "branch_sha": "aa59d1ba96fe990b84e30473cb836acff1124b92",
     "pr_number": 34,
     "validation": "success"
   }
