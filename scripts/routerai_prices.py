@@ -136,6 +136,8 @@ def _model(model_id: str, live: dict | None, payload: dict | None, spec: dict | 
     if not isinstance(endpoints, list) or len(endpoints) > 64:
         raise PriceError("invalid endpoint list")
     reason = "endpoints-missing" if not endpoints else None
+    if any(not isinstance(architecture.get(k), list) or not architecture[k] or not all(isinstance(x, str) for x in architecture[k]) for k in ("input_modalities", "output_modalities")):
+        reason = "modalities-not-confirmed"
     tags = set()
     for endpoint in endpoints:
         if not isinstance(endpoint, dict):
@@ -212,7 +214,7 @@ def verify(value: dict, *, published: bool) -> dict:
         if model.get("status") not in {"available", "unpriced"}:
             raise PriceError("invalid model status")
         available = model["status"] == "available"
-        if available and (model.get("reason") is not None or not model.get("api") or not model.get("endpoints")):
+        if available and (model.get("reason") is not None or not isinstance(model.get("api"), str) or not model["api"] or not model.get("endpoints")):
             raise PriceError("incomplete available model")
         ceilings = model.get("price_ceilings")
         if not isinstance(ceilings, dict):
@@ -238,8 +240,9 @@ def verify(value: dict, *, published: bool) -> dict:
                     bound = ceilings.get(key)
                     if units.get(key) not in UNITS or not bound or bound["unit"] != units[key] or amount(price) > amount(bound["rub"]):
                         raise PriceError("unknown or unapproved published unit/price")
+            apis = ep.get("supported_apis")
             if available and (not pricing or ep.get("variable_pricing") is not False
-                              or model["api"] not in ep.get("supported_apis", [])):
+                              or not isinstance(apis, list) or not all(isinstance(x, str) for x in apis) or model["api"] not in apis):
                 raise PriceError("unsafe available endpoint")
             if ep.get("source_url") != f"{SOURCE}/{model_id}/endpoints":
                 raise PriceError("untrusted endpoint source")
@@ -264,6 +267,9 @@ def approve(candidate: dict, previous: dict | None, *, candidate_sha: str, run_i
         raise PriceError("missing exact validation identity")
     if previous is not None:
         verify(previous, published=True)
+        for model_id, model in previous["content"]["models"].items():
+            if model["status"] == "available" and candidate["content"]["models"].get(model_id, {}).get("status") != "available":
+                raise PriceError("previously priced model lost verified coverage")
         if timestamp(candidate["source_checked_at"]) <= timestamp(previous["source_checked_at"]):
             raise PriceError("replayed or older source observation")
     out = {**candidate, "state": "published", "published_at": at, "content_changed_at": at,

@@ -228,6 +228,19 @@ class ContractTests(unittest.TestCase):
         with self.assertRaises(catalog.CatalogError):
             catalog._unique_object([("pricing", {}), ("pricing", {})])
 
+    def test_loss_of_previously_verified_price_preserves_last_good(self):
+        candidate = self.candidate()
+        previous = prices.approve(candidate, None, candidate_sha=SHA, run_id=7, at=AT)
+        live, endpoints, policy = fixture()
+        endpoints["synthetic/asr"]["data"]["endpoints"][0]["pricing_units"] = {}
+        unavailable = prices.build_candidate(live, endpoints, policy, checked_at="2026-10-29T12:00:00Z")
+        self.assertEqual(unavailable["content"]["models"]["synthetic/asr"]["status"], "unpriced")
+        api = FakeAPI(previous)
+        with self.assertRaises(prices.PriceError):
+            publisher.publish(api, unavailable, sha=SHA, run_id=7, at="2026-10-29T12:01:00Z")
+        self.assertEqual(api.price_head, "old")
+        self.assertFalse(any(method in {"POST", "PATCH"} and path.startswith("git/refs") for method, path, _ in api.calls))
+
     def test_fixture_matches_documented_contract(self):
         path = ROOT / "tests/fixtures/routerai_prices_published.json"
         document = json.loads(path.read_text(encoding="utf-8"))
