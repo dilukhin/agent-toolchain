@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "_comment": "Reviewed publication ceilings from public endpoint metadata on 2026-10-28. These are NOT observed prices and do not enable inference. Missing API/units/variable pricing remains unpriced. Changes require code review; see docs/routerai_prices_contract_ru.md.",
+  "models": {
+    "openai/whisper-large-v3-turbo": {
+      "api": "audio/transcriptions",
+      "ceilings": {
+        "prompt": {"unit": "token", "rub": "0.001163221222221059"},
+        "seconds": {"unit": "second", "rub": "0.001163221222221059"},
+        "completion": {"unit": "token", "rub": "0"}
+      }
+    },
+    "openai/whisper-large-v3": {
+      "api": "audio/transcriptions",
+      "ceilings": {
+        "prompt": {"unit": "token", "rub": "0.003227938891663177"},
+        "seconds": {"unit": "second", "rub": "0.003227938891663177"},
+        "completion": {"unit": "token", "rub": "0"}
+      }
+    },
+    "qwen/qwen3-asr-flash-2026-02-10": {
+      "api": "audio/transcriptions",
+      "ceilings": {}
+    },
+    "openai/gpt-4o": {
+      "api": "chat",
+      "ceilings": {
+        "prompt": {"unit": "token", "rub": "0.000261724775"},
+        "completion": {"unit": "token", "rub": "0.0010468991"},
+        "input_cache_read": {"unit": "token", "rub": "0.0001308623875"}
+      }
+    }
+  }
+}

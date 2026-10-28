@@ -6,6 +6,10 @@ on:
       - main
     paths:
       - templates/routerai_catalog.generated.json
+      - .github/workflows/routerai_catalog.yml
+      - scripts/routerai_prices.py
+      - scripts/publish_routerai_prices.py
+      - templates/routerai_prices_policy.json
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
@@ -74,7 +78,7 @@ jobs:
         run: |
           set -euo pipefail
           cp templates/routerai_catalog.generated.json "$RUNNER_TEMP/routerai-before.json"
-          python3 ./scripts/update_routerai_catalog.py --write
+          python3 ./scripts/update_routerai_catalog.py --write --prices-output "$RUNNER_TEMP/routerai-prices-candidate.json"
           checked_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           changed="$(
             python3 - "$RUNNER_TEMP/routerai-before.json" templates/routerai_catalog.generated.json <<'PY'
@@ -118,20 +122,18 @@ jobs:
           echo "local_sha=$local_sha" >> "$GITHUB_OUTPUT"
 
           if git diff --quiet origin/main...HEAD; then
-            echo "push_required=0" >> "$GITHUB_OUTPUT"
-            exit 0
+            echo "candidate_required=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "candidate_required=1" >> "$GITHUB_OUTPUT"
           fi
-
-          if [[ "$BRANCH_EXISTED" == "1" && "$local_sha" == "$REMOTE_BRANCH_SHA" ]]; then
-            echo "push_required=0" >> "$GITHUB_OUTPUT"
-            exit 0
+          if [[ "$BRANCH_EXISTED" != "1" || "$local_sha" != "$REMOTE_BRANCH_SHA" ]]; then
+            git push origin "HEAD:refs/heads/$BRANCH"
           fi
-
-          git push origin "HEAD:refs/heads/$BRANCH"
-          echo "push_required=1" >> "$GITHUB_OUTPUT"
+          remote_sha="$(git ls-remote origin "refs/heads/$BRANCH" | awk '{print $1}')"
+          test "$remote_sha" = "$local_sha"
 
       - name: Open or reuse pull request
-        if: steps.commit.outputs.push_required == '1'
+        if: steps.commit.outputs.candidate_required == '1'
         id: pr
         shell: bash
         run: |
@@ -148,7 +150,6 @@ jobs:
           echo "number=$number" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch and wait for full Windows/Linux validation
-        if: steps.commit.outputs.push_required == '1'
         id: validation
         shell: bash
         run: |
@@ -179,6 +180,16 @@ jobs:
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
           gh run watch "$run_id" --exit-status
 
+      - name: Publish checked consumer prices independently of the config PR
+        id: prices
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/publish_routerai_prices.py \
+            --candidate "$RUNNER_TEMP/routerai-prices-candidate.json" \
+            --candidate-sha "${{ steps.commit.outputs.local_sha }}" \
+            --validation-run "${{ steps.validation.outputs.run_id }}"
+
       - name: Summarize refresh attempt
         if: always()
         id: summary
@@ -190,7 +201,8 @@ jobs:
           COMMIT_OUTCOME: ${{ steps.commit.outcome }}
           PR_OUTCOME: ${{ steps.pr.outcome }}
           VALIDATION_OUTCOME: ${{ steps.validation.outcome }}
-          PUSH_REQUIRED: ${{ steps.commit.outputs.push_required }}
+          CANDIDATE_REQUIRED: ${{ steps.commit.outputs.candidate_required }}
+          PRICES_OUTCOME: ${{ steps.prices.outcome }}
           SOURCE_CHECK_AT: ${{ steps.refresh.outputs.checked_at }}
           CATALOG_CHANGED: ${{ steps.refresh.outputs.catalog_changed }}
           CANDIDATE_SHA: ${{ steps.commit.outputs.local_sha }}
@@ -221,16 +233,21 @@ jobs:
             phase="publish-candidate"
             code="candidate-publish"
             summary="Не удалось безопасно сформировать или опубликовать ветку-кандидат RouterAI."
-          elif [[ "$PUSH_REQUIRED" == "1" && "$PR_OUTCOME" != "success" ]]; then
+          elif [[ "$CANDIDATE_REQUIRED" == "1" && "$PR_OUTCOME" != "success" ]]; then
             status="failed"
             phase="pull-request"
             code="pull-request"
             summary="Не удалось создать или переиспользовать pull request обновления RouterAI."
-          elif [[ "$PUSH_REQUIRED" == "1" && "$VALIDATION_OUTCOME" != "success" ]]; then
+          elif [[ "$VALIDATION_OUTCOME" != "success" ]]; then
             status="failed"
             phase="full-validation"
             code="full-validation"
             summary="Кандидат RouterAI не прошёл полную Windows/Linux проверку."
+          elif [[ "$PRICES_OUTCOME" != "success" ]]; then
+            status="failed"
+            phase="publish-prices"
+            code="price-publication"
+            summary="Проверенные тарифы не опубликованы; используется последняя подтверждённая версия."
           fi
 
           validation="unchanged"
