@@ -55,6 +55,11 @@ GET нет. Предел документа — 8 МиБ. Из GitHub API его
 
 Запись модели содержит `id`, `architecture` (модальности), `api`, `status`, `reason`,
 `catalog_pricing`, `catalog_pricing_units`, `price_ceilings` и `endpoints`.
+
+Виртуальные идентификаторы с одним начальным `~` сохраняются буквально, без
+переименования. Без отдельной проверенной политики и endpoint-данных они остаются
+`unpriced`; их наличие не останавливает публикацию остальных моделей.
+
 Endpoint сохраняет provider tag, точные `pricing` и `pricing_units`,
 `supported_apis`, `variable_pricing` и свой точный `source_url`.
 Временная деприоритизация провайдера не позволяет убрать его более дорогую цену:

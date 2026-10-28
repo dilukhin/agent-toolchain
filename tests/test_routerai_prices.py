@@ -92,6 +92,19 @@ class FakeAPI:
 
 
 class ContractTests(unittest.TestCase):
+    def test_virtual_model_id_is_preserved_without_financial_approval(self):
+        live, endpoints, policy = fixture()
+        live["~synthetic/asr-latest"] = copy.deepcopy(live["synthetic/asr"])
+        value = prices.build_candidate(live, endpoints, policy, checked_at=CHECKED)
+        record = value["content"]["models"]["~synthetic/asr-latest"]
+        self.assertEqual(record["id"], "~synthetic/asr-latest")
+        self.assertEqual(record["status"], "unpriced")
+        self.assertEqual(record["reason"], "endpoints-not-checked")
+        prices.verify(value, published=False)
+        for invalid in ("~~synthetic/asr", "synthetic/../asr", "synthetic/asr?key=value"):
+            with self.subTest(invalid=invalid), self.assertRaises(prices.PriceError):
+                prices.build_candidate({invalid: {}}, {}, policy, checked_at=CHECKED)
+
     def candidate(self):
         return prices.build_candidate(*fixture(), checked_at=CHECKED)
 

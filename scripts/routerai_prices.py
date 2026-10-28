@@ -17,7 +17,7 @@ BRANCH = "automation/routerai-prices"
 FILE = "routerai-prices.json"
 MAX_BYTES = 8 * 1024 * 1024
 UNITS = {"token", "second", "request", "image", "megapixel", "search_unit"}
-MODEL_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.:+-]*\Z")
+MODEL_ID = re.compile(r"~?[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.:+-]*\Z")
 DECIMAL = re.compile(r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?\Z")
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 
