@@ -87,6 +87,7 @@ def _error_advice(code: str | None) -> str:
             "Проверьте automation/routerai-catalog и права workflow на запись, затем повторите обновление."
         ),
         "pull-request": "Проверьте открытый RouterAI PR и повторите штатное обновление.",
+        "price-publication": "Проверьте ownership, лимиты цен и SHA канала automation/routerai-prices; повторите полный refresh.",
         "full-validation": (
             "Исправьте причину ошибки полного Windows/Linux validate и повторите штатное обновление."
         ),

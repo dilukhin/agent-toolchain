@@ -62,9 +62,18 @@ def _emit(text: str, *, stream: TextIO | None = None) -> None:
     stream.write((text + "\n").encode("ascii", errors="backslashreplace").decode("ascii"))
 
 
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise CatalogError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
 def _load(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"), parse_float=Decimal)
+        value = json.loads(path.read_text(encoding="utf-8"), parse_float=Decimal, object_pairs_hook=_unique_object)
     except (OSError, json.JSONDecodeError) as exc:
         raise CatalogError(f"cannot load {path}: {exc}") from exc
     if not isinstance(value, dict):
@@ -86,9 +95,9 @@ def _render(value: dict[str, Any]) -> str:
     return json.dumps(_plain(value), ensure_ascii=False, indent=2) + "\n"
 
 
-def _fetch() -> dict[str, Any]:
+def _fetch(url: str = MODELS_URL) -> dict[str, Any]:
     request = urllib.request.Request(
-        MODELS_URL,
+        url,
         headers={"Accept": "application/json", "User-Agent": "agent-toolchain-routerai-catalog/1"},
     )
     try:
@@ -99,7 +108,7 @@ def _fetch() -> dict[str, Any]:
     if len(raw) > MAX_RESPONSE_BYTES:
         raise CatalogError(f"RouterAI catalog exceeds {MAX_RESPONSE_BYTES} bytes")
     try:
-        value = json.loads(raw.decode("utf-8"), parse_float=Decimal)
+        value = json.loads(raw.decode("utf-8"), parse_float=Decimal, object_pairs_hook=_unique_object)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CatalogError(f"RouterAI catalog is not valid UTF-8 JSON: {exc}") from exc
     if not isinstance(value, dict):
@@ -113,8 +122,10 @@ def _pricing(value: Any) -> dict[str, str]:
     result: dict[str, str] = {}
     for key, raw in value.items():
         try:
-            if isinstance(raw, (str, int, Decimal)):
-                result[str(key)] = format(Decimal(raw), "f")
+            if isinstance(raw, (str, int, Decimal)) and not isinstance(raw, bool):
+                value = Decimal(raw)
+                if value.is_finite() and value >= 0 and -60 <= value.adjusted() <= 18 and len(value.as_tuple().digits) <= 60:
+                    result[str(key)] = format(value, "f")
         except InvalidOperation:
             pass
     return result
@@ -128,6 +139,8 @@ def normalize_catalog(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
     for item in data:
         if not isinstance(item, dict) or not isinstance(item.get("id"), str) or not item["id"]:
             continue
+        if item["id"] in out:
+            raise CatalogError("duplicate RouterAI model id")
         entry: dict[str, Any] = {}
         for key in ("name", "created", "context_length"):
             if isinstance(item.get(key), (str, int)):
@@ -144,6 +157,16 @@ def normalize_catalog(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
         prices = _pricing(item.get("pricing"))
         if prices:
             entry["pricing"] = prices
+        units = item.get("pricing_units")
+        if isinstance(units, dict):
+            entry["pricing_units"] = {
+                k: v for k, v in units.items() if isinstance(k, str) and isinstance(v, str)
+            }
+        for key in ("supported_apis", "variable_pricings"):
+            if key in item:
+                entry[key] = _plain(item[key])
+        if isinstance(item.get("pricing"), dict) and len(prices) != len(item["pricing"]):
+            entry["pricing_incomplete"] = True
         out[item["id"]] = entry
     if not out:
         raise CatalogError("RouterAI catalog contains no valid model records")
@@ -157,6 +180,8 @@ def _million(prices: dict[str, str], key: str) -> int | None:
     try:
         value = Decimal(raw) * Decimal(1_000_000)
     except InvalidOperation:
+        return None
+    if not value.is_finite() or value < 0:
         return None
     return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
@@ -357,11 +382,16 @@ def build_parser() -> argparse.ArgumentParser:
     mode.add_argument("--sync-generated", action="store_true")
     mode.add_argument("--verify-generated", action="store_true")
     parser.add_argument("--input", type=Path)
+    parser.add_argument("--prices-output", type=Path, help="Build an unpublished consumer candidate from this same fetch")
+    parser.add_argument("--endpoint-input", type=Path, help="Offline endpoint fixtures; requires --input")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.prices_output and (not args.write or bool(args.input) != bool(args.endpoint_input)):
+        _emit("--prices-output requires --write; offline use requires both --input and --endpoint-input", stream=sys.stderr)
+        return 2
     if args.verify_generated:
         if args.input:
             _emit("--input нельзя использовать вместе с --verify-generated", stream=sys.stderr)
@@ -379,7 +409,16 @@ def main(argv: list[str] | None = None) -> int:
         snapshot, new_config, new_template, missing = build_outputs(
             payload, policy, old_snapshot, config, template, observed_at=observed_at
         )
-    except CatalogError as exc:
+        prices_candidate = None
+        if args.prices_output:
+            try:
+                from scripts.routerai_prices import build_candidate, collect_endpoints
+            except ModuleNotFoundError:
+                from routerai_prices import build_candidate, collect_endpoints
+            export_policy = _load(ROOT / "templates/routerai_prices_policy.json")
+            endpoints = _load(args.endpoint_input) if args.endpoint_input else collect_endpoints(export_policy, _fetch, live=snapshot["models"])
+            prices_candidate = build_candidate(snapshot["models"], endpoints, export_policy, checked_at=observed_at)
+    except (CatalogError, ValueError) as exc:
         _emit(f"RouterAI catalog update failed: {exc}", stream=sys.stderr)
         return 2
     outputs = {SNAPSHOT_PATH: _render(snapshot), CONFIG_PATH: _render(new_config), TEMPLATE_PATH: _render(new_template)}
@@ -399,6 +438,8 @@ def main(argv: list[str] | None = None) -> int:
     for path in changed:
         path.write_text(outputs[path], encoding="utf-8", newline="\n")
         _emit(f"updated: {_label(path)}")
+    if prices_candidate is not None:
+        args.prices_output.write_text(_render(prices_candidate), encoding="utf-8", newline="\n")
     return 0
 
 
