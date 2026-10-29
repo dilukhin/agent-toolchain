@@ -57,6 +57,17 @@ class CostEvidenceTests(unittest.TestCase):
         self.assertEqual(value['reported_cost_rub'], '1.234567890123456789E-12')
         self.assertEqual(value['cost_precision'], 'decimal-text')
 
+    def test_old_missing_usage_seconds_keeps_reserve_separate_and_never_fabricates_ratio(self):
+        self.conn.execute('UPDATE transcription_jobs SET duration_seconds=NULL')
+        self.conn.execute('CREATE TABLE paid_calls(job_id TEXT,reserved_seconds INTEGER)')
+        self.conn.execute("INSERT INTO paid_calls VALUES('NEVER_EXPORT_ID',10)")
+        self.conn.commit()
+        value=inspect(self.path)['observations'][0]
+        self.assertIsNone(value['reported_seconds'])
+        self.assertIsNone(value['effective_rub_per_second'])
+        self.assertEqual(value['operational_reserved_seconds'],'10')
+        self.assertNotIn('NEVER_EXPORT',json.dumps(value))
+
     def test_bounded_sample_only_known_models_and_successful_jobs(self):
         self.add(model='synthetic/unrelated')
         self.add(state='error')

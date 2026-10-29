@@ -50,19 +50,27 @@ def inspect(database, *, limit=100):
         if not REQUIRED <= columns:
             raise ValueError('unsupported transcription_jobs schema')
         exact_column = 'cost_rub' if 'cost_rub' in columns else 'NULL'
+        paid_columns = {row[1] for row in conn.execute('PRAGMA table_info(paid_calls)')}
+        reserved_column = ('(SELECT MAX(p.reserved_seconds) FROM paid_calls p WHERE p.job_id=j.id)'
+            if 'id' in columns and {'job_id','reserved_seconds'} <= paid_columns else 'NULL')
         # The only selected runtime fields are model, cost, duration and date.
         # Never select transcript, file IDs, user/chat IDs, secrets or raw JSON.
         rows = conn.execute(
-            'SELECT provider_model,cost,duration_seconds,created_at,' + exact_column +
-            " FROM transcription_jobs WHERE status='done' AND provider_model IN (?,?)"
-            ' ORDER BY created_at DESC LIMIT ?', (*MODELS, limit)).fetchall()
+            'SELECT j.provider_model,j.cost,j.duration_seconds,j.created_at,' + exact_column + ',' + reserved_column +
+            " FROM transcription_jobs j WHERE j.status='done' AND j.provider_model IN (?,?)"
+            ' ORDER BY j.created_at DESC LIMIT ?', (*MODELS, limit)).fetchall()
         conn.rollback()
-    for model, legacy_cost, seconds, created, exact_cost in rows:
+    for model, legacy_cost, seconds, created, exact_cost, reserved in rows:
         try:
             cost = number(exact_cost if exact_cost is not None else legacy_cost)
-            duration = number(seconds, positive=True)
-            if duration > 86400:
+            duration = number(seconds, positive=True) if seconds is not None else None
+            if duration is not None and duration > 86400:
                 raise ValueError('invalid duration')
+            # The old bot omitted usage.seconds. Keep its operational reserve as
+            # a separate observation, never as actual/provider-billed duration.
+            reserve = number(reserved, positive=True) if reserved is not None else None
+            if reserve is not None and reserve > 86400:
+                raise ValueError('invalid reserved duration')
             # Emit only a calendar date, never an arbitrary stored string.
             parsed = datetime.fromisoformat(created.replace('Z', '+00:00'))
             if parsed.tzinfo is None:
@@ -70,10 +78,12 @@ def inspect(database, *, limit=100):
             day = parsed.astimezone(timezone.utc).date().isoformat()
             with localcontext() as ctx:
                 ctx.prec = 50
-                ratio = cost / duration
+                ratio = cost / duration if duration is not None else None
             observations.append({'model': model, 'day_utc': day,
-                'reported_cost_rub': str(cost), 'reported_seconds': str(duration),
-                'effective_rub_per_second': str(ratio),
+                'reported_cost_rub': str(cost),
+                'reported_seconds': str(duration) if duration is not None else None,
+                'operational_reserved_seconds': str(reserve) if reserve is not None else None,
+                'effective_rub_per_second': str(ratio) if ratio is not None else None,
                 'cost_precision': 'decimal-text' if exact_cost is not None else 'legacy-approximate',
                 'provider_route': 'not-recorded-by-this-query'})
         except (ValueError, TypeError, AttributeError, InvalidOperation):
@@ -83,7 +93,8 @@ def inspect(database, *, limit=100):
         'scope': 'historical-reported-metadata-only', 'inference_requests': 0,
         'rows_examined': len(rows), 'rows_skipped': skipped, 'observations': observations,
         'limitations': ['not a verified tariff or provider invoice',
-            'legacy REAL is approximate; duration is provider-reported',
+            'legacy REAL is approximate; reported duration may be missing',
+            'operational reserved seconds are Telegram metadata or a configured maximum, not billed duration',
             'provider route and historical exchange rate are not established',
             'zero or missing observations do not authorize a new paid request']}
 
