@@ -1,4 +1,5 @@
 import hashlib
+from contextlib import closing
 import json
 import os
 from pathlib import Path
@@ -95,7 +96,9 @@ class CostEvidenceTests(unittest.TestCase):
         self.assertEqual(main(['--database',str(missing),'--output',str(self.root/'missing.json')]),1)
         self.assertFalse(missing.exists());self.assertFalse((self.root/'missing.json').exists())
         other=self.root/'other.sqlite3'
-        with sqlite3.connect(other) as conn:conn.execute('CREATE TABLE unrelated(value TEXT)')
+        with closing(sqlite3.connect(other)) as conn:
+            conn.execute('CREATE TABLE unrelated(value TEXT)')
+            conn.commit()
         with self.assertRaises(ValueError):inspect(other)
 
     def test_report_is_private_exclusive_and_cannot_overwrite_source(self):
