@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "state": "research-only",
+  "financial_authorization": false,
+  "task": "RAI-113-PAID-01",
+  "model": "openai/whisper-large-v3-turbo",
+  "currency": "RUB",
+  "input": "synthetic-tones-PCM16-mono-16000Hz",
+  "execution_source": "owner-supplied-local-agent-report; not independently re-executed in Work",
+  "input_report_sha256": "fe4eb049c3f260bfb94823fd5c4cb28d1dae63faec9c6f561b3388f2a847e2d8",
+  "probe_source_commit": "ff612e68d337381fff3a3e53e89bdc694596ec1f",
+  "probe_source_sha256": "4f5195c6a93f4e92f59b2b372ef11946937f512e3e6451baf6532c98d130028d",
+  "started_at": "2026-10-30T15:47:27+00:00",
+  "finished_at": "2026-10-30T15:47:35+00:00",
+  "paid_attempts": 3,
+  "known_cost_rub": "0.025345741416641319",
+  "observed_providers": [
+    "groq"
+  ],
+  "unobserved_advertised_providers": [
+    "deepinfra"
+  ],
+  "observations": [
+    {
+      "input_seconds": "1.25",
+      "usage_seconds": "1.25",
+      "provider": "groq",
+      "seconds_rate_rub": "0.001165321444443279",
+      "raw_prompt_rate_rub": "0.001165321444443279",
+      "raw_prompt_unit": "token",
+      "input_tokens": "0",
+      "output_tokens": "0",
+      "usage_cost_rub": "0.001456651805554099",
+      "generation_cost_rub": "0.001456651805554099",
+      "seconds_only_exact_rub": "0.00145665180555409875",
+      "actual_minus_seconds_only_rub": "0.00000000000000000025",
+      "input_bytes": 40044,
+      "input_sha256": "d4fa101b7470df04daa8779db191ebcb2f45e8f52589bca7318a55930e8b916c"
+    },
+    {
+      "input_seconds": "9.25",
+      "usage_seconds": "9.25",
+      "provider": "groq",
+      "seconds_rate_rub": "0.001165321444443279",
+      "raw_prompt_rate_rub": "0.001165321444443279",
+      "raw_prompt_unit": "token",
+      "input_tokens": "0",
+      "output_tokens": "0",
+      "usage_cost_rub": "0.01077922336110033",
+      "generation_cost_rub": "0.01077922336110033",
+      "seconds_only_exact_rub": "0.01077922336110033075",
+      "actual_minus_seconds_only_rub": "-0.00000000000000000075",
+      "input_bytes": 296044,
+      "input_sha256": "eac821981deb5d1cb78ea93602dfe7a4baf895094fb642a1146047bf79b82cca"
+    },
+    {
+      "input_seconds": "11.25",
+      "usage_seconds": "11.25",
+      "provider": "groq",
+      "seconds_rate_rub": "0.001165321444443279",
+      "raw_prompt_rate_rub": "0.001165321444443279",
+      "raw_prompt_unit": "token",
+      "input_tokens": "0",
+      "output_tokens": "0",
+      "usage_cost_rub": "0.01310986624998689",
+      "generation_cost_rub": "0.01310986624998689",
+      "seconds_only_exact_rub": "0.01310986624998688875",
+      "actual_minus_seconds_only_rub": "0.00000000000000000125",
+      "input_bytes": 360044,
+      "input_sha256": "044d2e6575366dd840645caf50749ff226842c726d4d3adcedae76ba88515555"
+    }
+  ],
+  "not_established": [
+    "prompt-is-an-alias-for-seconds",
+    "deepinfra-billing",
+    "all-provider-routes-covered",
+    "general-rounding-or-minimum-rule",
+    "guaranteed-future-upper-cost"
+  ],
+  "export_omissions": [
+    "account-generation-identifiers",
+    "runtime-paths-and-host",
+    "secrets-and-transcripts"
+  ],
+  "public_sources": [
+    {
+      "url": "https://routerai.ru/docs/guides/overview/multimodal/speech-to-text.md",
+      "retrieved_at": "2026-10-30T16:01:19Z",
+      "bytes": 27881,
+      "sha256": "b1783bd55a07f3cc74c732da1b6d58dcf5ebc68916241077cb22d5a602dde39f"
+    },
+    {
+      "url": "https://routerai.ru/docs/guides/overview/provider-selection.md",
+      "retrieved_at": "2026-10-30T16:01:28Z",
+      "bytes": 18855,
+      "sha256": "10d5b79beddc0376370d4d9cecc60085c67d1d937c0e46a12f5f776aed327dc1"
+    },
+    {
+      "url": "https://routerai.ru/api/v1/models/openai/whisper-large-v3-turbo/endpoints",
+      "retrieved_at": "2026-10-30T16:01:35Z",
+      "bytes": 2023,
+      "sha256": "ab2b8ce48f8e918da5ee26bcf2094698451e77ede7bd224c4896905898621517"
+    },
+    {
+      "url": "https://routerai.ru/api/v1/models/openai/whisper-large-v3/endpoints",
+      "retrieved_at": "2026-10-30T16:01:41Z",
+      "bytes": 2325,
+      "sha256": "8d5955d15fdbabd498d14eb6388174a1f8c51e4b166095a91201979f5c4d093c"
+    },
+    {
+      "url": "https://routerai.ru/models/openai/whisper-large-v3-turbo",
+      "retrieved_at": "2026-10-30T16:04:11Z",
+      "bytes": 47706,
+      "sha256": "b02be1d24ec63f8ee2f611c09b5ebd1d3a0fe5675483a997a6e6a17401c58c06"
+    }
+  ],
+  "public_source_timestamp_note": "retrieved_at records local completion of the GET/save, not provider publication time",
+  "published_channel_checked": {
+    "branch": "automation/routerai-prices",
+    "commit": "f9a773b072cc48c58f3abf5bf37bdd483f90d3f0",
+    "source_checked_at": "2026-10-28T20:43:18Z",
+    "models": 579,
+    "available_models": 0
+  }
+}
