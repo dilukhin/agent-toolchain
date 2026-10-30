@@ -159,6 +159,8 @@ class ProbeTests(unittest.TestCase):
             with patch.dict(os.environ,{'EXISTING_TEST_VAR':'preserve'},clear=True):
                 self.assertEqual(probe.key_from_env_file(path),'TEST_ONLY_SECRET')
                 self.assertEqual(dict(os.environ),{'EXISTING_TEST_VAR':'preserve'})
+                path.write_text('ROUTERAI_API_KEY="TEST_ONLY_SECRET" # comment\n')
+                self.assertEqual(probe.key_from_env_file(path),'TEST_ONLY_SECRET')
             path.write_text('ROUTERAI_API_KEY=TEST_ONLY_SECRET\nROUTERAI_API_KEY=OTHER_TEST_SECRET\n')
             with self.assertRaises(ValueError):probe.key_from_env_file(path)
 

@@ -6,6 +6,7 @@ client-side: an already sent request cannot be capped or undone by this script.
 from __future__ import annotations
 
 import argparse
+import ast
 import base64
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -283,12 +284,13 @@ def key_from_env_file(path):
         match = re.fullmatch(r'\s*(?:export\s+)?ROUTERAI_API_KEY\s*=\s*(.*?)\s*', line)
         if match:
             val = match[1]
-            if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
-                val = val[1:-1]
+            if val.startswith(('"',"'")):
+                val = ast.literal_eval(val)
             else:
                 val = val.split(' #',1)[0].rstrip()
             values.append(val)
-    if len(values) != 1 or not re.fullmatch(r'[!-~]{8,512}', values[0]):
+    if (len(values) != 1 or not isinstance(values[0],str)
+            or not re.fullmatch(r'[!-~]{8,512}', values[0]) or '${' in values[0]):
         raise ValueError('key unavailable or unsupported env format')
     return values[0]
 
