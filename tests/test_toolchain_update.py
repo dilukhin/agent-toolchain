@@ -6,6 +6,8 @@ import http.client
 import io
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -208,6 +210,51 @@ class ToolchainUpdateTests(unittest.TestCase):
     def test_self_update_payload_contract_matches_bootstrap(self) -> None:
         self.assertEqual(toolchainctl._CORE_REQUIRED_FILES, bootstrap_core.REQUIRED_FILES)
         self.assertEqual(toolchainctl._CORE_REQUIRED_TREES, bootstrap_core.REQUIRED_TREES)
+
+    def test_published_core_can_verify_yc_trusted_launcher_in_isolation(self) -> None:
+        # Regression: a self-updated core must carry bootstrap_core.py, not
+        # merely find it in the developer checkout via sys.path.
+        self.assertEqual(bootstrap_core.REQUIRED_FILES.count("bootstrap_core.py"), 1)
+        self.assertEqual(toolchainctl._CORE_REQUIRED_FILES.count("bootstrap_core.py"), 1)
+        source = Path(bootstrap_core.__file__).resolve().parent
+        with tempfile.TemporaryDirectory() as temporary:
+            data = Path(temporary).resolve()
+            core = data / "core"
+            core.mkdir()
+            fingerprint = bootstrap_core.source_fingerprint(source)
+            bootstrap_core._copy_payload(source, core, fingerprint, "a" * 40)
+            self.assertTrue((core / "bootstrap_core.py").is_file())
+            owned = bootstrap_core._owned_core(core)
+            self.assertIsNotNone(owned)
+            self.assertIn(
+                "bootstrap_core.py",
+                {item["path"] for item in owned["payload"]},
+            )
+            self.assertEqual(
+                toolchainctl._installed_core_fingerprint_from_payload(core, owned["payload"]),
+                fingerprint,
+            )
+            public_bin = data / "bin"
+            public_bin.mkdir()
+            launcher = public_bin / ("toolchainctl.cmd" if os.name == "nt" else "toolchainctl")
+            launcher.write_bytes(bootstrap_core._entrypoint_bytes(core))
+            env = os.environ.copy()
+            env.pop("PYTHONPATH", None)
+            # Import the guard from the installed core as a fresh subprocess.
+            # No cloud command is executed.
+            code = (
+                "from pathlib import Path\n"
+                "import sys\n"
+                "from setup_yc_transitional_guard import _trusted_python\n"
+                "data = Path(sys.argv[1])\n"
+                "assert _trusted_python(data, data / 'bin') == Path(sys.executable).resolve()\n"
+            )
+            completed = subprocess.run(
+                [sys.executable, "-B", "-c", code, str(data)],
+                cwd=core, env=env, capture_output=True, text=True,
+                timeout=30, check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
 
     def test_update_archive_accepts_single_safe_root(self) -> None:
         buffer = io.BytesIO()
