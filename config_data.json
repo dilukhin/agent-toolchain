@@ -10,91 +10,92 @@
   "models": {
     "openai/gpt-4o": {
       "description": "Дорогая универсальная модель, запасной вариант для сложных задач",
-      "name": "OpenAI GPT-4o [дорогая универсальная, 278/1113 ₽]",
-      "price_input_rub_per_1m": 278,
-      "price_output_rub_per_1m": 1113,
-      "cache_read_rub_per_1m": 139
+      "name": "OpenAI GPT-4o [дорогая универсальная, 262/1047 ₽]",
+      "price_input_rub_per_1m": 262,
+      "price_output_rub_per_1m": 1047,
+      "cache_read_rub_per_1m": 131
     },
     "openai/gpt-4o-mini": {
       "description": "Быстрая и дешёвая модель для простых задач",
-      "name": "OpenAI GPT-4o mini [дешёвая быстрая, 17/67 ₽]",
-      "price_input_rub_per_1m": 17,
-      "price_output_rub_per_1m": 67,
+      "name": "OpenAI GPT-4o mini [дешёвая быстрая, 16/63 ₽]",
+      "price_input_rub_per_1m": 16,
+      "price_output_rub_per_1m": 63,
       "cache_read_rub_per_1m": 8
     },
     "deepseek/deepseek-chat": {
       "description": "Недорогая модель для анализа кода и повседневных задач",
-      "name": "DeepSeek Chat [дешёвая code/chat, 36/99 ₽]",
-      "price_input_rub_per_1m": 36,
-      "price_output_rub_per_1m": 99
+      "name": "DeepSeek Chat [дешёвая code/chat, 34/93 ₽]",
+      "price_input_rub_per_1m": 34,
+      "price_output_rub_per_1m": 93
     },
     "anthropic/claude-opus-4.7": {
       "description": "Топовая модель для сложного агентного программирования",
-      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 556/2782 ₽]",
-      "price_input_rub_per_1m": 556,
-      "price_output_rub_per_1m": 2782,
-      "cache_read_rub_per_1m": 56
+      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 523/2617 ₽]",
+      "price_input_rub_per_1m": 523,
+      "price_output_rub_per_1m": 2617,
+      "cache_read_rub_per_1m": 52
     },
     "qwen/qwen3.6-plus": {
       "description": "Основная рабочая модель для OpenCode",
-      "name": "Qwen 3.6 Plus [основная, 36/217 ₽]",
-      "price_input_rub_per_1m": 36,
-      "price_output_rub_per_1m": 217,
-      "cache_read_rub_per_1m": 4
+      "name": "Qwen 3.6 Plus [основная, 34/204 ₽]",
+      "price_input_rub_per_1m": 34,
+      "price_output_rub_per_1m": 204,
+      "cache_read_rub_per_1m": 3
     },
     "deepseek/deepseek-v4-pro": {
       "description": "Сильная reasoning/code модель",
-      "name": "DeepSeek V4 Pro [reasoning, 106/212 ₽]",
-      "price_input_rub_per_1m": 106,
-      "price_output_rub_per_1m": 212,
-      "cache_read_rub_per_1m": 9
+      "name": "DeepSeek V4 Pro [reasoning, 132/220 ₽]",
+      "price_input_rub_per_1m": 132,
+      "price_output_rub_per_1m": 220,
+      "cache_read_rub_per_1m": 37
     },
     "minimax/minimax-m2.7": {
       "description": "Дешёвая рабочая модель",
-      "name": "MiniMax M2.7 [дешёвая, 27/107 ₽]",
-      "price_input_rub_per_1m": 27,
-      "price_output_rub_per_1m": 107
+      "name": "MiniMax M2.7 [дешёвая, 22/88 ₽]",
+      "price_input_rub_per_1m": 22,
+      "price_output_rub_per_1m": 88,
+      "cache_read_rub_per_1m": 4
     },
     "z-ai/glm-5": {
       "description": "Для архитектора/ревьюера: планирование, декомпозиция",
-      "name": "GLM-5 [архитектор, 67/214 ₽]",
-      "price_input_rub_per_1m": 67,
-      "price_output_rub_per_1m": 214,
+      "name": "GLM-5 [архитектор, 63/201 ₽]",
+      "price_input_rub_per_1m": 63,
+      "price_output_rub_per_1m": 201,
       "cache_read_rub_per_1m": 13
     },
     "moonshotai/kimi-k2.5": {
       "description": "Запасная агентная для tool-use и анализа кода",
-      "name": "Kimi K2.5 [агентная, 50/250 ₽]",
-      "price_input_rub_per_1m": 50,
-      "price_output_rub_per_1m": 250,
-      "cache_read_rub_per_1m": 8
+      "name": "Kimi K2.5 [агентная, 51/262 ₽]",
+      "price_input_rub_per_1m": 51,
+      "price_output_rub_per_1m": 262,
+      "cache_read_rub_per_1m": 21
     },
     "z-ai/glm-5-turbo": {
       "description": "Дорогой fallback для длинных цепочек",
-      "name": "GLM-5 Turbo [fallback, 134/445 ₽]",
-      "price_input_rub_per_1m": 134,
-      "price_output_rub_per_1m": 445,
-      "cache_read_rub_per_1m": 27
+      "name": "GLM-5 Turbo [fallback, 126/419 ₽]",
+      "price_input_rub_per_1m": 126,
+      "price_output_rub_per_1m": 419,
+      "cache_read_rub_per_1m": 25
     },
     "openai/gpt-5.2-codex": {
       "description": "Оптимизированная для программной инженерии",
-      "name": "GPT-5.2-Codex [код/агент, 195/1558 ₽]",
-      "price_input_rub_per_1m": 195,
-      "price_output_rub_per_1m": 1558,
-      "cache_read_rub_per_1m": 19
+      "name": "GPT-5.2-Codex [код/агент, 183/1466 ₽]",
+      "price_input_rub_per_1m": 183,
+      "price_output_rub_per_1m": 1466,
+      "cache_read_rub_per_1m": 18
     },
     "qwen/qwen3-coder-next": {
       "description": "Новая модель RouterAI для кодинга",
-      "name": "Qwen 3 Coder Next [код/агент, 13/89 ₽]",
+      "name": "Qwen 3 Coder Next [код/агент, 13/84 ₽]",
       "price_input_rub_per_1m": 13,
-      "price_output_rub_per_1m": 89,
-      "cache_read_rub_per_1m": 8
+      "price_output_rub_per_1m": 84,
+      "cache_read_rub_per_1m": 7
     },
     "qwen/qwen3.5-122b-a10b": {
       "description": "Мультимодальная модель с reasoning, контекст 262K токенов",
-      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 29/231 ₽]",
-      "price_input_rub_per_1m": 29,
-      "price_output_rub_per_1m": 231
+      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 27/218 ₽]",
+      "price_input_rub_per_1m": 27,
+      "price_output_rub_per_1m": 218
     }
   },
   "config_defaults": {
@@ -250,9 +251,21 @@
         "project_directory": "tunnelctl",
         "runtime": "go-binary",
         "update_policy": "follow-branch",
-        "entrypoints": ["tunnelctl"],
-        "health_contract": [{"argv": ["tunnelctl", "--version"]}],
-        "platforms": ["windows", "linux"]
+        "entrypoints": [
+          "tunnelctl"
+        ],
+        "health_contract": [
+          {
+            "argv": [
+              "tunnelctl",
+              "--version"
+            ]
+          }
+        ],
+        "platforms": [
+          "windows",
+          "linux"
+        ]
       },
       "proxy-tools": {
         "source": "builtin",
