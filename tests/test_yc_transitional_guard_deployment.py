@@ -87,10 +87,12 @@ def make_artifact(root: Path, *, runtime_adapter: bytes = b"# fixture\n") -> Pat
 
 class YcTransitionalDeploymentTests(unittest.TestCase):
     def test_pinned_source_and_artifact_identity_are_exact(self):
-        self.assertEqual(ycsetup.SOURCE_REF, "7922d612f244882aae3d843a64393b1363b593d9")
+        self.assertEqual(ycsetup.OLD_SOURCE_REF, "7922d612f244882aae3d843a64393b1363b593d9")
+        self.assertEqual(ycsetup.OLD_ARTIFACT_ID, "sha256:149ca1892d90f493da59d527999bdafbfb16ff4d7d53b3989de4f0e439c5e0ef")
+        self.assertEqual(ycsetup.SOURCE_REF, "e363d99333248f99d2934837a259955decb4d1fa")
         self.assertEqual(
             ycsetup.EXPECTED_ARTIFACT_ID,
-            "sha256:149ca1892d90f493da59d527999bdafbfb16ff4d7d53b3989de4f0e439c5e0ef",
+            "sha256:61bf7e809a86e1117e2e6886e571d8a835601837fdc3479f78988af6ac1d05d5",
         )
 
     def fixture(self, root: Path):
@@ -451,7 +453,10 @@ class YcTransitionalDeploymentTests(unittest.TestCase):
             path_env = os.pathsep.join((str(public_bin), str(legacy_bin)))
 
             with mock.patch.dict(os.environ, {"PATH": path_env}), \
-                    mock.patch.object(ycsetup.shutil, "which", return_value=str(managed_yc)):
+                    mock.patch.object(ycsetup.shutil, "which", return_value=str(managed_yc)), \
+                    mock.patch.object(ycsetup, "OLD_SOURCE_REF", ycsetup.SOURCE_REF), \
+                    mock.patch.object(ycsetup, "OLD_ARTIFACT_ID", "sha256:" + artifact.name[7:]), \
+                    mock.patch.object(ycsetup, "_trusted_python", return_value=Path(sys.executable).resolve()):
                 result = ycsetup.inspect_guard(
                     legacy_guard_root=legacy,
                     data_dir=data,

@@ -4,7 +4,9 @@ import json
 import sys
 import tempfile
 import unittest
+from contextlib import nullcontext
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -105,6 +107,13 @@ def dispatch(fact, *, trusted_execution_target, executor, caller_context=None):
 
 
 class YcTransitionalEntryTests(unittest.TestCase):
+    def setUp(self):
+        # The existing synthetic adapter tests exercise dispatch only. The
+        # activation boundary is exercised separately against managed fixtures.
+        gate = mock.patch.object(entry, "_activation_gate", return_value=nullcontext())
+        gate.start()
+        self.addCleanup(gate.stop)
+
     def test_allow_uses_exact_pinned_downstream_and_argv(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
