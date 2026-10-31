@@ -88,6 +88,7 @@ _CORE_REQUIRED_FILES = (
     "setup_tools.py",
     "setup_yc_transitional_guard.py",
     "yc_transitional_entry.py",
+    "bootstrap_core.py",
     "proxy_tools.py",
     "core_identity.py",
     "toolchain_state.py",
