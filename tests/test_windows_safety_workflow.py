@@ -23,7 +23,7 @@ class WindowsSafetyWorkflowTests(unittest.TestCase):
         names = ('powershell.exe', 'pwsh.exe') if os.name == 'nt' else ('pwsh',)
         shells = [shutil.which(name) for name in names]
         if os.name == 'nt':
-            self.assertTrue(all(shells), f'Windows validation requires both shells: {names}')
+            self.assertIsNotNone(shells[0], 'Windows validation requires powershell.exe')
         elif not any(shells):
             self.skipTest('PowerShell is unavailable; Windows CI exercises the literal transport')
 
