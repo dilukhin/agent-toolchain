@@ -244,7 +244,9 @@ class GuardUpgradeTests(unittest.TestCase):
 
     def test_trusted_python_requires_owned_core_and_independent_launcher(self):
         self.data.mkdir(exist_ok=True)
-        core = self.data / "core"
+        # Match the canonical core path used by the deployed verifier.
+        # Windows CI may expose temp directories through an 8.3 alias.
+        core = self.data.resolve() / "core"
         core.mkdir()
         launcher = self.bin / ("toolchainctl.cmd" if os.name == "nt" else "toolchainctl")
         launcher.write_bytes(bootstrap_core._entrypoint_bytes(core))
