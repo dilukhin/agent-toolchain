@@ -294,7 +294,11 @@ class RuntimeActivationTests(unittest.TestCase):
             with mock.patch.object(entry, "__file__", str(release / "yc_transitional_entry.py")), \
                     mock.patch.object(entry.importlib.util, "spec_from_file_location", return_value=spec), \
                     mock.patch.object(entry.importlib.util, "module_from_spec", return_value=fake_setup):
-                self.assertEqual(entry._owned_setup(release, deployment, manifest)[1:], (data, public_bin, state_dir))
+                # Windows runners may expose one temp path in 8.3 form and
+                # the same directory in its expanded form after resolution.
+                actual = entry._owned_setup(release, deployment, manifest)[1:]
+                self.assertEqual(tuple(Path(p).resolve() for p in actual),
+                                 tuple(Path(p).resolve() for p in (data, public_bin, state_dir)))
                 foreign = dict(deployment, managed_state_dir=str(f.root / "foreign-state"))
                 with self.assertRaises(entry.RuntimeGuardError) as context:
                     entry._owned_setup(release, foreign, manifest)

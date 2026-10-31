@@ -248,7 +248,11 @@ class GuardUpgradeTests(unittest.TestCase):
         core.mkdir()
         launcher = self.bin / ("toolchainctl.cmd" if os.name == "nt" else "toolchainctl")
         launcher.write_bytes(bootstrap_core._entrypoint_bytes(core))
-        with mock.patch.object(bootstrap_core, "_owned_core", return_value={"owner": "agent-toolchain"}):
+        # Runtime injects its integrity-checked bootstrap module explicitly.
+        # Do the same in the fixture so unrelated test module state cannot
+        # change the independently verified launcher comparison.
+        with mock.patch.object(guard, "bootstrap_core", bootstrap_core, create=True), \
+                mock.patch.object(bootstrap_core, "_owned_core", return_value={"owner": "agent-toolchain"}):
             self.assertEqual(REAL_TRUSTED_PYTHON(self.data, self.bin), Path(sys.executable).resolve())
             launcher.write_bytes(b"foreign toolchainctl launcher")
             with self.assertRaises(guard.YcGuardDeploymentError) as ctx:
