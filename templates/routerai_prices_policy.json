@@ -1,22 +1,28 @@
 {
   "schema": 1,
-  "_comment": "Reviewed publication ceilings from public endpoint metadata on 2026-10-28. These are NOT observed prices and do not enable inference. Missing API/units/variable pricing remains unpriced. Changes require code review; see docs/routerai_prices_contract_ru.md.",
+  "_comment": "Reviewed initial financial scope: Whisper Turbo only, documented duration billing. 0.0013 RUB/second is an absolute publication/reservation ceiling, not an observed rate. Other models remain unpriced. See docs/routerai_prices_contract_ru.md.",
   "models": {
     "openai/whisper-large-v3-turbo": {
       "api": "audio/transcriptions",
       "ceilings": {
-        "prompt": {"unit": "token", "rub": "0.001163221222221059"},
-        "seconds": {"unit": "second", "rub": "0.001163221222221059"},
-        "completion": {"unit": "token", "rub": "0"}
-      }
+        "prompt": {
+          "unit": "token",
+          "rub": "0.0013"
+        },
+        "seconds": {
+          "unit": "second",
+          "rub": "0.0013"
+        },
+        "completion": {
+          "unit": "token",
+          "rub": "0"
+        }
+      },
+      "billing_contract": "routerai-whisper-turbo-seconds-v1"
     },
     "openai/whisper-large-v3": {
       "api": "audio/transcriptions",
-      "ceilings": {
-        "prompt": {"unit": "token", "rub": "0.003227938891663177"},
-        "seconds": {"unit": "second", "rub": "0.003227938891663177"},
-        "completion": {"unit": "token", "rub": "0"}
-      }
+      "ceilings": {}
     },
     "qwen/qwen3-asr-flash-2026-02-10": {
       "api": "audio/transcriptions",
@@ -24,11 +30,7 @@
     },
     "openai/gpt-4o": {
       "api": "chat",
-      "ceilings": {
-        "prompt": {"unit": "token", "rub": "0.000261724775"},
-        "completion": {"unit": "token", "rub": "0.0010468991"},
-        "input_cache_read": {"unit": "token", "rub": "0.0001308623875"}
-      }
+      "ceilings": {}
     }
   }
 }

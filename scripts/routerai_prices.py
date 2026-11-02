@@ -8,6 +8,11 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable
 
+try:
+    from . import routerai_billing_review as billing_review
+except ImportError:  # Direct CLI execution by the refresh workflow.
+    import routerai_billing_review as billing_review
+
 SCHEMA = 1
 OWNER = "agent-toolchain:routerai-prices:v1"
 PUBLISHER = "dilukhin/agent-toolchain"
@@ -61,6 +66,13 @@ def policy_models(policy: dict) -> dict:
             raise PriceError("invalid export model")
         if not isinstance(spec.get("api"), str) or not spec["api"]:
             raise PriceError("missing API policy")
+        if "billing_review" in spec and (spec["billing_review"] != billing_review.PROFILE
+                or model_id != billing_review.MODEL or spec["api"] != billing_review.API):
+            raise PriceError("unknown or out-of-scope billing review")
+        if "billing_contract" in spec and (spec["billing_contract"] != billing_review.CONTRACT
+                or model_id != billing_review.MODEL or spec["api"] != billing_review.API
+                or "billing_review" in spec):
+            raise PriceError("unknown or out-of-scope billing contract")
         limits = spec.get("ceilings", {})
         if not isinstance(limits, dict):
             raise PriceError("invalid price ceilings")
@@ -139,6 +151,7 @@ def _model(model_id: str, live: dict | None, payload: dict | None, spec: dict | 
     if any(not isinstance(architecture.get(k), list) or not architecture[k] or not all(isinstance(x, str) for x in architecture[k]) for k in ("input_modalities", "output_modalities")):
         reason = "modalities-not-confirmed"
     tags = set()
+    api_metadata_valid = True
     for endpoint in endpoints:
         if not isinstance(endpoint, dict):
             raise PriceError("invalid endpoint record")
@@ -148,6 +161,8 @@ def _model(model_id: str, live: dict | None, payload: dict | None, spec: dict | 
         tags.add(tag)
         prices, units, complete = _rates(endpoint)
         apis = endpoint.get("supported_apis")
+        if apis is not None and (not isinstance(apis, list) or not all(isinstance(x, str) for x in apis)):
+            api_metadata_valid = False
         apis = apis if isinstance(apis, list) and all(isinstance(x, str) for x in apis) else []
         variable = endpoint.get("variable_pricings")
         variable = not isinstance(variable, list) or bool(variable)
@@ -171,6 +186,16 @@ def _model(model_id: str, live: dict | None, payload: dict | None, spec: dict | 
                 # no statistical thresholds, watchdogs, alerts or curated model edits.
                 raise PriceError("price exceeds reviewed publication ceiling")
     out["endpoints"].sort(key=lambda x: x["provider"])
+    if spec.get("billing_contract"):
+        effective = billing_review.contract(out) if api_metadata_valid else None
+        if effective is None:
+            reason = "billing-contract-shape-changed"
+        else:
+            out["billing_contract"] = effective
+            reason = None
+    if spec.get("billing_review"):
+        out["billing_review"] = billing_review.review(out)
+        reason = out["billing_review"]["reason"]
     out["reason"] = reason
     out["status"] = "available" if reason is None else "unpriced"
     return out
@@ -242,10 +267,19 @@ def verify(value: dict, *, published: bool) -> dict:
                         raise PriceError("unknown or unapproved published unit/price")
             apis = ep.get("supported_apis")
             if available and (not pricing or ep.get("variable_pricing") is not False
-                              or not isinstance(apis, list) or not all(isinstance(x, str) for x in apis) or model["api"] not in apis):
+                              or not isinstance(apis, list) or not all(isinstance(x, str) for x in apis) or (model["api"] not in apis and "billing_contract" not in model)):
                 raise PriceError("unsafe available endpoint")
             if ep.get("source_url") != f"{SOURCE}/{model_id}/endpoints":
                 raise PriceError("untrusted endpoint source")
+        if "billing_contract" in model:
+            expected_contract = billing_review.contract(model)
+            if expected_contract is None or model["billing_contract"] != expected_contract or not available:
+                raise PriceError("invalid documented billing contract")
+        if "billing_review" in model:
+            expected_review = billing_review.review(model)
+            if (model["billing_review"] != expected_review or available
+                    or model.get("reason") != expected_review["reason"]):
+                raise PriceError("untrusted billing review or premature financial admission")
     if published:
         published_at = timestamp(value.get("published_at"))
         changed_at = timestamp(value.get("content_changed_at"))

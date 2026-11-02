@@ -1,0 +1,132 @@
+{
+  "schema": 1,
+  "state": "research-only",
+  "financial_authorization": false,
+  "currency": "RUB",
+  "requests": "public GET only; no authorization or inference",
+  "sources": [
+    {
+      "url": "https://routerai.ru/docs/guides/overview/multimodal/speech-to-text.md",
+      "collected_at_utc": "2026-10-29T07:34:09+00:00",
+      "bytes": 27881,
+      "sha256": "b1783bd55a07f3cc74c732da1b6d58dcf5ebc68916241077cb22d5a602dde39f"
+    },
+    {
+      "url": "https://routerai.ru/docs/guides/overview/provider-selection.md",
+      "collected_at_utc": "2026-10-29T07:34:10+00:00",
+      "bytes": 19052,
+      "sha256": "73328a4c27ae0a69c15394ff4a70390403eaba66975b4989d3ce7ac5a27c741b"
+    },
+    {
+      "url": "https://routerai.ru/api/v1/models",
+      "collected_at_utc": "2026-10-29T07:34:11+00:00",
+      "bytes": 989767,
+      "sha256": "09a49ecb1461b8c7d6a74907252d88d600afdd5d1b5ae9a47d6492544f1ab9ff"
+    },
+    {
+      "url": "https://routerai.ru/api/v1/models/openai/whisper-large-v3-turbo/endpoints",
+      "collected_at_utc": "2026-10-29T07:34:10+00:00",
+      "bytes": 2063,
+      "sha256": "6f654ee7fac50a885fea772b5e805e8672bb29dfca823ccdeeb329a53eaeb815"
+    },
+    {
+      "url": "https://routerai.ru/api/v1/models/openai/whisper-large-v3/endpoints",
+      "collected_at_utc": "2026-10-29T07:34:16+00:00",
+      "bytes": 2377,
+      "sha256": "b06a2720001ee91c6eb70ba852fe5a9c07333e0a9accf2e0a5a21927eaa6c555"
+    },
+    {
+      "url": "https://routerai.ru/models/openai/whisper-large-v3-turbo",
+      "collected_at_utc": "2026-10-29T07:34:16+00:00",
+      "bytes": 47736,
+      "sha256": "cca0791b8632e0597aaa6b3f3ae37acc1e733bfb3a35178344455d59dec7a1b2"
+    },
+    {
+      "url": "https://routerai.ru/models/openai/whisper-large-v3",
+      "collected_at_utc": "2026-10-29T07:34:16+00:00",
+      "bytes": 48665,
+      "sha256": "a83a43f9a104ea872f4aecb2e35e5172a3c502343c26c95acfdaa39f40bc9ffe"
+    }
+  ],
+  "models": {
+    "openai/whisper-large-v3-turbo": {
+      "source": "https://routerai.ru/api/v1/models/openai/whisper-large-v3-turbo/endpoints",
+      "routes": [
+        {
+          "provider": "deepinfra",
+          "seconds_rub": "0.0003500706456",
+          "seconds_unit": "second",
+          "prompt_rub": "0.0003500706456",
+          "prompt_unit": "token",
+          "completion_rub": "0.0",
+          "supported_apis": [],
+          "variable_pricings": []
+        },
+        {
+          "provider": "groq",
+          "seconds_rub": "0.001168070222221054",
+          "seconds_unit": "second",
+          "prompt_rub": "0.001168070222221054",
+          "prompt_unit": "token",
+          "completion_rub": "0.0",
+          "supported_apis": [],
+          "variable_pricings": []
+        }
+      ]
+    },
+    "openai/whisper-large-v3": {
+      "source": "https://routerai.ru/api/v1/models/openai/whisper-large-v3/endpoints",
+      "routes": [
+        {
+          "provider": "deepinfra",
+          "seconds_rub": "0.0007884474",
+          "seconds_unit": "second",
+          "prompt_rub": "0.0007884474",
+          "prompt_unit": "token",
+          "completion_rub": "0.0",
+          "supported_apis": [],
+          "variable_pricings": []
+        },
+        {
+          "provider": "together",
+          "seconds_rub": "0.002628158",
+          "seconds_unit": "second",
+          "prompt_rub": "0.002628158",
+          "prompt_unit": "token",
+          "completion_rub": "0.0",
+          "supported_apis": [],
+          "variable_pricings": []
+        },
+        {
+          "provider": "groq",
+          "seconds_rub": "0.0032413948666631625",
+          "seconds_unit": "second",
+          "prompt_rub": "0.0032413948666631625",
+          "prompt_unit": "token",
+          "completion_rub": "0.0",
+          "supported_apis": [],
+          "variable_pricings": []
+        }
+      ]
+    }
+  },
+  "live_model_count": 583,
+  "qwen_candidates_found": [
+    "qwen/qwen3-asr-1.7b",
+    "qwen/qwen3-asr-0.6b"
+  ],
+  "qwen_config_id_present": false,
+  "counterexample_to_universal_prompt_alias": {
+    "id": "microsoft/mai-transcribe-1.5",
+    "pricing": {
+      "prompt": "37.8454752",
+      "seconds": "0.010512632",
+      "completion": "0.0"
+    },
+    "pricing_units": {
+      "prompt": "token",
+      "seconds": "second",
+      "completion": "token"
+    }
+  }
+}

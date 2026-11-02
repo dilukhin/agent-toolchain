@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -124,7 +125,8 @@ class NpmLatestPolicyTests(unittest.TestCase):
             runtime.shutil.which = lambda name: None
 
             reporter = runtime.Reporter()
-            runtime.reconcile_npm(Path("/unused"), self._base_config(), reporter, check=True, skip=False)
+            with mock.patch.object(runtime, "_external_opencode_inventory", return_value=None):
+                runtime.reconcile_npm(Path("/unused"), self._base_config(), reporter, check=True, skip=False)
 
             conflicts = [r for r in reporter.results if r.state == runtime.STATE_CONFLICT]
             self.assertFalse(conflicts, reporter.results)
@@ -180,7 +182,8 @@ class OpenCodeOwnershipTests(unittest.TestCase):
         runtime.run = lambda cmd, cwd=None, env=None: commands.append(cmd) or subprocess.CompletedProcess(cmd, 0, "", "")
 
         reporter = runtime.Reporter()
-        runtime._reconcile_opencode_cli({"dependencies": {"opencode-cli-package": "opencode-ai"}}, reporter, False, "npm")
+        with mock.patch.object(runtime, "_external_opencode_inventory", return_value=None):
+            runtime._reconcile_opencode_cli({"dependencies": {"opencode-cli-package": "opencode-ai"}}, reporter, False, "npm")
 
         cli = [r for r in reporter.results if r.component == "OpenCode CLI"][-1]
         self.assertEqual(cli.state, runtime.STATE_OK)
