@@ -32,7 +32,7 @@ class TurboContractTests(unittest.TestCase):
         prices.verify(v,published=False)
 
     def test_shape_or_route_changes_remove_financial_admission(self):
-        for mutation in ('add','remove','unit','variable','component','prompt','completion','architecture','api'):
+        for mutation in ('add','remove','unit','variable','component','prompt','completion','architecture','api','bad-api-shape'):
             parts=fixture();eps=parts[1][billing.MODEL]['data']['endpoints']
             if mutation=='add':eps.append({**copy.deepcopy(eps[0]),'tag':'new'})
             elif mutation=='remove':eps.pop()
@@ -42,7 +42,8 @@ class TurboContractTests(unittest.TestCase):
             elif mutation=='prompt':eps[0]['pricing']['prompt']='0.0002'
             elif mutation=='completion':eps[0]['pricing']['completion']='0.001'
             elif mutation=='architecture':parts[0][billing.MODEL]['architecture']['input_modalities']=['audio','text']
-            else:eps[0]['supported_apis']=['chat']
+            elif mutation=='api':eps[0]['supported_apis']=['chat']
+            else:eps[0]['supported_apis']='audio/transcriptions'
             with self.subTest(mutation=mutation):
                 try:v=candidate(parts)
                 except prices.PriceError:continue

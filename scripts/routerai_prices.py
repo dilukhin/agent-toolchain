@@ -151,6 +151,7 @@ def _model(model_id: str, live: dict | None, payload: dict | None, spec: dict | 
     if any(not isinstance(architecture.get(k), list) or not architecture[k] or not all(isinstance(x, str) for x in architecture[k]) for k in ("input_modalities", "output_modalities")):
         reason = "modalities-not-confirmed"
     tags = set()
+    api_metadata_valid = True
     for endpoint in endpoints:
         if not isinstance(endpoint, dict):
             raise PriceError("invalid endpoint record")
@@ -160,6 +161,8 @@ def _model(model_id: str, live: dict | None, payload: dict | None, spec: dict | 
         tags.add(tag)
         prices, units, complete = _rates(endpoint)
         apis = endpoint.get("supported_apis")
+        if apis is not None and (not isinstance(apis, list) or not all(isinstance(x, str) for x in apis)):
+            api_metadata_valid = False
         apis = apis if isinstance(apis, list) and all(isinstance(x, str) for x in apis) else []
         variable = endpoint.get("variable_pricings")
         variable = not isinstance(variable, list) or bool(variable)
@@ -184,7 +187,7 @@ def _model(model_id: str, live: dict | None, payload: dict | None, spec: dict | 
                 raise PriceError("price exceeds reviewed publication ceiling")
     out["endpoints"].sort(key=lambda x: x["provider"])
     if spec.get("billing_contract"):
-        effective = billing_review.contract(out)
+        effective = billing_review.contract(out) if api_metadata_valid else None
         if effective is None:
             reason = "billing-contract-shape-changed"
         else:
