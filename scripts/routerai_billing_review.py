@@ -57,3 +57,40 @@ def review(model):
         })
     result.update(state='candidate', reason='billing-contract-unconfirmed')
     return result
+
+# A separate contract, never an authorization bit on the research review.
+CONTRACT = 'routerai-whisper-turbo-seconds-v1'
+CEILING_RUB = '0.0013'
+OPENAPI = 'https://routerai.ru/api/openapi.json'
+OPENAPI_SHA256 = '7430c049de0f226259a3e135697143df10bebf3cc1f3e8ca67b79a82cd0fd40d'
+
+
+def contract(model):
+    """Reviewed interpretation of RouterAI's documented per-second model.
+
+    The 60-second floor/1-second ceiling are consumer reservation policy, not
+    assertions about RouterAI's billing minimum or quantum. Settlement uses
+    usage.cost and generation.total_cost, never these estimated quantities.
+    """
+    checked = review(model)
+    if checked['state'] != 'candidate':
+        return None
+    bounds = model.get('price_ceilings')
+    expected_bounds = {key: {'unit': unit, 'rub': CEILING_RUB if key != 'completion' else '0'}
+                       for key, unit in UNITS.items()}
+    if bounds != expected_bounds:
+        return None
+    for ep in model['endpoints']:
+        if ep.get('supported_apis') and API not in ep['supported_apis']:
+            return None
+        if Decimal(ep['pricing']['seconds']) > Decimal(CEILING_RUB):
+            return None
+    return {
+        'profile': CONTRACT, 'api': API, 'basis': 'documented-duration',
+        'sources': SOURCES + [OPENAPI], 'openapi_sha256': OPENAPI_SHA256,
+        'reservation': {'floor_seconds': '60', 'quantum_seconds': '1'},
+        'ceiling': {'rub': CEILING_RUB, 'unit': 'second'},
+        'routes': [{'provider': ep['provider'], 'components': {
+            'seconds': {'rub': ep['pricing']['seconds'], 'unit': 'second'}}}
+            for ep in sorted(model['endpoints'], key=lambda ep: ep['provider'])],
+    }
