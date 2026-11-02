@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-11-02T08:16:42Z",
+  "observed_at": "2026-11-02T11:04:51Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -4024,9 +4024,9 @@
         "tokenizer": "Gemma"
       },
       "pricing": {
-        "prompt": "0.00001036772451",
-        "completion": "0.00001748898983",
-        "input_cache_read": "0.0000052362245"
+        "prompt": "0.000010472449",
+        "completion": "0.0000356063266",
+        "input_cache_read": "0.000010472449"
       },
       "pricing_units": {
         "prompt": "token",
@@ -8981,9 +8981,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000219921429",
-        "completion": "0.00000806378573",
-        "input_cache_read": "0.00000198976531"
+        "prompt": "0.0000031417347",
+        "completion": "0.0000157086735",
+        "input_cache_read": "0.0000031417347"
       },
       "pricing_units": {
         "prompt": "token",
@@ -9005,9 +9005,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000219921429",
-        "completion": "0.00000806378573",
-        "input_cache_read": "0.00000198976531"
+        "prompt": "0.0000031417347",
+        "completion": "0.0000157086735",
+        "input_cache_read": "0.0000031417347"
       },
       "pricing_units": {
         "prompt": "token",
@@ -9029,9 +9029,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000188504082",
-        "completion": "0.0000094252041",
-        "input_cache_read": "0.00000094252041"
+        "prompt": "0.00000146614286",
+        "completion": "0.00000607402042",
+        "input_cache_read": "0.00000136141837"
       },
       "pricing_units": {
         "prompt": "token",
@@ -10541,9 +10541,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00000240866327",
-        "completion": "0.00000356063266",
-        "input_cache_read": "0.00000219921429"
+        "prompt": "0.0000052362245",
+        "completion": "0.00000774961226",
+        "input_cache_read": "0.00000471260205"
       },
       "pricing_units": {
         "prompt": "token",
@@ -10670,7 +10670,7 @@
       },
       "pricing": {
         "prompt": "0.0000010472449",
-        "completion": "0.00000963465308",
+        "completion": "0.00000994882655",
         "input_cache_read": "0.00000094252041"
       },
       "pricing_units": {
@@ -10843,7 +10843,7 @@
     "qwen/qwen3.8-27b": {
       "name": "Qwen: Qwen3.8 27B",
       "created": 1786722910,
-      "context_length": 1000000,
+      "context_length": 1024000,
       "architecture": {
         "input_modalities": [
           "text",
@@ -10856,9 +10856,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00000052362245",
-        "completion": "0.00002848506128",
-        "input_cache_read": "0.00000041889796"
+        "prompt": "0.00000240866327",
+        "completion": "0.00013111506148",
+        "input_cache_read": "0.0000020944898"
       },
       "pricing_units": {
         "prompt": "token",
