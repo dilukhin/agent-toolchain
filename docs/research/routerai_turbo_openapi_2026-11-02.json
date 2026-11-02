@@ -1,0 +1,87 @@
+{
+  "state": "research-only",
+  "financial_authorization": false,
+  "source_url": "https://routerai.ru/api/openapi.json",
+  "source_sha256": "7430c049de0f226259a3e135697143df10bebf3cc1f3e8ca67b79a82cd0fd40d",
+  "source_bytes": 136731,
+  "checked_at": "2026-11-02T08:05:22+00:00",
+  "schema_paths": [
+    "components.schemas.TranscriptionResponse.properties.usage.properties.input_tokens",
+    "components.schemas.TranscriptionResponse.properties.usage.properties.output_tokens",
+    "components.schemas.TranscriptionResponse.properties.usage.properties.seconds"
+  ],
+  "interpretation": "Token counters are documented for token-billed models; seconds for duration-billed models. Combined with the exact Whisper Turbo model page, this supports a scoped duration contract. Reservation floor/quantum are local safety policy, not an asserted RouterAI minimum.",
+  "model_url": "https://routerai.ru/models/openai/whisper-large-v3-turbo",
+  "endpoints": {
+    "data": {
+      "id": "openai/whisper-large-v3-turbo",
+      "name": "OpenAI: Whisper Large V3 Turbo",
+      "created": 1777642266,
+      "description": "Whisper Large V3 Turbo — это оптимизированная версия модели распознавания речи Whisper Large V3 от OpenAI, разработанная для повышения скорости и экономической эффективности. Она поддерживает транскрипцию на более чем 99 языках с уровнем ошибок в словах 12% и принимает распространенные аудиоформаты, включая mp3, mp4, wav, webm, flac и ogg. Достигает скорости в реальном времени до 216 раз, что делает её подходящей для задач, чувствительных к задержкам, и для высокопроизводительных рабочих нагрузок по транскрипции.",
+      "architecture": {
+        "modality": "audio->transcription",
+        "tokenizer": null,
+        "instruct_type": null,
+        "input_modalities": [
+          "audio"
+        ],
+        "output_modalities": [
+          "transcription"
+        ]
+      },
+      "endpoints": [
+        {
+          "name": "DeepInfra | openai/whisper-large-v3-turbo",
+          "provider_name": "DeepInfra",
+          "tag": "deepinfra",
+          "country": "us",
+          "countries": [
+            "us"
+          ],
+          "context_length": 0,
+          "quantization": "unknown",
+          "max_completion_tokens": null,
+          "supported_parameters": [],
+          "status": 0,
+          "pricing": {
+            "prompt": "0.0003487325517",
+            "seconds": "0.0003487325517",
+            "completion": "0.0"
+          },
+          "pricing_units": {
+            "prompt": "token",
+            "seconds": "second",
+            "completion": "token"
+          },
+          "variable_pricings": []
+        },
+        {
+          "name": "Groq | openai/whisper-large-v3-turbo",
+          "provider_name": "Groq",
+          "tag": "groq",
+          "country": "us",
+          "countries": [
+            "us"
+          ],
+          "context_length": 0,
+          "quantization": "unknown",
+          "max_completion_tokens": null,
+          "supported_parameters": [],
+          "status": 0,
+          "pricing": {
+            "prompt": "0.0011636054444432809",
+            "seconds": "0.0011636054444432809",
+            "completion": "0.0"
+          },
+          "pricing_units": {
+            "prompt": "token",
+            "seconds": "second",
+            "completion": "token"
+          },
+          "variable_pricings": []
+        }
+      ]
+    }
+  },
+  "endpoints_sha256": "41db7b5e3ad585a86c20494b1885caa29ccdae14423326787c8f3b7de135c0e4"
+}
