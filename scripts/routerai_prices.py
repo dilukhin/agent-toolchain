@@ -8,6 +8,11 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable
 
+try:
+    from . import routerai_billing_review as billing_review
+except ImportError:  # Direct CLI execution by the refresh workflow.
+    import routerai_billing_review as billing_review
+
 SCHEMA = 1
 OWNER = "agent-toolchain:routerai-prices:v1"
 PUBLISHER = "dilukhin/agent-toolchain"
@@ -61,6 +66,9 @@ def policy_models(policy: dict) -> dict:
             raise PriceError("invalid export model")
         if not isinstance(spec.get("api"), str) or not spec["api"]:
             raise PriceError("missing API policy")
+        if "billing_review" in spec and (spec["billing_review"] != billing_review.PROFILE
+                or model_id != billing_review.MODEL or spec["api"] != billing_review.API):
+            raise PriceError("unknown or out-of-scope billing review")
         limits = spec.get("ceilings", {})
         if not isinstance(limits, dict):
             raise PriceError("invalid price ceilings")
@@ -171,6 +179,9 @@ def _model(model_id: str, live: dict | None, payload: dict | None, spec: dict | 
                 # no statistical thresholds, watchdogs, alerts or curated model edits.
                 raise PriceError("price exceeds reviewed publication ceiling")
     out["endpoints"].sort(key=lambda x: x["provider"])
+    if spec.get("billing_review"):
+        out["billing_review"] = billing_review.review(out)
+        reason = out["billing_review"]["reason"]
     out["reason"] = reason
     out["status"] = "available" if reason is None else "unpriced"
     return out
@@ -246,6 +257,11 @@ def verify(value: dict, *, published: bool) -> dict:
                 raise PriceError("unsafe available endpoint")
             if ep.get("source_url") != f"{SOURCE}/{model_id}/endpoints":
                 raise PriceError("untrusted endpoint source")
+        if "billing_review" in model:
+            expected_review = billing_review.review(model)
+            if (model["billing_review"] != expected_review or available
+                    or model.get("reason") != expected_review["reason"]):
+                raise PriceError("untrusted billing review or premature financial admission")
     if published:
         published_at = timestamp(value.get("published_at"))
         changed_at = timestamp(value.get("content_changed_at"))
