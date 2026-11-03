@@ -10,10 +10,10 @@
   "models": {
     "openai/gpt-4o": {
       "description": "Дорогая универсальная модель, запасной вариант для сложных задач",
-      "name": "OpenAI GPT-4o [дорогая универсальная, 262/1047 ₽]",
-      "price_input_rub_per_1m": 262,
-      "price_output_rub_per_1m": 1047,
-      "cache_read_rub_per_1m": 131
+      "name": "OpenAI GPT-4o [дорогая универсальная, 263/1053 ₽]",
+      "price_input_rub_per_1m": 263,
+      "price_output_rub_per_1m": 1053,
+      "cache_read_rub_per_1m": 132
     },
     "openai/gpt-4o-mini": {
       "description": "Быстрая и дешёвая модель для простых задач",
@@ -24,29 +24,29 @@
     },
     "deepseek/deepseek-chat": {
       "description": "Недорогая модель для анализа кода и повседневных задач",
-      "name": "DeepSeek Chat [дешёвая code/chat, 34/93 ₽]",
+      "name": "DeepSeek Chat [дешёвая code/chat, 34/94 ₽]",
       "price_input_rub_per_1m": 34,
-      "price_output_rub_per_1m": 93
+      "price_output_rub_per_1m": 94
     },
     "anthropic/claude-opus-4.7": {
       "description": "Топовая модель для сложного агентного программирования",
-      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 524/2618 ₽]",
-      "price_input_rub_per_1m": 524,
-      "price_output_rub_per_1m": 2618,
-      "cache_read_rub_per_1m": 52
+      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 526/2632 ₽]",
+      "price_input_rub_per_1m": 526,
+      "price_output_rub_per_1m": 2632,
+      "cache_read_rub_per_1m": 53
     },
     "qwen/qwen3.6-plus": {
       "description": "Основная рабочая модель для OpenCode",
-      "name": "Qwen 3.6 Plus [основная, 34/204 ₽]",
+      "name": "Qwen 3.6 Plus [основная, 34/205 ₽]",
       "price_input_rub_per_1m": 34,
-      "price_output_rub_per_1m": 204,
+      "price_output_rub_per_1m": 205,
       "cache_read_rub_per_1m": 3
     },
     "deepseek/deepseek-v4-pro": {
       "description": "Сильная reasoning/code модель",
-      "name": "DeepSeek V4 Pro [reasoning, 132/220 ₽]",
-      "price_input_rub_per_1m": 132,
-      "price_output_rub_per_1m": 220,
+      "name": "DeepSeek V4 Pro [reasoning, 133/221 ₽]",
+      "price_input_rub_per_1m": 133,
+      "price_output_rub_per_1m": 221,
       "cache_read_rub_per_1m": 37
     },
     "minimax/minimax-m2.7": {
@@ -58,30 +58,30 @@
     },
     "z-ai/glm-5": {
       "description": "Для архитектора/ревьюера: планирование, декомпозиция",
-      "name": "GLM-5 [архитектор, 63/201 ₽]",
+      "name": "GLM-5 [архитектор, 63/202 ₽]",
       "price_input_rub_per_1m": 63,
-      "price_output_rub_per_1m": 201,
+      "price_output_rub_per_1m": 202,
       "cache_read_rub_per_1m": 13
     },
     "moonshotai/kimi-k2.5": {
       "description": "Запасная агентная для tool-use и анализа кода",
-      "name": "Kimi K2.5 [агентная, 51/262 ₽]",
-      "price_input_rub_per_1m": 51,
-      "price_output_rub_per_1m": 262,
+      "name": "Kimi K2.5 [агентная, 52/263 ₽]",
+      "price_input_rub_per_1m": 52,
+      "price_output_rub_per_1m": 263,
       "cache_read_rub_per_1m": 21
     },
     "z-ai/glm-5-turbo": {
       "description": "Дорогой fallback для длинных цепочек",
-      "name": "GLM-5 Turbo [fallback, 126/419 ₽]",
+      "name": "GLM-5 Turbo [fallback, 126/421 ₽]",
       "price_input_rub_per_1m": 126,
-      "price_output_rub_per_1m": 419,
+      "price_output_rub_per_1m": 421,
       "cache_read_rub_per_1m": 25
     },
     "openai/gpt-5.2-codex": {
       "description": "Оптимизированная для программной инженерии",
-      "name": "GPT-5.2-Codex [код/агент, 183/1466 ₽]",
-      "price_input_rub_per_1m": 183,
-      "price_output_rub_per_1m": 1466,
+      "name": "GPT-5.2-Codex [код/агент, 184/1474 ₽]",
+      "price_input_rub_per_1m": 184,
+      "price_output_rub_per_1m": 1474,
       "cache_read_rub_per_1m": 18
     },
     "qwen/qwen3-coder-next": {
@@ -93,9 +93,9 @@
     },
     "qwen/qwen3.5-122b-a10b": {
       "description": "Мультимодальная модель с reasoning, контекст 262K токенов",
-      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 27/218 ₽]",
+      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 27/219 ₽]",
       "price_input_rub_per_1m": 27,
-      "price_output_rub_per_1m": 218
+      "price_output_rub_per_1m": 219
     }
   },
   "config_defaults": {
