@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-11-04T10:54:17Z",
+  "observed_at": "2026-11-05T10:55:15Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -1981,7 +1981,7 @@
         "tokenizer": "Cohere"
       },
       "pricing": {
-        "prompt": "0.0000127405044",
+        "prompt": "0.0000084936696",
         "completion": "0.0",
         "image_token": "0.000042468348"
       },
@@ -2510,9 +2510,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.000003737214624",
-        "completion": "0.000033634931616",
-        "input_cache_read": "0.000000583939785"
+        "prompt": "0.000002569335054",
+        "completion": "0.0000467151828",
+        "input_cache_read": "0.000000467151828"
       },
       "pricing_units": {
         "prompt": "token",
@@ -4116,8 +4116,8 @@
         "tokenizer": "Gemma"
       },
       "pricing": {
-        "prompt": "0.00001263433353",
-        "completion": "0.00002112800313",
+        "prompt": "0.00001252816266",
+        "completion": "0.00002091566139",
         "input_cache_read": "0.00000626408133"
       },
       "pricing_units": {
@@ -4544,6 +4544,30 @@
         "prompt": "0.00000668876481",
         "completion": "0.00002006629443",
         "input_cache_read": "0.000001337752962"
+      },
+      "pricing_units": {
+        "prompt": "token",
+        "completion": "token",
+        "input_cache_read": "token"
+      }
+    },
+    "inclusionai/ling-3.0-tiny": {
+      "name": "inclusionAI: Ling 3.0 Tiny",
+      "created": 1786034890,
+      "context_length": 262144,
+      "architecture": {
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other"
+      },
+      "pricing": {
+        "prompt": "0.00000159256305",
+        "completion": "0.00000477768915",
+        "input_cache_read": "0.00000031851261"
       },
       "pricing_units": {
         "prompt": "token",
@@ -5998,9 +6022,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000053085435",
-        "completion": "0.000021234174",
-        "input_cache_read": "0.00000053085435"
+        "prompt": "0.000011944222875",
+        "completion": "0.0000477768915",
+        "input_cache_read": "0.0000011944222875"
       },
       "pricing_units": {
         "prompt": "token",
@@ -7195,9 +7219,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000019057671165",
-        "completion": "0.001032235666488",
-        "input_cache_read": "0.0000180490479"
+        "prompt": "0.000019365566688",
+        "completion": "0.000991508520756",
+        "input_cache_read": "0.0000191107566"
       },
       "pricing_units": {
         "prompt": "token",
@@ -7221,8 +7245,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00021234174",
-        "completion": "0.0010617087",
+        "prompt": "0.000041056275429",
+        "completion": "0.000841223654271",
         "input_cache_read": "0.000021234174"
       },
       "pricing_units": {
@@ -7291,7 +7315,7 @@
       "pricing": {
         "prompt": "0.00000445917654",
         "completion": "0.0",
-        "input_cache_read": "0.0000010617087"
+        "input_cache_read": "0.00000084936696"
       },
       "pricing_units": {
         "prompt": "token",
@@ -7618,8 +7642,8 @@
         ]
       },
       "pricing": {
-        "prompt": "0.003535489971",
-        "seconds": "0.003535489971",
+        "prompt": "0.001769518039029",
+        "seconds": "0.001769518039029",
         "completion": "0.0"
       },
       "pricing_units": {
@@ -9259,6 +9283,52 @@
         "image_output": "token"
       }
     },
+    "openai/gpt-image-2.6-flare": {
+      "name": "OpenAI: GPT Image 2.6 Flare",
+      "created": 1793835351,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "image"
+        ]
+      },
+      "pricing": {
+        "image": "0.00084936696",
+        "prompt": "0.00053085435",
+        "image_output": "0.0031851261"
+      },
+      "pricing_units": {
+        "image": "token",
+        "prompt": "token",
+        "image_output": "token"
+      }
+    },
+    "openai/gpt-image-2.6-sunburst": {
+      "name": "OpenAI: GPT Image 2.6 Sunburst",
+      "created": 1793835357,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "image"
+        ]
+      },
+      "pricing": {
+        "image": "0.00084936696",
+        "prompt": "0.00053085435",
+        "image_output": "0.0031851261"
+      },
+      "pricing_units": {
+        "image": "token",
+        "prompt": "token",
+        "image_output": "token"
+      }
+    },
     "openai/gpt-oss-120b": {
       "name": "OpenAI: gpt-oss-120b",
       "created": 1754414231,
@@ -9273,9 +9343,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000297278436",
-        "completion": "0.00001082942874",
-        "input_cache_read": "0.00000265427175"
+        "prompt": "0.00000244193001",
+        "completion": "0.00000891835308",
+        "input_cache_read": "0.0000021234174"
       },
       "pricing_units": {
         "prompt": "token",
@@ -9297,9 +9367,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000297278436",
-        "completion": "0.00001082942874",
-        "input_cache_read": "0.00000265427175"
+        "prompt": "0.00000244193001",
+        "completion": "0.00000891835308",
+        "input_cache_read": "0.0000021234174"
       },
       "pricing_units": {
         "prompt": "token",
@@ -9321,9 +9391,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000138022131",
-        "completion": "0.00000594556872",
-        "input_cache_read": "0.00000127405044"
+        "prompt": "0.00000042468348",
+        "completion": "0.00000180490479",
+        "input_cache_read": "0.00000031851261"
       },
       "pricing_units": {
         "prompt": "token",
@@ -10833,9 +10903,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000084936696",
-        "completion": "0.0000138022131",
-        "input_cache_read": "0.0000042468348"
+        "prompt": "0.00000817515699",
+        "completion": "0.00001199730831",
+        "input_cache_read": "0.00000732579003"
       },
       "pricing_units": {
         "prompt": "token",
@@ -10961,9 +11031,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.0000010617087",
-        "completion": "0.00000976772004",
-        "input_cache_read": "0.00000095553783"
+        "prompt": "0.00000159256305",
+        "completion": "0.00001497009267",
+        "input_cache_read": "0.00000148639218"
       },
       "pricing_units": {
         "prompt": "token",
@@ -11124,12 +11194,14 @@
       "pricing": {
         "prompt": "0.00021234174",
         "completion": "0.00063702522",
-        "input_cache_read": "0.0000265427175"
+        "input_cache_read": "0.0000265427175",
+        "input_cache_write": "0.000265427175"
       },
       "pricing_units": {
         "prompt": "token",
         "completion": "token",
-        "input_cache_read": "token"
+        "input_cache_read": "token",
+        "input_cache_write": "token"
       }
     },
     "qwen/qwen3.8-27b": {
@@ -11148,9 +11220,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00000414066393",
-        "completion": "0.0001327135875",
-        "input_cache_read": "0.000000414066393"
+        "prompt": "0.00000148639218",
+        "completion": "0.00008376881643",
+        "input_cache_read": "0.00000138022131"
       },
       "pricing_units": {
         "prompt": "token",
@@ -11751,6 +11823,30 @@
         "completion": "token"
       }
     },
+    "ricursiveai/ripple-65b-preview": {
+      "name": "ricursiveAI/Ripple-65B-Preview",
+      "created": 1793818990,
+      "context_length": 1048576,
+      "architecture": {
+        "input_modalities": [
+          "text"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Other"
+      },
+      "pricing": {
+        "prompt": "0.000021234174",
+        "completion": "0.000063702522",
+        "input_cache_read": "0.0000053085435"
+      },
+      "pricing_units": {
+        "prompt": "token",
+        "completion": "token",
+        "input_cache_read": "token"
+      }
+    },
     "runway/aleph-2": {
       "name": "Runway: Aleph 2.0",
       "created": 1785339484,
@@ -12316,32 +12412,6 @@
       },
       "pricing_units": {
         "image_output": "image"
-      }
-    },
-    "stealth/crouton-alpha": {
-      "name": "Crouton Alpha",
-      "created": 1793669930,
-      "context_length": 1048576,
-      "architecture": {
-        "input_modalities": [
-          "text",
-          "image",
-          "video",
-          "file",
-          "audio"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other"
-      },
-      "pricing": {
-        "prompt": "0.0",
-        "completion": "0.0"
-      },
-      "pricing_units": {
-        "prompt": "token",
-        "completion": "token"
       }
     },
     "stepfun/step-3.5-flash": {
@@ -14179,9 +14249,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00002187119922",
-        "completion": "0.000148639218",
-        "input_cache_read": "0.0000074319609"
+        "prompt": "0.000059721114375",
+        "completion": "0.000191107566",
+        "input_cache_read": "0.00001114794135"
       },
       "pricing_units": {
         "prompt": "token",
@@ -14229,9 +14299,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000031415960433",
-        "completion": "0.0000116320805172",
-        "input_cache_read": "0.0000031415960433"
+        "prompt": "0.0000033284567745",
+        "completion": "0.0000107795284311",
+        "input_cache_read": "0.0000033284567745"
       },
       "pricing_units": {
         "prompt": "token",
@@ -14606,9 +14676,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000019057671165",
-        "completion": "0.001032235666488",
-        "input_cache_read": "0.0000180490479"
+        "prompt": "0.000019365566688",
+        "completion": "0.000991508520756",
+        "input_cache_read": "0.0000191107566"
       },
       "pricing_units": {
         "prompt": "token",
@@ -14740,9 +14810,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000031415960433",
-        "completion": "0.0000116320805172",
-        "input_cache_read": "0.0000031415960433"
+        "prompt": "0.0000033284567745",
+        "completion": "0.0000107795284311",
+        "input_cache_read": "0.0000033284567745"
       },
       "pricing_units": {
         "prompt": "token",
