@@ -125,12 +125,12 @@ def check(data):
 @contextmanager
 def _lock(root):
     path = root / "stage.lock"
+    flags = os.O_RDWR | getattr(os, "O_BINARY", 0)
     try:
-        fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
+        fd = os.open(path, flags | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
         _ordinary(path)
-        require(path.read_bytes() == LOCK_MARKER, "YC_OWNER_LOCK_UNOWNED")
-        fd = os.open(path, os.O_RDWR)
+        fd = os.open(path, flags)
     else:
         os.write(fd, LOCK_MARKER)
         os.fsync(fd)
@@ -144,6 +144,8 @@ def _lock(root):
             import fcntl
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         acquired = True
+        os.lseek(fd, 0, os.SEEK_SET)
+        require(os.read(fd, len(LOCK_MARKER) + 1) == LOCK_MARKER, "YC_OWNER_LOCK_UNOWNED")
         yield
     except OSError:
         raise ComponentConflict("YC_OWNER_STAGE_LOCKED_OR_IO_FAILED") from None
