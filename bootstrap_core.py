@@ -61,6 +61,7 @@ REQUIRED_FILES = (
     "setup_external_updates.py",
     "setup_tools.py",
     "setup_yc_transitional_guard.py",
+    "setup_yc_owner_component.py",
     "yc_transitional_entry.py",
     "bootstrap_core.py",
     "proxy_tools.py",
