@@ -7,8 +7,8 @@
 ## Закреплённая поставка
 
 - Источник: `dilukhin/opencode_permissions` на полном commit
-  `9ee913d5580fc4516f12fdbd2f3bd98d8edc9b23`.
-- Компонент: `sha256:ad7b8497748c390a8cc4a09c0297df684ab9c7b1e3c066783a5227a4fb320647`.
+  `7d2ed931ab7c65a3ee267791c06cd1eac817df31`.
+- Компонент: `sha256:ec771e41e6c08638ac630c97ebb3dca9a1b58f254881d52417e18dfcc9e1a82a`.
 - Семь точных файлов: единственный Ledger, строгий ReadHost, ограниченный
   Windows pipe, получение субъектов ОС, профиль чтения, захват и проекция.
 - `status=library_only`, `execution_enabled=false`. Эти поля входят в идентичность.
