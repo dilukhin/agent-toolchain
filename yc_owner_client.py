@@ -67,7 +67,7 @@ def perform(call, *, clock=time.monotonic, pause=time.sleep, notify=lambda _: No
     need(pending.get('ok') is True and pending.get('state') == 'pending', 'YC_OWNER_PROPOSAL_REFUSED')
     bound = {key: pending[key] for key in ('request_id', 'operation_sha256')}
     instance = pending['owner_instance_id']
-    notify('Ожидается решение в отдельной локальной консоли владельца. Разового API-ответа OpenCode недостаточно.')
+    notify('Ожидается решение в отдельной локальной консоли владельца.')
     deadline = clock() + 55
     while True:
         need(clock() < deadline, 'YC_OWNER_DECISION_TIMEOUT')

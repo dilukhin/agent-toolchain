@@ -462,6 +462,9 @@ try {
     $wrapperText = @'
 param([string]$Seed,[string]$Expected,[string]$Mode,[string]$Agent,[string]$Destination,[string]$Cache)
 $ErrorActionPreference = 'Stop'
+# The disposable credential process has not had a GUI first login. Let Windows
+# create its own standard known folder, as the already-completed user login did.
+[void][Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData,[Environment+SpecialFolderOption]::Create)
 if ($Mode -eq 'Checkpoint') {
     $anchor = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agent-toolchain-yc-owner'
     $value = @{schema='yc-owner-active/v1';phase='closed';owner_sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value;

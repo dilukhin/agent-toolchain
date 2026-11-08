@@ -193,7 +193,9 @@ try {
     $seedSha = Hash-Bytes $SeedBytes
     $stageCode = 'ANCHOR'
     $stageCode = 'ANCHOR_FOLDER'
-    $anchor = [YcOwnerNative.Guard]::LocalPath((Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agent-toolchain-yc-owner'))
+    $localProfile = [Environment]::GetFolderPath('LocalApplicationData')
+    if ([string]::IsNullOrWhiteSpace($localProfile)) { throw 'YC_OWNER_LOCAL_PROFILE_UNAVAILABLE' }
+    $anchor = [YcOwnerNative.Guard]::LocalPath((Join-Path $localProfile 'agent-toolchain-yc-owner'))
     $anchorMarker = $Utf8.GetBytes("agent-toolchain:yc-owner-anchor:v1`n$OwnerSid`n")
     $anchorLock = $Utf8.GetBytes("agent-toolchain:yc-owner-lock:v1`n$OwnerSid`n")
     if (-not [IO.Directory]::Exists($anchor)) {
