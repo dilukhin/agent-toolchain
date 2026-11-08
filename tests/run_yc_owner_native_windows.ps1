@@ -166,10 +166,14 @@ try {
     } finally { $lease.Dispose() }
     # The production supervisor must run as the ordinary owner; admin is only
     # this disposable fixture's orchestrator. Test attacker is the other account.
-    $pythonAcl = Get-Acl -LiteralPath $python
-    $pythonAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($ownerUser.SID,
-        'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
-    Set-Acl -LiteralPath $python -AclObject $pythonAcl
+    # This exact tree was created by this fixture. Convert its creator-specific
+    # ownership/allow ACE to the administrative source used by a different owner.
+    Set-Acl -LiteralPath $python -AclObject $readable
+    foreach ($item in Get-ChildItem -LiteralPath $python -Recurse -Force) {
+        $itemAcl = Get-Acl -LiteralPath $item.FullName
+        $itemAcl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
+        Set-Acl -LiteralPath $item.FullName -AclObject $itemAcl
+    }
     $rootAcl = Get-Acl -LiteralPath $root
     $rootAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($user.SID,
         'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
