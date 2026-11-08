@@ -24,6 +24,7 @@ $Utf8 = [Text.UTF8Encoding]::new($false)
 $lease = $null
 $child = $null
 $cacheLease = $null
+$stageCode = 'INITIAL'
 
 function Hash-Bytes([byte[]]$Bytes) {
     $sha = [Security.Cryptography.SHA256]::Create()
@@ -169,6 +170,7 @@ function Check-Release {
 }
 
 try {
+    $stageCode = 'NATIVE_LOAD'
     if ([Environment]::OSVersion.Platform -ne 'Win32NT' -or [IntPtr]::Size -ne 8) { throw 'YC_OWNER_WINDOWS_X64_REQUIRED' }
     if ($SeedBytes.Length -lt 100 -or $SeedBytes.Length -gt 131072) { throw 'YC_OWNER_VERIFIED_SEED_REQUIRED' }
     if ('YcOwnerNative.Guard' -as [type]) { throw 'YC_OWNER_FRESH_NATIVE_HOST_REQUIRED' }
@@ -180,6 +182,7 @@ try {
         @{schema='yc-owner-capability-audit/v1';status='audit_written';cloud_invocations=0} | ConvertTo-Json -Compress
         exit 0
     }
+    $stageCode = 'OWNER_ADMISSION'
     [YcOwnerNative.Guard]::AssertStandardOwner($AgentSid)
     [YcOwnerNative.ManagedChild]::SealParent($AgentSid)
     if ($Mode -eq 'Run' -and ([Console]::IsInputRedirected -or [Console]::IsOutputRedirected)) {
@@ -188,6 +191,7 @@ try {
     if ($Mode -eq 'Run') { [YcOwnerNative.Guard]::AssertOwnerLoginSession($AgentSid) }
     $OwnerSid = [YcOwnerNative.Guard]::OwnerSid
     $seedSha = Hash-Bytes $SeedBytes
+    $stageCode = 'ANCHOR'
     $anchor = [YcOwnerNative.Guard]::LocalPath((Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agent-toolchain-yc-owner'))
     $anchorMarker = $Utf8.GetBytes("agent-toolchain:yc-owner-anchor:v1`n$OwnerSid`n")
     $anchorLock = $Utf8.GetBytes("agent-toolchain:yc-owner-lock:v1`n$OwnerSid`n")
@@ -213,6 +217,7 @@ try {
     $treeManifest = Join-Path $Destination 'release-payload.json'
     $releaseMarker = $Utf8.GetBytes("agent-toolchain:yc-owner-release:v1`n$OwnerSid`n$($Manifest.artifact_id)`n$seedSha`n")
     $checkpointPath = Join-Path $anchor 'active.json'
+    $stageCode = 'CHECKPOINT'
     $previous = Read-Checkpoint $checkpointPath
     if ($previous -and $previous.phase -eq 'owner_process_started') {
         try {
@@ -223,6 +228,7 @@ try {
     }
     $previousRelease = if ($previous) { $previous.destination } else { '' }
     if ($Mode -eq 'Prepare' -and -not [IO.Directory]::Exists($Destination)) {
+        $stageCode = 'ROOT_CREATE'
         if ($ProtectedCache) {
             $ProtectedCache = [YcOwnerNative.Guard]::LocalPath($ProtectedCache)
             $cacheLease = New-Object YcOwnerNative.FileLease
@@ -238,6 +244,7 @@ try {
         Write-JsonNew $journal $state
         [YcOwnerNative.Guard]::CreatePrivateDirectory($payload)
         foreach ($path in @($python,$component,$ycDirectory)) { [YcOwnerNative.Guard]::CreatePrivateDirectory($path) }
+        $stageCode = 'COMPONENT'
         foreach ($row in $Manifest.files) {
             $target = Join-Path $component $row.path
             [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))
@@ -249,22 +256,27 @@ try {
             }
         }
         Write-New (Join-Path $component 'manifest.json') $ManifestBytes
+        $stageCode = 'PYTHON'
         $archive = Join-Path $Destination 'python.zip'
         if ($cacheLease) {
             Copy-VerifiedCache 'python.zip' $archive -1 $PythonSha
         } else { Download-Fixed $PythonUrl $archive 16777216 $PythonSha }
         Expand-FixedPython $archive $python
+        $stageCode = 'YC'
         if ($cacheLease) { Copy-VerifiedCache 'yc.exe' $ycBinary 196325832 $YcSha }
         else { Download-Fixed $YcUrl $ycBinary 196325832 $YcSha }
+        $stageCode = 'SNAPSHOT'
         $pins = @(Hold-Payload)
         $rows = @($pins | ForEach-Object { @{path=$_.Path.Substring($payload.Length+1).Replace('\','/');sha256=$_.Sha256;size=$_.Size} })
         Write-JsonNew $treeManifest @{schema='yc-owner-payload/v1';files=$rows}
+        $stageCode = 'COMPLETE'
         $state.phase = 'complete'
         Replace-Json $journal $state
         @{schema='yc-owner-managed-result/v1';status='prepared';destination=$Destination;artifact_id=$Manifest.artifact_id;
           previous_release=$previousRelease;python_started=$false;cloud_invocations=0} | ConvertTo-Json -Compress
         exit 0
     }
+    $stageCode = 'CHECK_RELEASE'
     Check-Release
     if ($Mode -ne 'Run') {
         @{schema='yc-owner-managed-result/v1';status='prepared_verified';destination=$Destination;
@@ -273,6 +285,7 @@ try {
     }
     # Admission-only read by administrator. Not approval, account creation,
     # privilege changes or a second authorization owner.
+    $stageCode = 'AUDIT'
     $work = Join-Path $Destination ('session-' + [guid]::NewGuid().ToString('N'))
     [YcOwnerNative.Guard]::CreatePrivateDirectory($work)
     $audit = Join-Path $work 'capabilities.txt'
@@ -293,6 +306,7 @@ try {
         component_id=$Manifest.artifact_id;component_manifest_sha256=(Hash-Bytes $ManifestBytes);
         yc_path=$ycBinary;cwd=$work;pipe_prefix=('yc59-'+(Hash-Bytes ($Utf8.GetBytes("yc59.owner.endpoint/v1`n"+$OwnerSid))).Substring(0,32))}
     [void]$lease.HoldTree($work)
+    $stageCode = 'START'
     $child = $lease.StartPython((Join-Path $python 'python.exe'),(Join-Path $component 'runtime\approval_owner\entry.py'),$config,$work,$AgentSid)
     $active = @{schema='yc-owner-active/v1';phase='owner_process_started';owner_sid=$OwnerSid;
         destination=$Destination;artifact_id=$Manifest.artifact_id;previous_release=$previousRelease;server_pid=$child.Pid;seed_sha256=$seedSha}
@@ -307,7 +321,7 @@ try {
     $errorItem = $_.Exception
     while ($errorItem.InnerException) { $errorItem = $errorItem.InnerException }
     $code = $errorItem.Message
-    if ($code -notmatch '^YC_OWNER_[A-Z0-9_]+$') { $code = 'YC_OWNER_MANAGED_RELEASE_REFUSED' }
+    if ($code -notmatch '^YC_OWNER_[A-Z0-9_]+$') { $code = 'YC_OWNER_MANAGED_RELEASE_REFUSED_' + $stageCode }
     [Console]::Error.WriteLine($code)
     exit 2
 } finally {
