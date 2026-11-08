@@ -1,0 +1,25 @@
+name: YC59 native bootstrap
+on:
+  pull_request:
+    paths:
+      - 'native/**'
+      - 'tests/run_yc_owner_native_windows.ps1'
+      - '.github/workflows/yc59-native-bootstrap.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-boundary:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v6
+      - name: Parse bootstrap and run native primitives before Python
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tokens = $null
+          $errors = $null
+          [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path native/yc_owner_bootstrap.ps1), [ref]$tokens, [ref]$errors)
+          if ($errors.Count -ne 0) { throw 'Bootstrap parse failed' }
+          .\tests\run_yc_owner_native_windows.ps1

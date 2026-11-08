@@ -104,7 +104,7 @@ _CORE_REQUIRED_FILES = (
     "workspace_trust_contract.py",
     "config_data.json",
 )
-_CORE_REQUIRED_TREES = ("templates", "skills/remote-long-running")
+_CORE_REQUIRED_TREES = ("templates", "skills/remote-long-running", "native")
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
