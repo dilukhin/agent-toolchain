@@ -5,6 +5,7 @@ on:
       - 'native/**'
       - 'tests/run_yc_owner_native_windows.ps1'
       - 'tests/check_yc59_official_cli.ps1'
+      - 'tests/yc59_context_component_pins.json'
       - '.github/workflows/yc59-native-bootstrap.yml'
   workflow_dispatch:
 permissions:

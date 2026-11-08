@@ -1,0 +1,119 @@
+{
+  "manifest": {
+    "artifact_id": "sha256:972f1bc36afa2e8e926e774fde45175d78dbb363191852024f5f72fbf63f51b7",
+    "execution_enabled": false,
+    "files": [
+      {
+        "path": "policy/native/rules.v1.json",
+        "sha256": "b7af96ecefd9fce341d128073f1bccae8b66c72e544bf0f47ccbb024232c3490",
+        "size": 10650
+      },
+      {
+        "path": "policy/yc/yc_policy.v1.json",
+        "sha256": "c4f8fba27d4c47118be4da3cd15ae06bd30520de6f95d827783b0d293e52cd2d",
+        "size": 2063
+      },
+      {
+        "path": "runtime/approval_owner/console.py",
+        "sha256": "a07d8aaa8a87f650e4f83e19f1aa7a00bb78f22843603bcd2c7373e884b59bd6",
+        "size": 3252
+      },
+      {
+        "path": "runtime/approval_owner/entry.py",
+        "sha256": "aed874233bd8d38955c6998b38fe0370e0a682286833f3ce466578017f1b19ea",
+        "size": 5231
+      },
+      {
+        "path": "runtime/approval_owner/ledger.py",
+        "sha256": "99b9e7fb61f3b4ebb2fe1c2938cf09fa64a4c3e98b46e1f7a4f3068bf40c70ad",
+        "size": 7175
+      },
+      {
+        "path": "runtime/approval_owner/read_host.py",
+        "sha256": "cd1101a4d45308cfb758f33233be03814548bea5e0cea4886fe63496bb2018cd",
+        "size": 5443
+      },
+      {
+        "path": "runtime/native_policy_matcher.py",
+        "sha256": "e70b27f110ba729d8bbc32c0dba0a62caea1a48cb53712cefbe79b497f965477",
+        "size": 999
+      },
+      {
+        "path": "runtime/render_native_policy.py",
+        "sha256": "f519d74ae76eb8a5a32af97230fcc007fa7955a3df9724e0588abfc046e415dd",
+        "size": 5189
+      },
+      {
+        "path": "runtime/windows_owner_boundary.py",
+        "sha256": "093843f9d9f20dfc8cef0be3d0448f734c867cc8c04e76e47dbb92a2075ca86a",
+        "size": 7702
+      },
+      {
+        "path": "runtime/windows_owner_pipe.py",
+        "sha256": "02e0ecf8f442b3207b054bdb47943e6dc7ff88e03596fd293f7c26770703a859",
+        "size": 17687
+      },
+      {
+        "path": "runtime/yc_owner_native_veto.py",
+        "sha256": "dd8187e00fc60ea54800e45f6c2c73edcdc70c598cff2c207d3142246f4bf706",
+        "size": 4704
+      },
+      {
+        "path": "runtime/yc_owner_windows_context.py",
+        "sha256": "a9a98ea2db26ab0d091ed36d9b1ac213b7b92851d9d08c1577272564c7f2349a",
+        "size": 9314
+      },
+      {
+        "path": "runtime/yc_policy_veto.py",
+        "sha256": "6fa913ce712a54fe0f02d7e5cb1314906936ed4f66ca698af5017080d6cda1f5",
+        "size": 1545
+      },
+      {
+        "path": "runtime/yc_read_capture.py",
+        "sha256": "692f8ac80220b2c68cc753e0d61556dbd04d9a89db0a6fa94c3e779f6d51487f",
+        "size": 3919
+      },
+      {
+        "path": "runtime/yc_read_projection.py",
+        "sha256": "a756d5906674b569a6b26c62187ebd4261890eacb3c6543f58cfe3207c9be983",
+        "size": 8481
+      },
+      {
+        "path": "runtime/yc_snapshot_read.py",
+        "sha256": "fcba2888ec9fd40b588945fdbfba33481c00b9b2b89a0acba72c3d3ae17c9def",
+        "size": 8965
+      }
+    ],
+    "owner": "dilukhin/opencode_permissions",
+    "platform": "windows",
+    "profile": "yc-snapshot-read/v1",
+    "required_before_activation": [
+      "native_bootstrap_and_file_protection",
+      "live_native_veto_authority",
+      "trusted_read_context_and_spawn",
+      "managed_activation_and_installed_acceptance"
+    ],
+    "schema": "yc-owner-component/v1",
+    "status": "library_only"
+  },
+  "manifest_json": "{\"artifact_id\":\"sha256:972f1bc36afa2e8e926e774fde45175d78dbb363191852024f5f72fbf63f51b7\",\"execution_enabled\":false,\"files\":[{\"path\":\"policy/native/rules.v1.json\",\"sha256\":\"b7af96ecefd9fce341d128073f1bccae8b66c72e544bf0f47ccbb024232c3490\",\"size\":10650},{\"path\":\"policy/yc/yc_policy.v1.json\",\"sha256\":\"c4f8fba27d4c47118be4da3cd15ae06bd30520de6f95d827783b0d293e52cd2d\",\"size\":2063},{\"path\":\"runtime/approval_owner/console.py\",\"sha256\":\"a07d8aaa8a87f650e4f83e19f1aa7a00bb78f22843603bcd2c7373e884b59bd6\",\"size\":3252},{\"path\":\"runtime/approval_owner/entry.py\",\"sha256\":\"aed874233bd8d38955c6998b38fe0370e0a682286833f3ce466578017f1b19ea\",\"size\":5231},{\"path\":\"runtime/approval_owner/ledger.py\",\"sha256\":\"99b9e7fb61f3b4ebb2fe1c2938cf09fa64a4c3e98b46e1f7a4f3068bf40c70ad\",\"size\":7175},{\"path\":\"runtime/approval_owner/read_host.py\",\"sha256\":\"cd1101a4d45308cfb758f33233be03814548bea5e0cea4886fe63496bb2018cd\",\"size\":5443},{\"path\":\"runtime/native_policy_matcher.py\",\"sha256\":\"e70b27f110ba729d8bbc32c0dba0a62caea1a48cb53712cefbe79b497f965477\",\"size\":999},{\"path\":\"runtime/render_native_policy.py\",\"sha256\":\"f519d74ae76eb8a5a32af97230fcc007fa7955a3df9724e0588abfc046e415dd\",\"size\":5189},{\"path\":\"runtime/windows_owner_boundary.py\",\"sha256\":\"093843f9d9f20dfc8cef0be3d0448f734c867cc8c04e76e47dbb92a2075ca86a\",\"size\":7702},{\"path\":\"runtime/windows_owner_pipe.py\",\"sha256\":\"02e0ecf8f442b3207b054bdb47943e6dc7ff88e03596fd293f7c26770703a859\",\"size\":17687},{\"path\":\"runtime/yc_owner_native_veto.py\",\"sha256\":\"dd8187e00fc60ea54800e45f6c2c73edcdc70c598cff2c207d3142246f4bf706\",\"size\":4704},{\"path\":\"runtime/yc_owner_windows_context.py\",\"sha256\":\"a9a98ea2db26ab0d091ed36d9b1ac213b7b92851d9d08c1577272564c7f2349a\",\"size\":9314},{\"path\":\"runtime/yc_policy_veto.py\",\"sha256\":\"6fa913ce712a54fe0f02d7e5cb1314906936ed4f66ca698af5017080d6cda1f5\",\"size\":1545},{\"path\":\"runtime/yc_read_capture.py\",\"sha256\":\"692f8ac80220b2c68cc753e0d61556dbd04d9a89db0a6fa94c3e779f6d51487f\",\"size\":3919},{\"path\":\"runtime/yc_read_projection.py\",\"sha256\":\"a756d5906674b569a6b26c62187ebd4261890eacb3c6543f58cfe3207c9be983\",\"size\":8481},{\"path\":\"runtime/yc_snapshot_read.py\",\"sha256\":\"fcba2888ec9fd40b588945fdbfba33481c00b9b2b89a0acba72c3d3ae17c9def\",\"size\":8965}],\"owner\":\"dilukhin/opencode_permissions\",\"platform\":\"windows\",\"profile\":\"yc-snapshot-read/v1\",\"required_before_activation\":[\"native_bootstrap_and_file_protection\",\"live_native_veto_authority\",\"trusted_read_context_and_spawn\",\"managed_activation_and_installed_acceptance\"],\"schema\":\"yc-owner-component/v1\",\"status\":\"library_only\"}\n",
+  "source_map": {
+    "policy/native/rules.v1.json": "policy/native/rules.v1.json",
+    "policy/yc/yc_policy.v1.json": "policy/yc/yc_policy.v1.json",
+    "runtime/approval_owner/console.py": "runtime/approval_owner/console.py",
+    "runtime/approval_owner/entry.py": "runtime/approval_owner/entry.py",
+    "runtime/approval_owner/ledger.py": "runtime/approval_owner/ledger.py",
+    "runtime/approval_owner/read_host.py": "runtime/approval_owner/read_host.py",
+    "runtime/native_policy_matcher.py": "tools/native_policy_matcher.py",
+    "runtime/render_native_policy.py": "tools/render_native_policy.py",
+    "runtime/windows_owner_boundary.py": "tools/windows_owner_boundary.py",
+    "runtime/windows_owner_pipe.py": "tools/windows_owner_pipe.py",
+    "runtime/yc_owner_native_veto.py": "tools/yc_owner_native_veto.py",
+    "runtime/yc_owner_windows_context.py": "tools/yc_owner_windows_context.py",
+    "runtime/yc_policy_veto.py": "tools/yc_policy_veto.py",
+    "runtime/yc_read_capture.py": "tools/yc_read_capture.py",
+    "runtime/yc_read_projection.py": "tools/yc_read_projection.py",
+    "runtime/yc_snapshot_read.py": "tools/yc_snapshot_read.py"
+  },
+  "source_ref": "9ece957d76b0a5a41caa05956c1665543614ef82"
+}
