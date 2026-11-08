@@ -14,8 +14,10 @@ function Expect-Code([scriptblock]$Action, [string]$Code) {
 }
 $nonce = [guid]::NewGuid().ToString('N')
 $userName = 'ycboot_' + $nonce.Substring(0, 10)
-$root = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) ('yc-native-' + $nonce)
+$root = Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) ('yc-native-' + $nonce)
 $created = $false
+$ownerCreated = $false
+$rootCreated = $false
 try {
     $password = ConvertTo-SecureString ('aA1!' + [guid]::NewGuid().ToString('N')) -AsPlainText -Force
     $user = New-LocalUser -Name $userName -Password $password -AccountNeverExpires
@@ -25,33 +27,49 @@ try {
     $owner = [YcOwnerNative.Guard]::OwnerSid
     Expect-Code { [YcOwnerNative.Guard]::AssertLocalAgentAccount($owner) } 'YC_OWNER_STANDARD_AGENT_ACCOUNT_REQUIRED'
     [YcOwnerNative.Guard]::CreatePrivateDirectory($root)
+    $rootCreated = $true
     Expect-Code { [YcOwnerNative.Guard]::CreatePrivateDirectory($root) } 'YC_OWNER_DESTINATION_EXISTS'
+    $ownerName = 'ycown_' + $nonce.Substring(0, 10)
+    $ownerPassword = ConvertTo-SecureString ('aA1!' + [guid]::NewGuid().ToString('N')) -AsPlainText -Force
+    $ownerUser = New-LocalUser -Name $ownerName -Password $ownerPassword -AccountNeverExpires
+    $ownerCreated = $true
+    Add-LocalGroupMember -Group (Get-LocalGroup -SID 'S-1-5-32-545') -Member $ownerUser
     # Verify lookup/LSA rights also from the ordinary owner account, not just admin CI.
-    $readable = Get-Acl -LiteralPath $root
-    $readable.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($user.SID,
+    $readable = [Security.AccessControl.DirectorySecurity]::new()
+    $readable.SetAccessRuleProtection($true, $false)
+    $readable.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
+    foreach ($sid in @('S-1-5-18','S-1-5-32-544')) {
+        $readable.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
+            [Security.Principal.SecurityIdentifier]::new($sid), 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+    }
+    $readable.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($ownerUser.SID,
         'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
     Set-Acl -LiteralPath $root -AclObject $readable
     $exchange = Join-Path $root 'exchange'
     [void](New-Item -ItemType Directory -Path $exchange)
     $exchangeAcl = Get-Acl -LiteralPath $exchange
-    $exchangeAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($user.SID,
+    $exchangeAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($ownerUser.SID,
         'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
     Set-Acl -LiteralPath $exchange -AclObject $exchangeAcl
     $copiedSource = Join-Path $root 'native.cs'
     [IO.File]::WriteAllText($copiedSource, [IO.File]::ReadAllText((Join-Path $repo 'native\yc_owner_native.cs')))
     $checker = Join-Path $root 'check-rights.ps1'
     $checkerText = @'
-param([string]$Source,[string]$Sid)
+param([string]$Source,[string]$Sid,[string]$Audit,[string]$Nonce)
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -Language CSharp
-[YcOwnerNative.Guard]::AssertLocalAgentAccount($Sid)
+[YcOwnerNative.Guard]::VerifyCapabilityAudit($Sid,$Nonce,$Audit)
 [Console]::WriteLine('STANDARD_OWNER_RIGHTS_PASS')
 '@
     [IO.File]::WriteAllText($checker, $checkerText)
-    $credential = [PSCredential]::new(($env:COMPUTERNAME + '\' + $userName), $password)
+    $audit = Join-Path $root 'capabilities.txt'
+    $auditNonce = [guid]::NewGuid().ToString('D')
+    [YcOwnerNative.Guard]::WriteCapabilityAudit($user.SID.Value, $ownerUser.SID.Value, $auditNonce, $audit)
+    $credential = [PSCredential]::new(($env:COMPUTERNAME + '\' + $ownerName), $ownerPassword)
     $out = Join-Path $exchange 'ordinary.out'
     $err = Join-Path $exchange 'ordinary.err'
-    $arguments = @('-NoProfile', '-File', ('"' + $checker + '"'), ('"' + $copiedSource + '"'), $user.SID.Value)
+    $arguments = @('-NoProfile', '-File', ('"' + $checker + '"'), ('"' + $copiedSource + '"'), $user.SID.Value,
+                   ('"' + $audit + '"'), $auditNonce)
     $ordinary = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
         -ArgumentList $arguments -Credential $credential -LoadUserProfile -WorkingDirectory $exchange `
         -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
@@ -134,5 +152,6 @@ Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -Language CSharp
     Write-Host 'PASS native leases, owner/DACL, groups/rights, mutation rejection and exact isolated Python. No YC/approval/installed host.'
 } finally {
     if ($created) { Remove-LocalUser -Name $userName }
-    if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force }
+    if ($ownerCreated) { Remove-LocalUser -Name $ownerName }
+    if ($rootCreated -and (Test-Path -LiteralPath $root)) { Remove-Item -LiteralPath $root -Recurse -Force }
 }

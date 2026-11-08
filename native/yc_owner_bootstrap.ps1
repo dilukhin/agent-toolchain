@@ -1,14 +1,16 @@
 # Bootstrap seed MUST be verified by the owner in a fresh OS PowerShell session.
 # It does not trust an agent-writable Python to validate its own interpreter.
 param(
-    [ValidateSet('Check','PreparePython')][string]$Mode = 'Check',
+    [ValidateSet('Check','PreparePython','AuditAgent')][string]$Mode = 'Check',
     [Parameter(Mandatory=$true)][string]$AgentSid,
     [Parameter(Mandatory=$true)][string]$Destination,
-    [Parameter(Mandatory=$true)][string]$NativeSource
+    [Parameter(Mandatory=$true)][string]$NativeSource,
+    [string]$OwnerSid,
+    [string]$Nonce
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$NativeSha256 = '9a6d487d2e9a286f48b9bf50e19eda62e5e999826f2340348f6dd9862264e60a'
+$NativeSha256 = 'b8c4fb4196b9ad99a8d67e9bc831de02e229b984f2a6543eba15cb68edebb157'
 $PythonUrl = 'https://www.python.org/ftp/python/3.14.2/python-3.14.2-embed-amd64.zip'
 $PythonArchiveSha256 = 'f05e28d161c6b15af64a7cb7f08b4a22b3a6b03eee71baee24ea557b3bdd5798'
 
@@ -38,7 +40,30 @@ try {
     $native = Read-LockedBytes $NativeSource 131072
     if ((Hash-Bytes $native) -ne $NativeSha256) { throw 'YC_OWNER_NATIVE_SOURCE_DIGEST_MISMATCH' }
     Add-Type -TypeDefinition ([Text.Encoding]::UTF8.GetString($native)) -Language CSharp
+    if ($Mode -eq 'AuditAgent') {
+        [YcOwnerNative.Guard]::WriteCapabilityAudit($AgentSid, $OwnerSid, $Nonce, $Destination)
+        @{schema='yc-owner-capability-audit/v1'; status='audit_written';
+          cloud_invocations=0; deployment_authorized=$false} | ConvertTo-Json -Compress
+        exit 0
+    }
     [YcOwnerNative.Guard]::AssertInteractiveOwner($AgentSid)
+    # The ordinary owner cannot query LSA rights. A one-time administrator reads
+    # them; no account/group/privilege changes and no permanent privileged service.
+    $requestRoot = $Destination + '.native-request-' + [guid]::NewGuid().ToString('N')
+    [YcOwnerNative.Guard]::CreatePrivateDirectory($requestRoot)
+    $capabilityFile = Join-Path $requestRoot 'capabilities.txt'
+    $challenge = [guid]::NewGuid().ToString('D')
+    [Console]::WriteLine('Required one-time native eligibility audit (read-only administrator step).')
+    [Console]::WriteLine('Owner SID: ' + [YcOwnerNative.Guard]::OwnerSid)
+    [Console]::WriteLine('Agent SID: ' + $AgentSid)
+    [Console]::WriteLine('Nonce: ' + $challenge)
+    [Console]::WriteLine('New audit file: ' + $capabilityFile)
+    $auditWatch = [Diagnostics.Stopwatch]::StartNew()
+    while (-not [IO.File]::Exists($capabilityFile)) {
+        if ($auditWatch.Elapsed.TotalSeconds -ge 180) { throw 'YC_OWNER_CAPABILITY_AUDIT_TIMEOUT' }
+        Start-Sleep -Milliseconds 200
+    }
+    [YcOwnerNative.Guard]::VerifyCapabilityAudit($AgentSid, $challenge, $capabilityFile)
     if ($Mode -eq 'Check') {
         $lease = New-Object YcOwnerNative.FileLease
         try {

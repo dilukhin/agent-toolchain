@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
@@ -59,14 +60,17 @@ namespace YcOwnerNative {
         [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool
             CreateDirectory(string path, ref SecurityAttributes attrs);
         [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr value);
+        [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern SafeFileHandle CreateFile(
+            string path, uint access, uint share, ref SecurityAttributes attrs, uint creation, uint flags, IntPtr template);
+        [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool MoveFileEx(string from, string to, uint flags);
 
         public static string OwnerSid { get { return WindowsIdentity.GetCurrent().User.Value; } }
         public static void AssertInteractiveOwner(string agentSid) {
             Need(Process.GetCurrentProcess().SessionId != 0, "YC_OWNER_INTERACTIVE_SESSION_REQUIRED");
             Need(OwnerSid != agentSid, "YC_OWNER_DISTINCT_AGENT_REQUIRED");
-            AssertLocalAgentAccount(agentSid);
+            LocalAgentSubjects(agentSid);
         }
-        public static void AssertLocalAgentAccount(string agentSid) {
+        static HashSet<string> LocalAgentSubjects(string agentSid) {
             SecurityIdentifier sid;
             try { sid = new SecurityIdentifier(agentSid); }
             catch { throw new Refusal("YC_OWNER_AGENT_SID_INVALID"); }
@@ -94,6 +98,10 @@ namespace YcOwnerNative {
                 }
             } finally { if (buffer != IntPtr.Zero) NetApiBufferFree(buffer); }
             Need(subjects.Contains("S-1-5-32-545"), "YC_OWNER_STANDARD_AGENT_ACCOUNT_REQUIRED");
+            return subjects;
+        }
+        public static void AssertLocalAgentAccount(string agentSid) {
+            HashSet<string> subjects = LocalAgentSubjects(agentSid);
             // Account membership is checked independently of a potentially filtered
             // process token. Also inspect explicitly assigned rights of every subject.
             LsaAttributes attrs = new LsaAttributes(); attrs.Length = (uint)Marshal.SizeOf(attrs);
@@ -120,6 +128,51 @@ namespace YcOwnerNative {
                     } finally { if (rights != IntPtr.Zero) LsaFreeMemory(rights); }
                 }
             } finally { if (policy != IntPtr.Zero) LsaClose(policy); }
+        }
+        public static void WriteCapabilityAudit(string agentSid, string ownerSid, string nonce, string output) {
+            WindowsPrincipal current = new WindowsPrincipal(WindowsIdentity.GetCurrent());
+            Need(current.IsInRole(WindowsBuiltInRole.Administrator), "YC_OWNER_ADMIN_READ_REQUIRED");
+            Need(ownerSid != agentSid && OwnerSid != agentSid, "YC_OWNER_DISTINCT_AGENT_REQUIRED");
+            LocalAgentSubjects(ownerSid);
+            AssertLocalAgentAccount(agentSid);
+            Guid id; Need(Guid.TryParseExact(nonce, "D", out id) && id.ToString("D") == nonce,
+                "YC_OWNER_CAPABILITY_NONCE_INVALID");
+            output = LocalPath(output);
+            Need(!File.Exists(output) && !Directory.Exists(output), "YC_OWNER_AUDIT_OUTPUT_EXISTS");
+            string staging = LocalPath(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(output), "~audit-" + Guid.NewGuid().ToString("N")));
+            byte[] data = Encoding.ASCII.GetBytes("YC-OWNER-CAPS/1\n" + agentSid + "\n" + ownerSid + "\n" + nonce +
+                "\n" + DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture) + "\nSTANDARD_LOCAL_ACCOUNT\n");
+            using (FileLease parents = FileLease.AuditParentChain(System.IO.Path.GetDirectoryName(output), ownerSid)) {
+                IntPtr descriptor = IntPtr.Zero;
+                try {
+                    Need(ConvertStringSecurityDescriptorToSecurityDescriptor("O:BAD:P(A;;FR;;;" + ownerSid +
+                        ")(A;;FA;;;SY)(A;;FA;;;BA)", 1, out descriptor, IntPtr.Zero), "YC_OWNER_AUDIT_DACL_FAILED");
+                    SecurityAttributes attrs = new SecurityAttributes(); attrs.Length = (uint)Marshal.SizeOf(attrs);
+                    attrs.Descriptor = descriptor;
+                    SafeFileHandle handle = CreateFile(staging, 0x40000000, 0, ref attrs, 1, 0x80, IntPtr.Zero);
+                    Need(!handle.IsInvalid, "YC_OWNER_AUDIT_CREATE_FAILED");
+                    using (FileStream stream = new FileStream(handle, FileAccess.Write)) { stream.Write(data, 0, data.Length); stream.Flush(true); }
+                    Need(MoveFileEx(staging, output, 8), "YC_OWNER_AUDIT_PUBLISH_FAILED");
+                } finally { if (descriptor != IntPtr.Zero) LocalFree(descriptor); }
+            }
+        }
+        public static void VerifyCapabilityAudit(string agentSid, string nonce, string path) {
+            Need(OwnerSid != agentSid, "YC_OWNER_DISTINCT_AGENT_REQUIRED");
+            LocalAgentSubjects(agentSid);
+            using (FileLease lease = new FileLease()) {
+                FilePin pin = lease.HoldAuditFile(path);
+                Need(pin.Size <= 4096, "YC_OWNER_CAPABILITY_SIZE_INVALID");
+                string[] rows = Encoding.ASCII.GetString(File.ReadAllBytes(path)).Split('\n');
+                Need(rows.Length == 7 && rows[0] == "YC-OWNER-CAPS/1" && rows[1] == agentSid && rows[2] == OwnerSid &&
+                    rows[3] == nonce && rows[5] == "STANDARD_LOCAL_ACCOUNT" && rows[6] == "", "YC_OWNER_CAPABILITY_BINDING_INVALID");
+                Guid id; Need(Guid.TryParseExact(nonce, "D", out id) && id.ToString("D") == nonce,
+                    "YC_OWNER_CAPABILITY_NONCE_INVALID");
+                DateTime issued;
+                Need(DateTime.TryParseExact(rows[4], "o", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out issued) &&
+                    issued.Kind == DateTimeKind.Utc, "YC_OWNER_CAPABILITY_TIME_INVALID");
+                double age = (DateTime.UtcNow - issued).TotalSeconds;
+                Need(age >= 0 && age <= 180, "YC_OWNER_CAPABILITY_EXPIRED");
+            }
         }
         internal static string LocalPath(string path) {
             Need(path != null && path.Length >= 3 && path.Length < 248 && path[1] == ':' &&
@@ -177,10 +230,13 @@ namespace YcOwnerNative {
         readonly List<IDisposable> held = new List<IDisposable>();
         readonly HashSet<string> directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, FilePin> files = new Dictionary<string, FilePin>(StringComparer.OrdinalIgnoreCase);
+        readonly string additionalOwner;
         bool closed;
         long totalBytes;
 
-        static void CheckAcl(SafeFileHandle handle, bool ancestor) {
+        public FileLease() { }
+        FileLease(string owner) { additionalOwner = owner; }
+        void CheckAcl(SafeFileHandle handle, bool ancestor, bool administrative) {
             IntPtr descriptor = IntPtr.Zero;
             try {
                 Guard.Need(GetSecurityInfo(handle, 1, 5, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, out descriptor) == 0,
@@ -190,8 +246,10 @@ namespace YcOwnerNative {
                 byte[] raw = new byte[length]; Marshal.Copy(descriptor, raw, 0, (int)length);
                 RawSecurityDescriptor sd = new RawSecurityDescriptor(raw, 0);
                 string owner = Guard.OwnerSid;
-                Guard.Need(sd.Owner != null && (sd.Owner.Value == owner || Guard.Trusted.Contains(sd.Owner.Value)),
+                Guard.Need(sd.Owner != null && (sd.Owner.Value == owner || sd.Owner.Value == additionalOwner || Guard.Trusted.Contains(sd.Owner.Value)),
                     "YC_OWNER_UNTRUSTED_FILE_OWNER");
+                if (administrative) Guard.Need(sd.Owner.Value == "S-1-5-18" || sd.Owner.Value == "S-1-5-32-544",
+                    "YC_OWNER_ADMIN_AUDIT_REQUIRED");
                 Guard.Need(sd.DiscretionaryAcl != null, "YC_OWNER_NULL_DACL");
                 uint dangerous = ancestor ? 0x500D0040U : 0x500D0156U;
                 foreach (GenericAce entry in sd.DiscretionaryAcl) {
@@ -201,12 +259,12 @@ namespace YcOwnerNative {
                         "YC_OWNER_UNSUPPORTED_ACE");
                     if (ace.AceQualifier != AceQualifier.AccessAllowed || (ace.AceFlags & AceFlags.InheritOnly) != 0) continue;
                     string sid = ace.SecurityIdentifier.Value;
-                    if (sid != owner && !Guard.Trusted.Contains(sid))
+                    if (sid != owner && sid != additionalOwner && !Guard.Trusted.Contains(sid))
                         Guard.Need(((uint)ace.AccessMask & dangerous) == 0, "YC_OWNER_AGENT_WRITABLE_PATH");
                 }
             } finally { if (descriptor != IntPtr.Zero) LocalFree(descriptor); }
         }
-        SafeFileHandle Open(string path, bool directory, bool ancestor) {
+        SafeFileHandle Open(string path, bool directory, bool ancestor, bool administrative = false) {
             Guard.Need(!closed, "YC_OWNER_LEASE_CLOSED");
             // FILE_SHARE_READ only: writes, replacement and deletion cannot race a live lease.
             SafeFileHandle handle = CreateFile(path, directory ? 0x20080U : 0x80020000U, 1,
@@ -225,7 +283,7 @@ namespace YcOwnerNative {
                 if (resolved.StartsWith("\\\\?\\", StringComparison.Ordinal)) resolved = resolved.Substring(4);
                 Guard.Need(String.Equals(resolved.TrimEnd('\\'), path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase),
                     "YC_OWNER_PATH_REPLACED");
-                CheckAcl(handle, ancestor);
+                CheckAcl(handle, ancestor, administrative);
                 return handle;
             } catch { handle.Dispose(); throw; }
         }
@@ -246,11 +304,20 @@ namespace YcOwnerNative {
             try { result.Ancestors(Guard.LocalPath(parent)); return result; }
             catch { result.Dispose(); throw; }
         }
+        internal static FileLease AuditParentChain(string parent, string owner) {
+            FileLease result = new FileLease(owner);
+            try { result.Ancestors(Guard.LocalPath(parent)); return result; }
+            catch { result.Dispose(); throw; }
+        }
         public FilePin HoldFile(string path, string expectedHash) {
+            return HoldFileCore(path, expectedHash, false);
+        }
+        internal FilePin HoldAuditFile(string path) { return HoldFileCore(path, null, true); }
+        FilePin HoldFileCore(string path, string expectedHash, bool administrative) {
             path = Guard.LocalPath(path);
             Guard.Need(!files.ContainsKey(path) && files.Count < 10000, "YC_OWNER_FILE_COUNT_LIMIT");
             Ancestors(System.IO.Path.GetDirectoryName(path));
-            SafeFileHandle handle = Open(path, false, false);
+            SafeFileHandle handle = Open(path, false, false, administrative);
             FileStream stream = null;
             try {
                 stream = new FileStream(handle, FileAccess.Read);
