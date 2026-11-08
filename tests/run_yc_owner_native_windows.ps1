@@ -445,7 +445,42 @@ try {
         Get-Content -LiteralPath $supervisedErr | Write-Host
         throw 'PROTECTED_SUPERVISOR_FAILED'
     }
-    Write-Host 'PASS native file/process/token protection, ordinary owner supervisor, hostile account denial, timeout and descendant cleanup. No YC/approval/installed host.'
+    # Exercise the real managed seed, not a Python model of its state machine.
+    $cache = Join-Path $root 'managed-cache'
+    [void][IO.Directory]::CreateDirectory($cache)
+    [IO.File]::Copy($archive,(Join-Path $cache 'python.zip'))
+    [IO.File]::Copy($yc,(Join-Path $cache 'yc.exe'))
+    $candidatePath = Join-Path $root 'candidate.json'
+    [IO.File]::Copy((Join-Path $repo 'native/yc_owner_candidate.json'),$candidatePath)
+    $candidate = Get-Content -LiteralPath $candidatePath -Raw | ConvertFrom-Json
+    foreach ($row in $candidate.files) {
+        $target = Join-Path (Join-Path $cache 'component') $row.path
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))
+        Get-VerifiedFixtureFile ('https://raw.githubusercontent.com/dilukhin/opencode_permissions/'+
+            $candidate.source_ref+'/'+$candidate.sources.($row.path)) $target $row.sha256 $row.size
+    }
+    Protect-FixtureSource $cache
+    $managedSeed = Join-Path $root 'managed.ps1'
+    $managedDriver = Join-Path $root 'managed-driver.ps1'
+    [IO.File]::Copy((Join-Path $repo 'native/yc_owner_managed.ps1'),$managedSeed)
+    [IO.File]::Copy((Join-Path $PSScriptRoot 'yc59_managed_fixture_driver.ps1'),$managedDriver)
+    $managedOut=Join-Path $exchange 'managed.out'
+    $managedErr=Join-Path $exchange 'managed.err'
+    $arguments=@('-NoProfile','-File',('"'+$managedDriver+'"'),('"'+$managedSeed+'"'),
+        ('"'+$copiedSource+'"'),('"'+$candidatePath+'"'),$user.SID.Value,('"'+$cache+'"'),
+        ('"'+(Join-Path $exchange 'managed-root')+'"'))
+    $ordinary=Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+        -ArgumentList $arguments -Credential $credential -LoadUserProfile -WorkingDirectory $exchange `
+        -RedirectStandardOutput $managedOut -RedirectStandardError $managedErr -PassThru
+    $ordinaryHandle=$ordinary.Handle
+    if (-not $ordinary.WaitForExit(240000)) { $ordinary.Kill(); throw 'MANAGED_DRIVER_TIMEOUT' }
+    $ordinary.WaitForExit()
+    if ($ordinary.ExitCode -ne 0 -or ([IO.File]::ReadAllText($managedOut)).Trim() -ne 'MANAGED_OWNER_ACTIVATION_PASS') {
+        Get-Content -LiteralPath $managedOut | Write-Host
+        Get-Content -LiteralPath $managedErr | Write-Host
+        throw 'MANAGED_DRIVER_FAILED'
+    }
+    Write-Host 'PASS native protection and managed prepare/check/disable/reactivation, exact files, pending refusal and owner-wide lock. No cloud/approval/installed host.'
 } catch {
     [Console]::Error.WriteLine('NATIVE_FIXTURE_FAILURE: ' + $_.Exception.Message)
     [Console]::Error.WriteLine($_.ScriptStackTrace)

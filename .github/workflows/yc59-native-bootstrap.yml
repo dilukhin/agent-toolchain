@@ -6,6 +6,7 @@ on:
       - 'tests/run_yc_owner_native_windows.ps1'
       - 'tests/check_yc59_official_cli.ps1'
       - 'tests/yc59_context_component_pins.json'
+      - 'tests/yc59_managed_fixture_driver.ps1'
       - '.github/workflows/yc59-native-bootstrap.yml'
   workflow_dispatch:
 permissions:
@@ -13,7 +14,7 @@ permissions:
 jobs:
   native-boundary:
     runs-on: windows-latest
-    timeout-minutes: 8
+    timeout-minutes: 14
     steps:
       - uses: actions/checkout@v6
       - name: Parse bootstrap and run native primitives before Python
@@ -24,6 +25,10 @@ jobs:
           $errors = $null
           [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path native/yc_owner_bootstrap.ps1), [ref]$tokens, [ref]$errors)
           if ($errors.Count -ne 0) { throw 'Bootstrap parse failed' }
+          foreach ($path in @('native/yc_owner_managed.ps1','tests/yc59_managed_fixture_driver.ps1')) {
+            [void][Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path), [ref]$tokens, [ref]$errors)
+            if ($errors.Count -ne 0) { throw 'Managed seed parse failed' }
+          }
           .\tests\run_yc_owner_native_windows.ps1
   official-yc-surface:
     runs-on: windows-latest
