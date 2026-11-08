@@ -70,6 +70,10 @@ namespace YcOwnerNative {
             Need(OwnerSid != agentSid, "YC_OWNER_DISTINCT_AGENT_REQUIRED");
             LocalAgentSubjects(agentSid);
         }
+        public static void AssertStandardOwner(string agentSid) {
+            AssertInteractiveOwner(agentSid);
+            LocalAgentSubjects(OwnerSid);
+        }
         static HashSet<string> LocalAgentSubjects(string agentSid) {
             SecurityIdentifier sid;
             try { sid = new SecurityIdentifier(agentSid); }
@@ -230,6 +234,7 @@ namespace YcOwnerNative {
         readonly List<IDisposable> held = new List<IDisposable>();
         readonly HashSet<string> directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string, FilePin> files = new Dictionary<string, FilePin>(StringComparer.OrdinalIgnoreCase);
+        readonly HashSet<string> trees = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         readonly string additionalOwner;
         bool closed;
         long totalBytes;
@@ -350,14 +355,174 @@ namespace YcOwnerNative {
                 }
             }
             Guard.Need(files.Count > before, "YC_OWNER_EMPTY_TREE");
+            trees.Add(root);
             List<FilePin> pins = new List<FilePin>(files.Values);
             pins.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Path, b.Path));
             return pins.ToArray();
+        }
+        public ManagedChild StartPython(string python, string entry, string config, string cwd, string agentSid) {
+            Guard.Need(!closed, "YC_OWNER_LEASE_CLOSED");
+            Guard.AssertStandardOwner(agentSid);
+            python = Guard.LocalPath(python); entry = Guard.LocalPath(entry);
+            config = Guard.LocalPath(config); cwd = Guard.LocalPath(cwd);
+            Guard.Need(files.ContainsKey(python) && files.ContainsKey(entry) && files.ContainsKey(config)
+                && directories.Contains(cwd) && trees.Contains(System.IO.Path.GetDirectoryName(python))
+                && System.IO.Path.GetFileName(python) == "python.exe", "YC_OWNER_UNHELD_PROCESS_INPUT");
+            // Recheck cwd as a protected directory, not merely an ancestor.
+            HoldDirectory(cwd, false);
+            ManagedChild child = ManagedChild.Start(python, entry, config, cwd, agentSid);
+            held.Add(child); // killed BEFORE any interpreter/payload lease is released
+            return child;
         }
         public void Dispose() {
             if (closed) return; closed = true;
             for (int i = held.Count - 1; i >= 0; i--) held[i].Dispose();
             held.Clear();
+        }
+    }
+
+    // No pipe/approval interface: only the pinned native composition root calls
+    // this after holding every interpreter/payload/config input under FileLease.
+    public sealed class ManagedChild : IDisposable {
+        [StructLayout(LayoutKind.Sequential)] struct SecurityAttributes {
+            public uint Length; public IntPtr Descriptor; [MarshalAs(UnmanagedType.Bool)] public bool Inherit;
+        }
+        [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)] struct StartupInfo {
+            public uint Size; public string Reserved, Desktop, Title;
+            public uint X, Y, XSize, YSize, XChars, YChars, Fill, Flags;
+            public ushort Show, ReservedSize; public IntPtr ReservedData, Input, Output, Error;
+        }
+        [StructLayout(LayoutKind.Sequential)] struct ProcessInfo { public IntPtr Process, Thread; public uint Pid, Tid; }
+        [StructLayout(LayoutKind.Sequential)] struct BasicLimits {
+            public long ProcessTime, JobTime; public uint Flags; public UIntPtr MinWorking, MaxWorking;
+            public uint ActiveProcesses; public UIntPtr Affinity; public uint Priority, Scheduling;
+        }
+        [StructLayout(LayoutKind.Sequential)] struct IoCounters { public ulong A, B, C, D, E, F; }
+        [StructLayout(LayoutKind.Sequential)] struct ExtendedLimits {
+            public BasicLimits Basic; public IoCounters Io;
+            public UIntPtr ProcessMemory, JobMemory, PeakProcess, PeakJob;
+        }
+        [StructLayout(LayoutKind.Sequential)] struct Accounting {
+            public long UserTime, KernelTime, PeriodUser, PeriodKernel;
+            public uint Faults, TotalProcesses, ActiveProcesses, TerminatedProcesses;
+        }
+        [DllImport("advapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool
+            ConvertStringSecurityDescriptorToSecurityDescriptor(string sddl, uint revision, out IntPtr descriptor, IntPtr size);
+        [DllImport("advapi32.dll", SetLastError=true)] static extern bool SetKernelObjectSecurity(IntPtr handle, uint info, IntPtr descriptor);
+        [DllImport("advapi32.dll", SetLastError=true)] static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+        [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
+        [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateProcess(
+            string application, StringBuilder command, ref SecurityAttributes processAttrs, ref SecurityAttributes threadAttrs,
+            bool inherit, uint flags, IntPtr environment, string cwd, ref StartupInfo startup, out ProcessInfo info);
+        [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern IntPtr CreateJobObject(IntPtr attrs, string name);
+        [DllImport("kernel32.dll", SetLastError=true)] static extern bool SetInformationJobObject(IntPtr job, int kind, ref ExtendedLimits data, uint size);
+        [DllImport("kernel32.dll", SetLastError=true)] static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+        [DllImport("kernel32.dll", SetLastError=true)] static extern uint ResumeThread(IntPtr thread);
+        [DllImport("kernel32.dll", SetLastError=true)] static extern bool TerminateProcess(IntPtr process, uint code);
+        [DllImport("kernel32.dll", SetLastError=true)] static extern bool TerminateJobObject(IntPtr job, uint code);
+        [DllImport("kernel32.dll", SetLastError=true)] static extern bool QueryInformationJobObject(
+            IntPtr job, int kind, out Accounting data, uint size, IntPtr returned);
+        [DllImport("kernel32.dll")] static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+        [DllImport("kernel32.dll")] static extern bool GetExitCodeProcess(IntPtr process, out uint code);
+        [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+        [DllImport("kernel32.dll")] static extern IntPtr LocalFree(IntPtr value);
+        IntPtr job, process;
+        public uint Pid { get; private set; }
+        bool closed;
+
+        static IntPtr Descriptor(string agentSid, string allowed, string denied) {
+            IntPtr result;
+            Guard.Need(ConvertStringSecurityDescriptorToSecurityDescriptor("O:" + Guard.OwnerSid +
+                "D:P(D;;" + denied + ";;;" + agentSid + ")(A;;" + allowed + ";;;" + agentSid +
+                ")(A;;GA;;;" + Guard.OwnerSid + ")(A;;GA;;;SY)(A;;GA;;;BA)", 1, out result, IntPtr.Zero),
+                "YC_OWNER_PROCESS_DESCRIPTOR_FAILED");
+            return result;
+        }
+        static void ProtectProcessAndToken(IntPtr target, IntPtr processSd, IntPtr tokenSd) {
+            Guard.Need(SetKernelObjectSecurity(target, 4, processSd), "YC_OWNER_PROCESS_DACL_FAILED");
+            IntPtr token = IntPtr.Zero;
+            try {
+                Guard.Need(OpenProcessToken(target, 0x40008, out token), "YC_OWNER_PROCESS_TOKEN_UNAVAILABLE");
+                Guard.Need(SetKernelObjectSecurity(token, 4, tokenSd), "YC_OWNER_TOKEN_DACL_FAILED");
+            } finally { if (token != IntPtr.Zero) CloseHandle(token); }
+        }
+        static string Quote(string path) {
+            // Canonical local file paths cannot contain quotes or end with '\'.
+            Guard.Need(path.IndexOf('"') < 0 && !path.EndsWith("\\"), "YC_OWNER_PROCESS_PATH_INVALID");
+            return "\"" + path + "\"";
+        }
+        internal static ManagedChild Start(string python, string entry, string config, string cwd, string agentSid) {
+            ManagedChild result = new ManagedChild();
+            IntPtr processSd = IntPtr.Zero, tokenSd = IntPtr.Zero, threadSd = IntPtr.Zero, environment = IntPtr.Zero;
+            ProcessInfo child = new ProcessInfo();
+            try {
+                processSd = Descriptor(agentSid, "0x1000", "0x1fefff");
+                tokenSd = Descriptor(agentSid, "0x8", "0xf01f7");
+                threadSd = Descriptor(agentSid, "0", "GA");
+                ProtectProcessAndToken(GetCurrentProcess(), processSd, tokenSd);
+                result.job = CreateJobObject(IntPtr.Zero, null);
+                Guard.Need(result.job != IntPtr.Zero, "YC_OWNER_JOB_CREATE_FAILED");
+                ExtendedLimits limits = new ExtendedLimits();
+                limits.Basic.Flags = 0x2000 | 0x8 | 0x200; // kill on close, active count, job memory
+                limits.Basic.ActiveProcesses = 8;
+                limits.JobMemory = new UIntPtr(1024UL * 1024 * 1024);
+                Guard.Need(SetInformationJobObject(result.job, 9, ref limits, (uint)Marshal.SizeOf(limits)),
+                    "YC_OWNER_JOB_LIMITS_FAILED");
+                string windows = Guard.LocalPath(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
+                // No inherited Python/YC/proxy/config/plugin variables, handles or
+                // search paths. Credentials are entered later in the protected UI.
+                string block = "PATH=" + windows + "\\System32\0SystemRoot=" + windows +
+                    "\0TEMP=" + cwd + "\0TMP=" + cwd + "\0USERPROFILE=" + cwd + "\0\0";
+                environment = Marshal.StringToHGlobalUni(block);
+                SecurityAttributes processAttrs = new SecurityAttributes { Length=(uint)Marshal.SizeOf(typeof(SecurityAttributes)), Descriptor=processSd };
+                SecurityAttributes threadAttrs = new SecurityAttributes { Length=(uint)Marshal.SizeOf(typeof(SecurityAttributes)), Descriptor=threadSd };
+                StartupInfo startup = new StartupInfo(); startup.Size = (uint)Marshal.SizeOf(startup);
+                Guard.Need(CreateProcess(python, new StringBuilder(Quote(python) + " -I -S -B " + Quote(entry) + " " + Quote(config)),
+                    ref processAttrs, ref threadAttrs, false, 0x4 | 0x400 | 0x04000000, environment, cwd, ref startup, out child),
+                    "YC_OWNER_PROCESS_CREATE_FAILED");
+                result.process = child.Process; result.Pid = child.Pid;
+                // No Python instruction runs before token protection and job assignment.
+                ProtectProcessAndToken(child.Process, processSd, tokenSd);
+                Guard.Need(AssignProcessToJobObject(result.job, child.Process), "YC_OWNER_JOB_ASSIGN_FAILED");
+                Guard.Need(ResumeThread(child.Thread) == 1, "YC_OWNER_PROCESS_RESUME_FAILED");
+                return result;
+            } catch {
+                if (child.Process != IntPtr.Zero) TerminateProcess(child.Process, 70);
+                result.Dispose(); throw;
+            } finally {
+                if (child.Thread != IntPtr.Zero) CloseHandle(child.Thread);
+                if (environment != IntPtr.Zero) Marshal.FreeHGlobal(environment);
+                if (threadSd != IntPtr.Zero) LocalFree(threadSd);
+                if (tokenSd != IntPtr.Zero) LocalFree(tokenSd);
+                if (processSd != IntPtr.Zero) LocalFree(processSd);
+            }
+        }
+        public uint Wait(uint milliseconds) {
+            Guard.Need(!closed && milliseconds > 0 && milliseconds <= 600000, "YC_OWNER_PROCESS_WAIT_INVALID");
+            uint status = WaitForSingleObject(process, milliseconds);
+            if (status == 258) { Dispose(); throw new Refusal("YC_OWNER_PROCESS_TIMEOUT"); }
+            Guard.Need(status == 0, "YC_OWNER_PROCESS_WAIT_FAILED");
+            uint code; Guard.Need(GetExitCodeProcess(process, out code), "YC_OWNER_PROCESS_EXIT_UNAVAILABLE");
+            return code;
+        }
+        public void Dispose() {
+            if (closed) return; closed = true;
+            if (job != IntPtr.Zero) {
+                bool terminated = TerminateJobObject(job, 70);
+                Stopwatch watch = Stopwatch.StartNew();
+                Accounting data;
+                bool drained = false;
+                while (terminated && watch.ElapsedMilliseconds < 5000) {
+                    if (!QueryInformationJobObject(job, 1, out data, (uint)Marshal.SizeOf(typeof(Accounting)), IntPtr.Zero)) break;
+                    if (data.ActiveProcesses == 0) { drained = true; break; }
+                    System.Threading.Thread.Sleep(10);
+                }
+                // Never release executable/config leases under a live child. An
+                // unconfirmed kernel shutdown is fatal to this native host.
+                if (!drained) Environment.FailFast("YC_OWNER_JOB_SHUTDOWN_UNCONFIRMED");
+                CloseHandle(job); job = IntPtr.Zero;
+            }
+            if (process != IntPtr.Zero) { WaitForSingleObject(process, 5000); CloseHandle(process); process = IntPtr.Zero; }
         }
     }
 }

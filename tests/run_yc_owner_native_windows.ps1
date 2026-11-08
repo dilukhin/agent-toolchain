@@ -164,7 +164,142 @@ try {
         if (-not $process.WaitForExit(10000)) { $process.Kill(); throw 'SYNTHETIC_PYTHON_TIMEOUT' }
         if ($process.ExitCode -ne 0 -or $process.StandardOutput.ReadToEnd().Trim() -ne 'NATIVE_PROTECTED_PYTHON_PASS') { throw 'SYNTHETIC_PYTHON_FAILED' }
     } finally { $lease.Dispose() }
-    Write-Host 'PASS native leases, owner/DACL, groups/rights, mutation rejection and exact isolated Python. No YC/approval/installed host.'
+    # The production supervisor must run as the ordinary owner; admin is only
+    # this disposable fixture's orchestrator. Test attacker is the other account.
+    $pythonAcl = Get-Acl -LiteralPath $python
+    $pythonAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($ownerUser.SID,
+        'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+    Set-Acl -LiteralPath $python -AclObject $pythonAcl
+    $rootAcl = Get-Acl -LiteralPath $root
+    $rootAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($user.SID,
+        'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+    Set-Acl -LiteralPath $root -AclObject $rootAcl
+    $supervisor = Join-Path $root 'supervisor.ps1'
+    $supervisorText = @'
+param([string]$Source,[string]$AgentSid,[string]$Python,[string]$Exchange)
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -Language CSharp
+$work = Join-Path $Exchange 'private-run'
+[YcOwnerNative.Guard]::CreatePrivateDirectory($work)
+$entry = Join-Path $work 'entry.py'
+$config = Join-Path $work 'config.json'
+$entryText = @"
+import json, os, pathlib, subprocess, sys, time
+p = pathlib.Path(sys.argv[1]).parent
+assert sys.flags.isolated and sys.flags.no_site and sys.dont_write_bytecode
+assert set(os.environ).issubset({'PATH','SystemRoot','TEMP','TMP','USERPROFILE','LC_CTYPE'})
+mode = json.loads(pathlib.Path(sys.argv[1]).read_text())['mode']
+if mode == 'timeout':
+    time.sleep(60)
+else:
+    (p/'ready').write_text(str(os.getpid()))
+    until = time.monotonic() + 30
+    while not (p/'release').exists():
+        if time.monotonic() > until: raise RuntimeError('TEST_RELEASE_TIMEOUT')
+        time.sleep(.05)
+    child = subprocess.Popen([sys.executable, '-I', '-S', '-c', 'import time; time.sleep(60)'])
+    (p/'descendant.pid').write_text(str(child.pid))
+"@
+[IO.File]::WriteAllText($entry,$entryText)
+[IO.File]::WriteAllText($config,'{"mode":"normal"}')
+$lease = New-Object YcOwnerNative.FileLease
+try {
+    [void]$lease.HoldTree($Python)
+    [void]$lease.HoldTree($work)
+    $child = $lease.StartPython((Join-Path $Python 'python.exe'),$entry,$config,$work,$AgentSid)
+    [IO.File]::WriteAllText((Join-Path $Exchange 'supervised.pid'), [string]$child.Pid)
+    if ($child.Wait(45000) -ne 0) { throw 'SUPERVISED_CHILD_FAILED' }
+} finally { $lease.Dispose() }
+$descendant = [int]([IO.File]::ReadAllText((Join-Path $work 'descendant.pid')))
+try { $still = Get-Process -Id $descendant -ErrorAction Stop } catch { $still = $null }
+if ($still) { throw 'DESCENDANT_SURVIVED_JOB_CLOSE' }
+$timeoutConfig = Join-Path $work 'timeout.json'
+[IO.File]::WriteAllText($timeoutConfig,'{"mode":"timeout"}')
+$lease = New-Object YcOwnerNative.FileLease
+try {
+    [void]$lease.HoldTree($Python)
+    [void]$lease.HoldTree($work)
+    $child = $lease.StartPython((Join-Path $Python 'python.exe'),$entry,$timeoutConfig,$work,$AgentSid)
+    try { [void]$child.Wait(500); throw 'PROCESS_TIMEOUT_NOT_ENFORCED' }
+    catch { if ($_.Exception.GetBaseException().Message -ne 'YC_OWNER_PROCESS_TIMEOUT') { throw } }
+} finally { $lease.Dispose() }
+try { $still = Get-Process -Id $child.Pid -ErrorAction Stop } catch { $still = $null }
+if ($still) { throw 'TIMEOUT_CHILD_SURVIVED' }
+[Console]::WriteLine('PROTECTED_SUPERVISOR_PASS')
+'@
+    [IO.File]::WriteAllText($supervisor, $supervisorText)
+    $attacker = Join-Path $root 'attacker.ps1'
+    $attackerText = @'
+param([int]$Target)
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class Attacker {
+    [DllImport("kernel32.dll",SetLastError=true)] public static extern IntPtr OpenProcess(uint access,bool inherit,uint pid);
+    [DllImport("advapi32.dll",SetLastError=true)] public static extern bool OpenProcessToken(IntPtr process,uint access,out IntPtr token);
+    [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr handle);
+}
+"@
+foreach ($right in @(1,8,16,32,64,128,256,512,1024,2048,0x20000,0x40000,0x80000)) {
+    $handle = [Attacker]::OpenProcess($right,$false,$Target)
+    if ($handle -ne [IntPtr]::Zero) { [void][Attacker]::CloseHandle($handle); throw "PROCESS_RIGHT_GRANTED: $right" }
+}
+$query = [Attacker]::OpenProcess(0x1000,$false,$Target)
+if ($query -eq [IntPtr]::Zero) { throw 'IDENTITY_QUERY_DENIED' }
+try {
+    foreach ($right in @(1,2,4,0x10,0x20,0x40,0x80,0x100,0x20000,0x40000,0x80000)) {
+        $token = [IntPtr]::Zero
+        if ([Attacker]::OpenProcessToken($query,$right,[ref]$token)) {
+            [void][Attacker]::CloseHandle($token); throw "TOKEN_RIGHT_GRANTED: $right"
+        }
+    }
+    $token = [IntPtr]::Zero
+    if (-not [Attacker]::OpenProcessToken($query,8,[ref]$token)) { throw 'TOKEN_IDENTITY_QUERY_DENIED' }
+    [void][Attacker]::CloseHandle($token)
+} finally { [void][Attacker]::CloseHandle($query) }
+[Console]::WriteLine('AGENT_MUTATION_DENIED_PASS')
+'@
+    [IO.File]::WriteAllText($attacker, $attackerText)
+    $supervisedOut = Join-Path $exchange 'supervised.out'
+    $supervisedErr = Join-Path $exchange 'supervised.err'
+    $arguments = @('-NoProfile','-File',('"'+$supervisor+'"'),('"'+$copiedSource+'"'),$user.SID.Value,
+                   ('"'+$python+'"'),('"'+$exchange+'"'))
+    $ordinary = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+        -ArgumentList $arguments -Credential $credential -LoadUserProfile -WorkingDirectory $exchange `
+        -RedirectStandardOutput $supervisedOut -RedirectStandardError $supervisedErr -PassThru
+    $ordinaryHandle = $ordinary.Handle
+    $ready = Join-Path $exchange 'private-run\ready'
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    while (-not (Test-Path -LiteralPath $ready)) {
+        if ($ordinary.HasExited -or $watch.Elapsed.TotalSeconds -gt 30) {
+            Get-Content -LiteralPath $supervisedErr | Write-Host
+            throw 'SUPERVISED_START_FAILED'
+        }
+        Start-Sleep -Milliseconds 100
+    }
+    $childId = [int]([IO.File]::ReadAllText($ready))
+    $agentCredential = [PSCredential]::new(($env:COMPUTERNAME+'\'+$userName),$password)
+    $attackOut = Join-Path $env:RUNNER_TEMP ('agent-'+$nonce+'.out')
+    $attackErr = Join-Path $env:RUNNER_TEMP ('agent-'+$nonce+'.err')
+    $attack = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+        -ArgumentList @('-NoProfile','-File',('"'+$attacker+'"'),$childId) -Credential $agentCredential `
+        -LoadUserProfile -WorkingDirectory $root -RedirectStandardOutput $attackOut -RedirectStandardError $attackErr -PassThru
+    $attackHandle = $attack.Handle
+    if (-not $attack.WaitForExit(20000)) { $attack.Kill(); throw 'AGENT_MUTATION_TEST_TIMEOUT' }
+    $attack.WaitForExit()
+    if ($attack.ExitCode -ne 0 -or (Get-Content -LiteralPath $attackOut -Raw).Trim() -ne 'AGENT_MUTATION_DENIED_PASS') {
+        Get-Content -LiteralPath $attackErr | Write-Host
+        throw 'AGENT_MUTATION_TEST_FAILED'
+    }
+    [IO.File]::WriteAllText((Join-Path $exchange 'private-run\release'), 'release')
+    if (-not $ordinary.WaitForExit(30000)) { $ordinary.Kill(); throw 'SUPERVISED_STOP_TIMEOUT' }
+    $ordinary.WaitForExit()
+    if ($ordinary.ExitCode -ne 0 -or (Get-Content -LiteralPath $supervisedOut -Raw).Trim() -ne 'PROTECTED_SUPERVISOR_PASS') {
+        Get-Content -LiteralPath $supervisedErr | Write-Host
+        throw 'PROTECTED_SUPERVISOR_FAILED'
+    }
+    Write-Host 'PASS native file/process/token protection, ordinary owner supervisor, hostile account denial, timeout and descendant cleanup. No YC/approval/installed host.'
 } finally {
     if ($created) { Remove-LocalUser -Name $userName }
     if ($ownerCreated) { Remove-LocalUser -Name $ownerName }
