@@ -51,22 +51,35 @@ try {
         $stderr = $process.StandardError.ReadToEndAsync()
         try {
             if (-not $process.WaitForExit(10000)) { $process.Kill(); throw 'YC_CLI_SURFACE_TIMEOUT' }
-            if ($process.ExitCode -ne 0) { throw 'YC_CLI_SURFACE_FAILED' }
             $text = $stdout.Result + $stderr.Result
             if ($text.Length -gt 262144) { throw 'YC_CLI_SURFACE_OUTPUT_LIMIT' }
+            if ($process.ExitCode -ne 0) {
+                [Console]::Error.WriteLine($text.Substring(0,[Math]::Min(4096,$text.Length)))
+                throw 'YC_CLI_SURFACE_FAILED'
+            }
             return $text
         } finally { $process.Dispose() }
     }
     try {
         $actualVersion = (Read-Surface 'version').Trim()
         if ($actualVersion -notmatch '\b1\.39\.0\b' -or $actualVersion -notmatch 'windows/amd64') { throw 'YC_CLI_VERSION_MISMATCH' }
+        @{schema='yc59-cli-binary/v1'; source_url=$url; sha256=$hash;
+          size=(Get-Item -LiteralPath $binary).Length; version_output=$actualVersion} | ConvertTo-Json -Compress
+        $globalHelp = Read-Surface '--help'
         $surfaces = @()
         foreach ($kind in @('instance','disk','snapshot')) {
             $help = Read-Surface ('compute ' + $kind + ' get --help')
+            $completeHelp = $help + $globalHelp
             foreach ($flag in @('--id','--cloud-id','--folder-id','--format','--retry','--no-user-output','--no-browser')) {
-                if (-not $help.Contains($flag)) { throw ('YC_CLI_REQUIRED_FLAG_MISSING: ' + $flag) }
+                if (-not $completeHelp.Contains($flag)) {
+                    [Console]::Error.WriteLine($completeHelp.Substring(0,[Math]::Min(12000,$completeHelp.Length)))
+                    throw ('YC_CLI_REQUIRED_FLAG_MISSING: ' + $flag)
+                }
             }
-            if (-not $help.Contains('json-rest')) { throw 'YC_CLI_JSON_REST_UNAVAILABLE' }
+            if (-not $completeHelp.Contains('json-rest')) { throw 'YC_CLI_JSON_REST_UNAVAILABLE' }
+            # Parse the complete production argv plus --help. This performs no
+            # resource lookup and detects flags hidden from nested help output.
+            [void](Read-Surface ('compute ' + $kind + ' get --id synthetic-resource --cloud-id synthetic-cloud --folder-id synthetic-folder --format json-rest --retry 0 --no-user-output --no-browser --help'))
             $surfaces += ('compute.' + $kind + '.get')
         }
         @{schema='yc59-cli-surface/v1'; source_url=$url; sha256=$hash;

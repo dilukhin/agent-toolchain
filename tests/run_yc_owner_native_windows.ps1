@@ -197,7 +197,8 @@ $entryText = @"
 import json, os, pathlib, subprocess, sys, time
 p = pathlib.Path(sys.argv[1]).parent
 assert sys.flags.isolated and sys.flags.no_site and sys.dont_write_bytecode
-assert set(os.environ).issubset({'PATH','SystemRoot','TEMP','TMP','USERPROFILE','LC_CTYPE'})
+allowed = {'PATH','SYSTEMROOT','TEMP','TMP','USERPROFILE','LC_CTYPE'}
+assert set(os.environ).issubset(allowed), sorted(set(os.environ) - allowed)
 mode = json.loads(pathlib.Path(sys.argv[1]).read_text())['mode']
 if mode == 'timeout':
     time.sleep(60)
