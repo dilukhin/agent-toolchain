@@ -1,5 +1,6 @@
 """Bootstrap byte pins are checked portably; native behavior runs on Windows."""
 import hashlib
+import base64
 import json
 from pathlib import Path
 import re
@@ -9,6 +10,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class NativeBootstrapContractTests(unittest.TestCase):
+    def test_managed_seed_embeds_exact_native_and_authoritative_candidate_bytes(self):
+        import setup_yc_owner_release as release
+        raw = (ROOT / 'native/yc_owner_release.ps1').read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), release.SEED_SHA256)
+        seed = raw.decode('utf-8')
+        native = re.search(r"(?m)^\$EmbeddedNativeBytes = \[Convert\]::FromBase64String\('([^']+)'\)$",seed)
+        manifest = re.search(r"(?m)^\$ManifestBytes = \[Convert\]::FromBase64String\('([^']+)'\)$",seed)
+        self.assertEqual(base64.b64decode(native.group(1)),(ROOT/'native/yc_owner_native.cs').read_bytes())
+        import setup_yc_owner_component as component
+        self.assertEqual(base64.b64decode(manifest.group(1)),component.canonical(release.MANIFEST)+b'\n')
+        self.assertTrue(release.MANIFEST['execution_enabled'])
+        self.assertEqual(release.MANIFEST['status'],'managed_owner_candidate')
+        self.assertFalse(release.MANIFEST['installed_acceptance'])
+
     def test_context_fixture_uses_the_exact_inactive_component_pin(self):
         import setup_yc_owner_component as component
         pins = json.loads((ROOT / 'tests/yc59_context_component_pins.json').read_bytes())

@@ -104,3 +104,19 @@ ReadContext. Для рабочего пути ещё требуются защи
 Источники: [NetUserGetLocalGroups](https://learn.microsoft.com/en-us/windows/win32/api/lmaccess/nf-lmaccess-netusergetlocalgroups),
 [LsaEnumerateAccountRights](https://learn.microsoft.com/en-us/windows/win32/api/ntsecapi/nf-ntsecapi-lsaenumerateaccountrights),
 [FileShare](https://learn.microsoft.com/en-us/dotnet/api/system.io.fileshare?view=netframework-4.8.1).
+
+
+## Управляемый выпуск
+
+`native/yc_owner_release.ps1` содержит точные байты C# и авторитетного v2-манифеста
+внутри независимо проверяемого seed. Prepare/Check/Run работают под владельцем;
+на входе Run WTS подтверждает собственный интерактивный вход (runas недостаточно)
+до запроса секретов. Родитель запечатывается сразу после загрузки нативного слоя.
+Общий owner.lock в защищённом профиле охватывает все выпуски/сеансы этого SID.
+Журналы и контрольная точка не содержат согласий; прошлый выпуск сохраняется.
+Неподтверждённый прежний процесс и частичный журнал вызывают отказ.
+
+CI проверяет настоящий цикл Prepare/Check, повторную подготовку, общий замок,
+сохранение прошлого выпуска, отказ частичному журналу и фоновому Run. Введённый
+в тесте закрытый checkpoint — только испытание поставки, не имитация согласия
+или облачного результата. Подробная локальная приёмка — [отдельная инструкция](yc59_managed_delivery_ru.md).

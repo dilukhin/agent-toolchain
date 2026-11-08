@@ -246,6 +246,13 @@ try {
 param([string]$Source,[string]$AgentSid,[string]$Python,[string]$Exchange,[string]$Component,[string]$Yc)
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -Language CSharp
+[YcOwnerNative.ManagedChild]::SealParent($AgentSid)
+try {
+    [YcOwnerNative.Guard]::AssertOwnerLoginSession($AgentSid)
+    throw 'CREDENTIAL_PROCESS_ACCEPTED_AS_OWNER_LOGIN'
+} catch {
+    if ($_.Exception.GetBaseException().Message -notin @('YC_OWNER_OWN_INTERACTIVE_LOGON_REQUIRED','YC_OWNER_SESSION_LOGIN_UNAVAILABLE')) { throw }
+}
 $work = Join-Path $Exchange 'private-run'
 [YcOwnerNative.Guard]::CreatePrivateDirectory($work)
 $entry = Join-Path $work 'entry.py'
@@ -445,7 +452,86 @@ try {
         Get-Content -LiteralPath $supervisedErr | Write-Host
         throw 'PROTECTED_SUPERVISOR_FAILED'
     }
-    Write-Host 'PASS native file/process/token protection, ordinary owner supervisor, hostile account denial, timeout and descendant cleanup. No YC/approval/installed host.'
+    # Run the actual managed native seed from verified bytes, never through Python.
+    # No interactive consent is manufactured: background Run must fail before UI.
+    Protect-FixtureSource $archive
+    $releaseSeed = Join-Path $root 'release-seed.ps1'
+    [IO.File]::WriteAllBytes($releaseSeed,[IO.File]::ReadAllBytes((Join-Path $repo 'native\yc_owner_release.ps1')))
+    $releaseSha = (Get-FileHash -LiteralPath $releaseSeed -Algorithm SHA256).Hash.ToLowerInvariant()
+    $wrapper = Join-Path $root 'managed-wrapper.ps1'
+    $wrapperText = @'
+param([string]$Seed,[string]$Expected,[string]$Mode,[string]$Agent,[string]$Destination,[string]$Cache)
+$ErrorActionPreference = 'Stop'
+if ($Mode -eq 'Checkpoint') {
+    $anchor = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agent-toolchain-yc-owner'
+    $value = @{schema='yc-owner-active/v1';phase='closed';owner_sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value;
+        destination=$Destination;server_pid=0;artifact_id='synthetic-previous';seed_sha256=$Expected;previous_release=''}
+    [IO.File]::WriteAllText((Join-Path $anchor 'active.json'),($value|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
+    exit 0
+}
+if ($Mode -eq 'LockedCheck') {
+    $anchor = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agent-toolchain-yc-owner'
+    $held = [IO.File]::Open((Join-Path $anchor 'owner.lock'),[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+    try {
+        $start = [Diagnostics.ProcessStartInfo]::new()
+        $start.FileName = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $start.Arguments = '-NoProfile -File "'+$PSCommandPath+'" "'+$Seed+'" '+$Expected+' Check '+$Agent+' "'+$Destination+'" "'+$Cache+'"'
+        $start.UseShellExecute = $false
+        $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
+        $process = [Diagnostics.Process]::Start($start)
+        if (-not $process.WaitForExit(20000)) { $process.Kill(); throw 'LOCK_TEST_TIMEOUT' }
+        if ($process.ExitCode -ne 2 -or $process.StandardError.ReadToEnd() -notmatch 'YC_OWNER_LEASE_OPEN_FAILED') { throw 'PARALLEL_OWNER_NOT_REFUSED' }
+    } finally { $held.Dispose() }
+    exit 0
+}
+$raw = [IO.File]::ReadAllBytes($Seed)
+$sha = [Security.Cryptography.SHA256]::Create()
+try { $actual = ([BitConverter]::ToString($sha.ComputeHash($raw))).Replace('-','').ToLowerInvariant() }
+finally { $sha.Dispose() }
+if ($actual -ne $Expected) { throw 'VERIFIED_SEED_MISMATCH' }
+& ([scriptblock]::Create([Text.Encoding]::UTF8.GetString($raw))) -Mode $Mode -AgentSid $Agent `
+    -SeedBytes $raw -Destination $Destination -ProtectedCache $Cache
+'@
+    [IO.File]::WriteAllText($wrapper,$wrapperText)
+    function Invoke-ManagedFixture([string]$Mode,[string]$Destination,[int]$ExpectedExit) {
+        $label = [guid]::NewGuid().ToString('N')
+        $out = Join-Path $exchange ($label+'.out'); $err = Join-Path $exchange ($label+'.err')
+        $arguments = @('-NoProfile','-File',('"'+$wrapper+'"'),('"'+$releaseSeed+'"'),$releaseSha,$Mode,$user.SID.Value,
+            ('"'+$Destination+'"'),('"'+$root+'"'))
+        $script:managedRun = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+            -ArgumentList $arguments -Credential $credential -LoadUserProfile -WorkingDirectory $exchange `
+            -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+        $managedHandle = $script:managedRun.Handle
+        if (-not $script:managedRun.WaitForExit(90000)) { $script:managedRun.Kill(); throw 'MANAGED_FIXTURE_TIMEOUT' }
+        $script:managedRun.WaitForExit()
+        if ($script:managedRun.ExitCode -ne $ExpectedExit) {
+            Get-Content -LiteralPath $err | Write-Host
+            throw ('MANAGED_FIXTURE_UNEXPECTED_EXIT: '+$Mode)
+        }
+        return @{out=[IO.File]::ReadAllText($out);err=[IO.File]::ReadAllText($err)}
+    }
+    $firstRelease = Join-Path $exchange 'managed-first'
+    $nextRelease = Join-Path $exchange 'managed-next'
+    $prepared = Invoke-ManagedFixture 'Prepare' $firstRelease 0
+    if (($prepared.out|ConvertFrom-Json).status -ne 'prepared') { throw 'MANAGED_PREPARE_RESULT_INVALID' }
+    $firstJournal = (Get-FileHash (Join-Path $firstRelease 'release.json') -Algorithm SHA256).Hash
+    $checked = Invoke-ManagedFixture 'Check' $firstRelease 0
+    if (($checked.out|ConvertFrom-Json).status -ne 'prepared_verified') { throw 'MANAGED_CHECK_RESULT_INVALID' }
+    [void](Invoke-ManagedFixture 'Prepare' $firstRelease 0)
+    [void](Invoke-ManagedFixture 'LockedCheck' $firstRelease 0)
+    $refused = Invoke-ManagedFixture 'Run' $firstRelease 2
+    if ($refused.err -notmatch 'YC_OWNER_LOCAL_TERMINAL_REQUIRED') { throw 'BACKGROUND_OWNER_WAS_NOT_REFUSED' }
+    [void](Invoke-ManagedFixture 'Checkpoint' $firstRelease 0)
+    [void](Invoke-ManagedFixture 'Prepare' $nextRelease 0)
+    $nextJournalPath = Join-Path $nextRelease 'release.json'
+    $nextJournal = Get-Content $nextJournalPath -Raw | ConvertFrom-Json
+    if ($nextJournal.previous_release -ne $firstRelease) { throw 'PREVIOUS_RELEASE_NOT_RETAINED' }
+    $nextJournal.phase = 'prepared'
+    [IO.File]::WriteAllText($nextJournalPath,($nextJournal|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
+    $refused = Invoke-ManagedFixture 'Check' $nextRelease 2
+    if ($refused.err -notmatch 'YC_OWNER_RELEASE_PENDING_OR_CONFLICT') { throw 'PARTIAL_RELEASE_ACCEPTED' }
+    if ((Get-FileHash (Join-Path $firstRelease 'release.json') -Algorithm SHA256).Hash -ne $firstJournal) { throw 'PREVIOUS_RELEASE_CHANGED' }
+    Write-Host 'PASS native managed prepare/check/lock/previous-release/partial-journal/background refusal. No human consent or cloud getter simulated.'
 } catch {
     [Console]::Error.WriteLine('NATIVE_FIXTURE_FAILURE: ' + $_.Exception.Message)
     [Console]::Error.WriteLine($_.ScriptStackTrace)
@@ -453,7 +539,7 @@ try {
 } finally {
     # Only processes created and retained by this disposable fixture. Kill the
     # native parent first; its kill-on-close job releases all child file leases.
-    foreach ($ownedProcess in @($ordinary,$attack)) {
+    foreach ($ownedProcess in @($ordinary,$attack,$managedRun)) {
         if ($ownedProcess -and -not $ownedProcess.HasExited) {
             $ownedProcess.Kill()
             [void]$ownedProcess.WaitForExit(5000)

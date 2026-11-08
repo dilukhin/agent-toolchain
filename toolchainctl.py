@@ -89,6 +89,8 @@ _CORE_REQUIRED_FILES = (
     "setup_tools.py",
     "setup_yc_transitional_guard.py",
     "setup_yc_owner_component.py",
+    "setup_yc_owner_release.py",
+    "yc_owner_client.py",
     "yc_transitional_entry.py",
     "bootstrap_core.py",
     "proxy_tools.py",
@@ -1436,7 +1438,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "yc-guard":
         return setup_yc_transitional_guard.run_cli(args)
     if args.command == "yc-owner":
-        if args.yc_owner_command == "stage":
+        if args.yc_owner_command in {"stage", "apply", "read"}:
             try:
                 _owned_installed_core()
             except (SelfUpdateError, OSError, ValueError):

@@ -46,6 +46,9 @@ namespace YcOwnerNative {
             string server, string user, uint level, uint flags, out IntPtr buffer, uint preferred,
             out uint read, out uint total);
         [DllImport("netapi32.dll")] static extern uint NetApiBufferFree(IntPtr buffer);
+        [DllImport("wtsapi32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool
+            WTSQuerySessionInformation(IntPtr server, uint session, int kind, out IntPtr buffer, out uint bytes);
+        [DllImport("wtsapi32.dll")] static extern void WTSFreeMemory(IntPtr buffer);
         [DllImport("advapi32.dll")] static extern uint LsaOpenPolicy(IntPtr system, ref LsaAttributes attrs,
             uint access, out IntPtr policy);
         [DllImport("advapi32.dll")] static extern uint LsaEnumerateAccountRights(IntPtr policy, byte[] sid,
@@ -73,6 +76,27 @@ namespace YcOwnerNative {
         public static void AssertStandardOwner(string agentSid) {
             AssertInteractiveOwner(agentSid);
             LocalAgentSubjects(OwnerSid);
+        }
+        static string SessionText(int kind) {
+            IntPtr buffer = IntPtr.Zero; uint bytes;
+            try {
+                Need(WTSQuerySessionInformation(IntPtr.Zero, (uint)Process.GetCurrentProcess().SessionId,
+                    kind, out buffer, out bytes) && bytes > 0 && bytes <= 1024 && bytes % 2 == 0,
+                    "YC_OWNER_SESSION_LOGIN_UNAVAILABLE");
+                string value = Marshal.PtrToStringUni(buffer, (int)bytes / 2).TrimEnd('\0');
+                Need(value.Length > 0, "YC_OWNER_SESSION_LOGIN_UNAVAILABLE");
+                return value;
+            } finally { if (buffer != IntPtr.Zero) WTSFreeMemory(buffer); }
+        }
+        public static void AssertOwnerLoginSession(string agentSid) {
+            AssertStandardOwner(agentSid);
+            string user = SessionText(5), domain = SessionText(7); // WTSUserName, WTSDomainName
+            Need(String.Equals(domain, Environment.MachineName, StringComparison.OrdinalIgnoreCase),
+                "YC_OWNER_OWN_INTERACTIVE_LOGON_REQUIRED");
+            string sid;
+            try { sid = ((SecurityIdentifier)new NTAccount(domain, user).Translate(typeof(SecurityIdentifier))).Value; }
+            catch { throw new Refusal("YC_OWNER_SESSION_LOGIN_UNAVAILABLE"); }
+            Need(sid == OwnerSid, "YC_OWNER_OWN_INTERACTIVE_LOGON_REQUIRED");
         }
         static HashSet<string> LocalAgentSubjects(string agentSid) {
             SecurityIdentifier sid;
@@ -269,10 +293,10 @@ namespace YcOwnerNative {
                 }
             } finally { if (descriptor != IntPtr.Zero) LocalFree(descriptor); }
         }
-        SafeFileHandle Open(string path, bool directory, bool ancestor, bool administrative = false) {
+        SafeFileHandle Open(string path, bool directory, bool ancestor, bool administrative = false, bool exclusive = false) {
             Guard.Need(!closed, "YC_OWNER_LEASE_CLOSED");
             // FILE_SHARE_READ only: writes, replacement and deletion cannot race a live lease.
-            SafeFileHandle handle = CreateFile(path, directory ? 0x20080U : 0x80020000U, 1,
+            SafeFileHandle handle = CreateFile(path, exclusive ? 0xC0020000U : (directory ? 0x20080U : 0x80020000U), exclusive ? 0U : 1U,
                 IntPtr.Zero, 3, 0x00200000U | (directory ? 0x02000000U : 0), IntPtr.Zero);
             Guard.Need(!handle.IsInvalid, "YC_OWNER_LEASE_OPEN_FAILED");
             try {
@@ -316,6 +340,26 @@ namespace YcOwnerNative {
         }
         public FilePin HoldFile(string path, string expectedHash) {
             return HoldFileCore(path, expectedHash, false);
+        }
+        public void HoldRoot(string path) {
+            path = Guard.LocalPath(path); Ancestors(path); HoldDirectory(path, false);
+        }
+        public void HoldLock(string path, string expectedHash) {
+            path = Guard.LocalPath(path);
+            Guard.Need(!files.ContainsKey(path), "YC_OWNER_DUPLICATE_LOCK");
+            Ancestors(System.IO.Path.GetDirectoryName(path));
+            SafeFileHandle handle = Open(path, false, false, false, true);
+            FileStream stream = null;
+            try {
+                stream = new FileStream(handle, FileAccess.ReadWrite);
+                Guard.Need(stream.Length > 0 && stream.Length <= 4096, "YC_OWNER_LOCK_MARKER_INVALID");
+                string digest;
+                using (SHA256 sha = SHA256.Create()) digest = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+                Guard.Need(digest == expectedHash, "YC_OWNER_LOCK_MARKER_INVALID");
+                stream.Position = 0;
+                held.Add(stream);
+                files.Add(path, new FilePin { Path=path, Sha256=digest, Size=stream.Length });
+            } catch { if (stream != null) stream.Dispose(); else handle.Dispose(); throw; }
         }
         internal FilePin HoldAuditFile(string path) { return HoldFileCore(path, null, true); }
         FilePin HoldFileCore(string path, string expectedHash, bool administrative) {
@@ -462,6 +506,18 @@ namespace YcOwnerNative {
             // Canonical local file paths cannot contain quotes or end with '\'.
             Guard.Need(path.IndexOf('"') < 0 && !path.EndsWith("\\"), "YC_OWNER_PROCESS_PATH_INVALID");
             return "\"" + path + "\"";
+        }
+        public static void SealParent(string agentSid) {
+            Guard.AssertStandardOwner(agentSid);
+            IntPtr processSd = IntPtr.Zero, tokenSd = IntPtr.Zero;
+            try {
+                processSd = Descriptor(agentSid, "0x1000", "0x1fefff");
+                tokenSd = Descriptor(agentSid, "0x8", "0xf01f7");
+                ProtectProcessAndToken(GetCurrentProcess(), processSd, tokenSd, IntPtr.Zero);
+            } finally {
+                if (tokenSd != IntPtr.Zero) LocalFree(tokenSd);
+                if (processSd != IntPtr.Zero) LocalFree(processSd);
+            }
         }
         internal static ManagedChild Start(string python, string entry, string config, string cwd, string agentSid) {
             ManagedChild result = new ManagedChild();
