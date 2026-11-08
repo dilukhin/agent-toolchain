@@ -170,8 +170,14 @@ try {
     # ownership/allow ACE to the administrative source used by a different owner.
     Set-Acl -LiteralPath $python -AclObject $readable
     foreach ($item in Get-ChildItem -LiteralPath $python -Recurse -Force) {
-        $itemAcl = Get-Acl -LiteralPath $item.FullName
+        $itemAcl = [Security.AccessControl.FileSecurity]::new()
+        $itemAcl.SetAccessRuleProtection($true, $false)
         $itemAcl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
+        foreach ($sid in @('S-1-5-18','S-1-5-32-544')) {
+            $itemAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
+                [Security.Principal.SecurityIdentifier]::new($sid), 'FullControl', 'Allow'))
+        }
+        $itemAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($ownerUser.SID, 'ReadAndExecute', 'Allow'))
         Set-Acl -LiteralPath $item.FullName -AclObject $itemAcl
     }
     $rootAcl = Get-Acl -LiteralPath $root
