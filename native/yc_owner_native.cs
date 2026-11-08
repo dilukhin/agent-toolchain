@@ -202,7 +202,7 @@ namespace YcOwnerNative {
                 Need(age >= 0 && age <= 180, "YC_OWNER_CAPABILITY_EXPIRED");
             }
         }
-        internal static string LocalPath(string path) {
+        public static string LocalPath(string path) {
             Need(path != null && path.Length >= 3 && path.Length < 248 && path[1] == ':' &&
                 Char.IsLetter(path[0]) && path[2] == '\\' && path.IndexOf(':', 2) < 0 &&
                 path.IndexOf('/') < 0 && path.IndexOf('\0') < 0 && path.IndexOf('"') < 0,

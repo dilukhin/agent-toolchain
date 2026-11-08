@@ -10,6 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class NativeBootstrapContractTests(unittest.TestCase):
+    def test_managed_script_path_validation_is_public(self):
+        native = (ROOT / 'native/yc_owner_native.cs').read_text()
+        self.assertIn('public static string LocalPath(string path)', native)
+
     def test_managed_seed_embeds_exact_native_and_authoritative_candidate_bytes(self):
         import setup_yc_owner_release as release
         raw = (ROOT / 'native/yc_owner_release.ps1').read_bytes()
