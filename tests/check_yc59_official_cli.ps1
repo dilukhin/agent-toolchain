@@ -7,7 +7,27 @@ $root = Join-Path $env:RUNNER_TEMP ('yc59-cli-' + [guid]::NewGuid().ToString('N'
 [void](New-Item -ItemType Directory -Path $root)
 try {
     $binary = Join-Path $root 'yc.exe'
-    Invoke-WebRequest -UseBasicParsing -TimeoutSec 60 -Uri $url -OutFile $binary
+    $request = [Net.HttpWebRequest]::Create($url)
+    $request.Timeout = 10000
+    $request.ReadWriteTimeout = 5000
+    $request.AllowAutoRedirect = $false
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    $response = $request.GetResponse()
+    try {
+        if ($response.ContentLength -gt 268435456) { throw 'YC_CLI_BINARY_LIMIT' }
+        $inputStream = $response.GetResponseStream()
+        $output = [IO.File]::Open($binary,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+        try {
+            $buffer = New-Object byte[] 65536
+            $total = 0L
+            while (($count = $inputStream.Read($buffer,0,$buffer.Length)) -gt 0) {
+                $total += $count
+                if ($total -gt 268435456 -or $watch.Elapsed.TotalSeconds -gt 60) { throw 'YC_CLI_DOWNLOAD_LIMIT' }
+                $output.Write($buffer,0,$count)
+            }
+            $output.Flush($true)
+        } finally { $output.Dispose(); $inputStream.Dispose() }
+    } finally { $response.Dispose() }
     if ((Get-Item -LiteralPath $binary).Length -gt 268435456) { throw 'YC_CLI_BINARY_LIMIT' }
     $hash = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
     $held = [IO.File]::Open($binary,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
