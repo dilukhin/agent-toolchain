@@ -184,9 +184,66 @@ try {
     $rootAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($user.SID,
         'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
     Set-Acl -LiteralPath $root -AclObject $rootAcl
+    function Get-VerifiedFixtureFile([string]$Url,[string]$Path,[string]$Hash,[long]$Size) {
+        $request = [Net.HttpWebRequest]::Create($Url)
+        $request.Timeout = 10000; $request.ReadWriteTimeout = 5000; $request.AllowAutoRedirect = $false
+        $watch = [Diagnostics.Stopwatch]::StartNew()
+        $response = $request.GetResponse()
+        try {
+            if ($response.ContentLength -gt $Size) { throw 'FIXTURE_SOURCE_SIZE_LIMIT' }
+            $source = $response.GetResponseStream()
+            $target = [IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+            try {
+                $buffer = New-Object byte[] 65536
+                $total = 0L
+                while (($count = $source.Read($buffer,0,$buffer.Length)) -gt 0) {
+                    $total += $count
+                    if ($total -gt $Size -or $watch.Elapsed.TotalSeconds -gt 60) { throw 'FIXTURE_SOURCE_DOWNLOAD_LIMIT' }
+                    $target.Write($buffer,0,$count)
+                }
+                $target.Flush($true)
+            } finally { $target.Dispose(); $source.Dispose() }
+        } finally { $response.Dispose() }
+        if ((Get-Item -LiteralPath $Path).Length -ne $Size -or
+            (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Hash) { throw 'FIXTURE_SOURCE_DIGEST_MISMATCH' }
+    }
+    function Protect-FixtureSource([string]$Path) {
+        foreach ($item in @((Get-Item -LiteralPath $Path)) + @(Get-ChildItem -LiteralPath $Path -Recurse -Force)) {
+            if ($item.PSIsContainer) {
+                Set-Acl -LiteralPath $item.FullName -AclObject $readable
+            } else {
+                $acl = [Security.AccessControl.FileSecurity]::new()
+                $acl.SetAccessRuleProtection($true,$false)
+                $acl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
+                foreach ($sid in @('S-1-5-18','S-1-5-32-544')) {
+                    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
+                        [Security.Principal.SecurityIdentifier]::new($sid),'FullControl','Allow'))
+                }
+                $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($ownerUser.SID,'ReadAndExecute','Allow'))
+                Set-Acl -LiteralPath $item.FullName -AclObject $acl
+            }
+        }
+    }
+    $component = Join-Path $root 'component'
+    [YcOwnerNative.Guard]::CreatePrivateDirectory($component)
+    $componentPins = Get-Content (Join-Path $PSScriptRoot 'yc59_context_component_pins.json') -Raw | ConvertFrom-Json
+    foreach ($row in $componentPins.manifest.files) {
+        $sourcePath = $componentPins.source_map.($row.path)
+        if ($row.path -notmatch '^[A-Za-z0-9_./-]+$' -or $row.path.Contains('..') -or -not $sourcePath) { throw 'FIXTURE_PIN_PATH_INVALID' }
+        $target = Join-Path $component $row.path
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))
+        Get-VerifiedFixtureFile ('https://raw.githubusercontent.com/dilukhin/opencode_permissions/' +
+            $componentPins.source_ref + '/' + $sourcePath) $target $row.sha256 $row.size
+    }
+    [IO.File]::WriteAllText((Join-Path $component 'manifest.json'),$componentPins.manifest_json,[Text.UTF8Encoding]::new($false))
+    Protect-FixtureSource $component
+    $yc = Join-Path $root 'yc.exe'
+    Get-VerifiedFixtureFile 'https://storage.yandexcloud.net/yandexcloud-yc/release/1.39.0/windows/amd64/yc.exe' `
+        $yc '7dc58200b8ecba6913ec3f9961d0fda21ee3b67fa6972dad0cffdde5198acb94' 196325832
+    Protect-FixtureSource $yc
     $supervisor = Join-Path $root 'supervisor.ps1'
     $supervisorText = @'
-param([string]$Source,[string]$AgentSid,[string]$Python,[string]$Exchange)
+param([string]$Source,[string]$AgentSid,[string]$Python,[string]$Exchange,[string]$Component,[string]$Yc)
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -Language CSharp
 $work = Join-Path $Exchange 'private-run'
@@ -200,7 +257,39 @@ assert sys.flags.isolated and sys.flags.no_site and sys.dont_write_bytecode
 allowed = {'PATH','SYSTEMROOT','TEMP','TMP','USERPROFILE','LC_CTYPE'}
 assert set(os.environ).issubset(allowed), sorted(set(os.environ) - allowed)
 mode = json.loads(pathlib.Path(sys.argv[1]).read_text())['mode']
-if mode == 'timeout':
+if mode == 'context':
+    data = json.loads(pathlib.Path(sys.argv[1]).read_text())
+    sys.path.insert(0, str(pathlib.Path(data['component'])/'runtime'))
+    from yc_owner_windows_context import WindowsReadContext
+    from yc_read_projection import SnapshotSelection
+    from yc_snapshot_read import ReadError
+    marker = 'SYNTHETIC_IAM_TOKEN_NEVER_FOR_CLOUD'
+    sources = WindowsReadContext(selection=SnapshotSelection('synthetic-folder','synthetic-vm','synthetic-disk','synthetic-snapshot'),
+        cloud_id='synthetic-cloud', observed_monotonic=time.monotonic(), yc_path=data['yc'], cwd=str(p),
+        native_policy_path=str(pathlib.Path(data['component'])/'policy/native/rules.v1.json'),
+        yc_policy_path=str(pathlib.Path(data['component'])/'policy/yc/yc_policy.v1.json'),
+        native_sha256=data['native_sha'], yc_policy_sha256=data['yc_policy_sha'], iam_token=marker)
+    try:
+        operation = sources.profile.operation()
+        assert marker not in json.dumps(operation)
+        assert operation['scope']['snapshot_id'] == 'synthetic-snapshot'
+        assert operation['execution']['executable_identity'].startswith('win-file:')
+        assert sources.veto.check(sources.current()) == 'ask'
+        for argv in operation['execution']['argv']:
+            try:
+                sources.start(operation['execution'], tuple([*argv, '--help']))
+                raise AssertionError('UNBOUND_ARGV_ACCEPTED')
+            except ReadError as error:
+                assert error.code == 'YC_OWNER_SPAWN_BINDING_CHANGED'
+    finally:
+        sources.close()
+    try:
+        sources.current()
+        raise AssertionError('CLOSED_CONTEXT_ACCEPTED')
+    except ReadError:
+        pass
+    (p/'context.pass').write_text('PROTECTED_CONTEXT_PASS')
+elif mode == 'timeout':
     time.sleep(60)
 else:
     (p/'ready').write_text(str(os.getpid()))
@@ -239,6 +328,22 @@ try {
 } finally { $lease.Dispose() }
 try { $still = Get-Process -Id $child.Pid -ErrorAction Stop } catch { $still = $null }
 if ($still) { throw 'TIMEOUT_CHILD_SURVIVED' }
+$contextConfig = Join-Path $work 'context.json'
+$pins = Get-Content (Join-Path $Component 'manifest.json') -Raw | ConvertFrom-Json
+$nativePin = $pins.files | Where-Object { $_.path -eq 'policy/native/rules.v1.json' }
+$ycPin = $pins.files | Where-Object { $_.path -eq 'policy/yc/yc_policy.v1.json' }
+[IO.File]::WriteAllText($contextConfig, (@{mode='context';component=$Component;yc=$Yc;
+    native_sha=$nativePin.sha256;yc_policy_sha=$ycPin.sha256} | ConvertTo-Json -Compress))
+$lease = New-Object YcOwnerNative.FileLease
+try {
+    [void]$lease.HoldTree($Python)
+    [void]$lease.HoldTree($Component)
+    [void]$lease.HoldFile($Yc,'7dc58200b8ecba6913ec3f9961d0fda21ee3b67fa6972dad0cffdde5198acb94')
+    [void]$lease.HoldTree($work)
+    $child = $lease.StartPython((Join-Path $Python 'python.exe'),$entry,$contextConfig,$work,$AgentSid)
+    if ($child.Wait(30000) -ne 0) { throw 'PROTECTED_CONTEXT_FAILED' }
+    if ([IO.File]::ReadAllText((Join-Path $work 'context.pass')) -ne 'PROTECTED_CONTEXT_PASS') { throw 'CONTEXT_RESULT_MISSING' }
+} finally { $lease.Dispose() }
 [Console]::WriteLine('PROTECTED_SUPERVISOR_PASS')
 '@
     [IO.File]::WriteAllText($supervisor, $supervisorText)
@@ -283,7 +388,7 @@ try {
     $supervisedOut = Join-Path $exchange 'supervised.out'
     $supervisedErr = Join-Path $exchange 'supervised.err'
     $arguments = @('-NoProfile','-File',('"'+$supervisor+'"'),('"'+$copiedSource+'"'),$user.SID.Value,
-                   ('"'+$python+'"'),('"'+$exchange+'"'))
+                   ('"'+$python+'"'),('"'+$exchange+'"'),('"'+$component+'"'),('"'+$yc+'"'))
     $ordinary = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
         -ArgumentList $arguments -Credential $credential -LoadUserProfile -WorkingDirectory $exchange `
         -RedirectStandardOutput $supervisedOut -RedirectStandardError $supervisedErr -PassThru
@@ -330,7 +435,7 @@ try {
         throw 'DESCENDANT_DEFAULT_DACL_FAILED'
     }
     [IO.File]::WriteAllText((Join-Path $exchange 'private-run\finish'), 'finish')
-    if (-not $ordinary.WaitForExit(30000)) { $ordinary.Kill(); throw 'SUPERVISED_STOP_TIMEOUT' }
+    if (-not $ordinary.WaitForExit(45000)) { $ordinary.Kill(); throw 'SUPERVISED_STOP_TIMEOUT' }
     $ordinary.WaitForExit()
     if ($ordinary.ExitCode -ne 0 -or (Get-Content -LiteralPath $supervisedOut -Raw).Trim() -ne 'PROTECTED_SUPERVISOR_PASS') {
         Get-Content -LiteralPath $supervisedErr | Write-Host
