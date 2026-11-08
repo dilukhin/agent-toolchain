@@ -442,7 +442,19 @@ try {
         throw 'PROTECTED_SUPERVISOR_FAILED'
     }
     Write-Host 'PASS native file/process/token protection, ordinary owner supervisor, hostile account denial, timeout and descendant cleanup. No YC/approval/installed host.'
+} catch {
+    [Console]::Error.WriteLine('NATIVE_FIXTURE_FAILURE: ' + $_.Exception.Message)
+    [Console]::Error.WriteLine($_.ScriptStackTrace)
+    throw
 } finally {
+    # Only processes created and retained by this disposable fixture. Kill the
+    # native parent first; its kill-on-close job releases all child file leases.
+    foreach ($ownedProcess in @($ordinary,$attack)) {
+        if ($ownedProcess -and -not $ownedProcess.HasExited) {
+            $ownedProcess.Kill()
+            [void]$ownedProcess.WaitForExit(5000)
+        }
+    }
     if ($created) { Remove-LocalUser -Name $userName }
     if ($ownerCreated) { Remove-LocalUser -Name $ownerName }
     if ($rootCreated -and (Test-Path -LiteralPath $root)) { Remove-Item -LiteralPath $root -Recurse -Force }
