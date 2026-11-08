@@ -192,10 +192,12 @@ try {
     $OwnerSid = [YcOwnerNative.Guard]::OwnerSid
     $seedSha = Hash-Bytes $SeedBytes
     $stageCode = 'ANCHOR'
+    $stageCode = 'ANCHOR_FOLDER'
     $anchor = [YcOwnerNative.Guard]::LocalPath((Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agent-toolchain-yc-owner'))
     $anchorMarker = $Utf8.GetBytes("agent-toolchain:yc-owner-anchor:v1`n$OwnerSid`n")
     $anchorLock = $Utf8.GetBytes("agent-toolchain:yc-owner-lock:v1`n$OwnerSid`n")
     if (-not [IO.Directory]::Exists($anchor)) {
+        $stageCode = 'ANCHOR_CREATE'
         if ($Mode -ne 'Prepare') { throw 'YC_OWNER_ANCHOR_NOT_PREPARED' }
         [YcOwnerNative.Guard]::CreatePrivateDirectory($anchor)
         Write-New (Join-Path $anchor '.owner') $anchorMarker
@@ -203,9 +205,12 @@ try {
         [YcOwnerNative.Guard]::CreatePrivateDirectory((Join-Path $anchor 'releases'))
     }
     $lease = New-Object YcOwnerNative.FileLease
+    $stageCode = 'ANCHOR_VERIFY'
     $lease.HoldRoot($anchor)
     [void]$lease.HoldFile((Join-Path $anchor '.owner'),(Hash-Bytes $anchorMarker))
+    $stageCode = 'ANCHOR_LOCK'
     $lease.HoldLock((Join-Path $anchor 'owner.lock'),(Hash-Bytes $anchorLock))
+    $stageCode = 'DESTINATION'
     if (-not $Destination) { $Destination = Join-Path (Join-Path $anchor 'releases') ($Manifest.artifact_id.Replace(':','-')+'-'+$seedSha.Substring(0,16)) }
     $Destination = [YcOwnerNative.Guard]::LocalPath($Destination)
     $payload = Join-Path $Destination 'payload'
@@ -321,7 +326,9 @@ try {
     $errorItem = $_.Exception
     while ($errorItem.InnerException) { $errorItem = $errorItem.InnerException }
     $code = $errorItem.Message
-    if ($code -notmatch '^YC_OWNER_[A-Z0-9_]+$') { $code = 'YC_OWNER_MANAGED_RELEASE_REFUSED_' + $stageCode }
+    if ($code -notmatch '^YC_OWNER_[A-Z0-9_]+$') {
+        $code = 'YC_OWNER_MANAGED_RELEASE_REFUSED_' + $stageCode + '_L' + [string]$_.InvocationInfo.ScriptLineNumber
+    }
     [Console]::Error.WriteLine($code)
     exit 2
 } finally {
