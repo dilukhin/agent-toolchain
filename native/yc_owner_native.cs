@@ -410,6 +410,10 @@ namespace YcOwnerNative {
             ConvertStringSecurityDescriptorToSecurityDescriptor(string sddl, uint revision, out IntPtr descriptor, IntPtr size);
         [DllImport("advapi32.dll", SetLastError=true)] static extern bool SetKernelObjectSecurity(IntPtr handle, uint info, IntPtr descriptor);
         [DllImport("advapi32.dll", SetLastError=true)] static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+        [DllImport("advapi32.dll", SetLastError=true)] static extern bool GetSecurityDescriptorDacl(
+            IntPtr descriptor, out bool present, out IntPtr acl, out bool defaulted);
+        [DllImport("advapi32.dll", SetLastError=true)] static extern bool SetTokenInformation(
+            IntPtr token, int kind, ref IntPtr data, uint size);
         [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
         [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)] static extern bool CreateProcess(
             string application, StringBuilder command, ref SecurityAttributes processAttrs, ref SecurityAttributes threadAttrs,
@@ -438,12 +442,20 @@ namespace YcOwnerNative {
                 "YC_OWNER_PROCESS_DESCRIPTOR_FAILED");
             return result;
         }
-        static void ProtectProcessAndToken(IntPtr target, IntPtr processSd, IntPtr tokenSd) {
+        static void ProtectProcessAndToken(IntPtr target, IntPtr processSd, IntPtr tokenSd, IntPtr childDefaultSd) {
             Guard.Need(SetKernelObjectSecurity(target, 4, processSd), "YC_OWNER_PROCESS_DACL_FAILED");
             IntPtr token = IntPtr.Zero;
             try {
-                Guard.Need(OpenProcessToken(target, 0x40008, out token), "YC_OWNER_PROCESS_TOKEN_UNAVAILABLE");
+                Guard.Need(OpenProcessToken(target, childDefaultSd == IntPtr.Zero ? 0x40008U : 0x40088U, out token), "YC_OWNER_PROCESS_TOKEN_UNAVAILABLE");
                 Guard.Need(SetKernelObjectSecurity(token, 4, tokenSd), "YC_OWNER_TOKEN_DACL_FAILED");
+                if (childDefaultSd != IntPtr.Zero) {
+                    bool present, defaulted; IntPtr acl;
+                    Guard.Need(GetSecurityDescriptorDacl(childDefaultSd, out present, out acl, out defaulted)
+                        && present && acl != IntPtr.Zero, "YC_OWNER_DEFAULT_DACL_UNAVAILABLE");
+                    // TOKEN_DEFAULT_DACL is one pointer. Future default-created
+                    // processes/threads/pipes cannot expose YC credentials to the agent.
+                    Guard.Need(SetTokenInformation(token, 6, ref acl, (uint)IntPtr.Size), "YC_OWNER_DEFAULT_DACL_FAILED");
+                }
             } finally { if (token != IntPtr.Zero) CloseHandle(token); }
         }
         static string Quote(string path) {
@@ -453,13 +465,14 @@ namespace YcOwnerNative {
         }
         internal static ManagedChild Start(string python, string entry, string config, string cwd, string agentSid) {
             ManagedChild result = new ManagedChild();
-            IntPtr processSd = IntPtr.Zero, tokenSd = IntPtr.Zero, threadSd = IntPtr.Zero, environment = IntPtr.Zero;
+            IntPtr processSd = IntPtr.Zero, tokenSd = IntPtr.Zero, threadSd = IntPtr.Zero, defaultSd = IntPtr.Zero, environment = IntPtr.Zero;
             ProcessInfo child = new ProcessInfo();
             try {
                 processSd = Descriptor(agentSid, "0x1000", "0x1fefff");
                 tokenSd = Descriptor(agentSid, "0x8", "0xf01f7");
                 threadSd = Descriptor(agentSid, "0", "GA");
-                ProtectProcessAndToken(GetCurrentProcess(), processSd, tokenSd);
+                defaultSd = Descriptor(agentSid, "0", "GA");
+                ProtectProcessAndToken(GetCurrentProcess(), processSd, tokenSd, IntPtr.Zero);
                 result.job = CreateJobObject(IntPtr.Zero, null);
                 Guard.Need(result.job != IntPtr.Zero, "YC_OWNER_JOB_CREATE_FAILED");
                 ExtendedLimits limits = new ExtendedLimits();
@@ -482,7 +495,7 @@ namespace YcOwnerNative {
                     "YC_OWNER_PROCESS_CREATE_FAILED");
                 result.process = child.Process; result.Pid = child.Pid;
                 // No Python instruction runs before token protection and job assignment.
-                ProtectProcessAndToken(child.Process, processSd, tokenSd);
+                ProtectProcessAndToken(child.Process, processSd, tokenSd, defaultSd);
                 Guard.Need(AssignProcessToJobObject(result.job, child.Process), "YC_OWNER_JOB_ASSIGN_FAILED");
                 Guard.Need(ResumeThread(child.Thread) == 1, "YC_OWNER_PROCESS_RESUME_FAILED");
                 return result;
@@ -493,6 +506,7 @@ namespace YcOwnerNative {
                 if (child.Thread != IntPtr.Zero) CloseHandle(child.Thread);
                 if (environment != IntPtr.Zero) Marshal.FreeHGlobal(environment);
                 if (threadSd != IntPtr.Zero) LocalFree(threadSd);
+                if (defaultSd != IntPtr.Zero) LocalFree(defaultSd);
                 if (tokenSd != IntPtr.Zero) LocalFree(tokenSd);
                 if (processSd != IntPtr.Zero) LocalFree(processSd);
             }

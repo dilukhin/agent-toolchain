@@ -210,6 +210,9 @@ else:
         time.sleep(.05)
     child = subprocess.Popen([sys.executable, '-I', '-S', '-c', 'import time; time.sleep(60)'])
     (p/'descendant.pid').write_text(str(child.pid))
+    while not (p/'finish').exists():
+        if time.monotonic() > until: raise RuntimeError('TEST_FINISH_TIMEOUT')
+        time.sleep(.05)
 "@
 [IO.File]::WriteAllText($entry,$entryText)
 [IO.File]::WriteAllText($config,'{"mode":"normal"}')
@@ -241,7 +244,7 @@ if ($still) { throw 'TIMEOUT_CHILD_SURVIVED' }
     [IO.File]::WriteAllText($supervisor, $supervisorText)
     $attacker = Join-Path $root 'attacker.ps1'
     $attackerText = @'
-param([int]$Target)
+param([int]$Target,[string]$NoQuery = 'false')
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @"
 using System;
@@ -252,11 +255,16 @@ public static class Attacker {
     [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr handle);
 }
 "@
-foreach ($right in @(1,8,16,32,64,128,256,512,1024,2048,0x20000,0x40000,0x80000)) {
+foreach ($right in @(1,2,8,16,32,64,128,256,512,1024,2048,0x20000,0x40000,0x80000)) {
     $handle = [Attacker]::OpenProcess($right,$false,$Target)
     if ($handle -ne [IntPtr]::Zero) { [void][Attacker]::CloseHandle($handle); throw "PROCESS_RIGHT_GRANTED: $right" }
 }
 $query = [Attacker]::OpenProcess(0x1000,$false,$Target)
+if ($NoQuery -eq 'true') {
+    if ($query -ne [IntPtr]::Zero) { [void][Attacker]::CloseHandle($query); throw 'DESCENDANT_QUERY_GRANTED' }
+    [Console]::WriteLine('AGENT_MUTATION_DENIED_PASS')
+    exit 0
+}
 if ($query -eq [IntPtr]::Zero) { throw 'IDENTITY_QUERY_DENIED' }
 try {
     foreach ($right in @(1,2,4,0x10,0x20,0x40,0x80,0x100,0x20000,0x40000,0x80000)) {
@@ -304,6 +312,24 @@ try {
         throw 'AGENT_MUTATION_TEST_FAILED'
     }
     [IO.File]::WriteAllText((Join-Path $exchange 'private-run\release'), 'release')
+    $descendantFile = Join-Path $exchange 'private-run\descendant.pid'
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    while (-not (Test-Path -LiteralPath $descendantFile)) {
+        if ($ordinary.HasExited -or $watch.Elapsed.TotalSeconds -gt 10) { throw 'DESCENDANT_NOT_STARTED' }
+        Start-Sleep -Milliseconds 50
+    }
+    $descendantId = [int]([IO.File]::ReadAllText($descendantFile))
+    $attack = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+        -ArgumentList @('-NoProfile','-File',('"'+$attacker+'"'),$descendantId,'true') -Credential $agentCredential `
+        -LoadUserProfile -WorkingDirectory $root -RedirectStandardOutput $attackOut -RedirectStandardError $attackErr -PassThru
+    $attackHandle = $attack.Handle
+    if (-not $attack.WaitForExit(15000)) { $attack.Kill(); throw 'DESCENDANT_SECURITY_TEST_TIMEOUT' }
+    $attack.WaitForExit()
+    if ($attack.ExitCode -ne 0 -or (Get-Content -LiteralPath $attackOut -Raw).Trim() -ne 'AGENT_MUTATION_DENIED_PASS') {
+        Get-Content -LiteralPath $attackErr | Write-Host
+        throw 'DESCENDANT_DEFAULT_DACL_FAILED'
+    }
+    [IO.File]::WriteAllText((Join-Path $exchange 'private-run\finish'), 'finish')
     if (-not $ordinary.WaitForExit(30000)) { $ordinary.Kill(); throw 'SUPERVISED_STOP_TIMEOUT' }
     $ordinary.WaitForExit()
     if ($ordinary.ExitCode -ne 0 -or (Get-Content -LiteralPath $supervisedOut -Raw).Trim() -ne 'PROTECTED_SUPERVISOR_PASS') {
