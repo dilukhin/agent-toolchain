@@ -118,7 +118,7 @@ function Read-Checkpoint([string]$Path) {
     if (-not [IO.File]::Exists($Path)) { return $null }
     $temporaryLease = New-Object YcOwnerNative.FileLease
     try {
-        [void]$temporaryLease.HoldFile($Path,$null)
+        [void]$temporaryLease.HoldFile($Path,[NullString]::Value)
         $value = $Utf8.GetString((Read-Bytes $Path 4096)) | ConvertFrom-Json
         if ($value.schema -ne 'yc-owner-active/v1' -or $value.owner_sid -ne $OwnerSid -or
             $value.phase -notin @('owner_process_started','closed')) { throw 'YC_OWNER_CHECKPOINT_CONFLICT' }
@@ -139,14 +139,14 @@ function Check-Release {
     [void]$lease.HoldFile((Join-Path $Destination 'bootstrap.ps1'),$seedSha)
     [void]$lease.HoldFile((Join-Path $Destination 'native.cs'),$NativeSha256)
     [void]$lease.HoldFile((Join-Path $Destination 'python.zip'),$PythonSha)
-    [void]$lease.HoldFile($journal,$null)
+    [void]$lease.HoldFile($journal,[NullString]::Value)
     $state = $Utf8.GetString((Read-Bytes $journal 4096)) | ConvertFrom-Json
     if ($state.schema -ne 'yc-owner-release/v1' -or $state.phase -ne 'complete' -or
         $state.owner_sid -ne $OwnerSid -or $state.artifact_id -ne $Manifest.artifact_id -or
         $state.source_ref -ne $Manifest.source_ref -or $state.seed_sha256 -ne $seedSha -or
         $state.native_sha256 -ne $NativeSha256 -or $state.python_archive_sha256 -ne $PythonSha -or
         $state.yc_sha256 -ne $YcSha) { throw 'YC_OWNER_RELEASE_PENDING_OR_CONFLICT' }
-    [void]$lease.HoldFile($treeManifest,$null)
+    [void]$lease.HoldFile($treeManifest,[NullString]::Value)
     $expected = $Utf8.GetString((Read-Bytes $treeManifest 65536)) | ConvertFrom-Json
     $actual = @(Hold-Payload)
     if ($expected.schema -ne 'yc-owner-payload/v1' -or $expected.files.Count -ne $actual.Count) { throw 'YC_OWNER_RELEASE_FILESET_CHANGED' }

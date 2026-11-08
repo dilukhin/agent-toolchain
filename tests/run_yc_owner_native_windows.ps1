@@ -127,7 +127,7 @@ try {
     [void](New-Item -ItemType HardLink -Path $hard -Target $file)
     try {
         $lease = New-Object YcOwnerNative.FileLease
-        try { Expect-Code { $lease.HoldFile($file, $null) } 'YC_OWNER_HARDLINK_FORBIDDEN' }
+        try { Expect-Code { $lease.HoldFile($file, [NullString]::Value) } 'YC_OWNER_HARDLINK_FORBIDDEN' }
         finally { $lease.Dispose() }
     } finally { Remove-Item -LiteralPath $hard }
     $other = Join-Path $root 'other'
