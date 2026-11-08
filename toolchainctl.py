@@ -55,6 +55,7 @@ from setup_tools import parse_tool_specs, resolve_tool_specs
 from setup_external_updates import cache_path, load_cache, refresh
 from setup_inventory import common_external_cli_inventory
 import setup_yc_transitional_guard
+import setup_yc_owner_component
 import setup_agent_inventory
 import setup_agent_roles
 
@@ -87,6 +88,7 @@ _CORE_REQUIRED_FILES = (
     "setup_external_updates.py",
     "setup_tools.py",
     "setup_yc_transitional_guard.py",
+    "setup_yc_owner_component.py",
     "yc_transitional_entry.py",
     "bootstrap_core.py",
     "proxy_tools.py",
@@ -102,7 +104,7 @@ _CORE_REQUIRED_FILES = (
     "workspace_trust_contract.py",
     "config_data.json",
 )
-_CORE_REQUIRED_TREES = ("templates", "skills/remote-long-running")
+_CORE_REQUIRED_TREES = ("templates", "skills/remote-long-running", "native")
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -490,6 +492,7 @@ def build_parser() -> argparse.ArgumentParser:
     adopt_cmd.add_argument("component", choices=("opencode-config",), help="managed component to adopt")
     adopt_cmd.add_argument("--expected-sha", required=True, help="exact sha256 of the reviewed current payload")
     setup_yc_transitional_guard.add_cli_parser(sub)
+    setup_yc_owner_component.add_cli_parser(sub)
     setup_agent_inventory.add_cli_parser(sub)
     setup_workspace_trust.add_cli_parser(sub)
     p0 = sub.add_parser("p0", help="explicit OpenCode Permissions P0 pilot controls")
@@ -1432,6 +1435,14 @@ def main(argv: list[str] | None = None) -> int:
         return _run_adopt(args)
     if args.command == "yc-guard":
         return setup_yc_transitional_guard.run_cli(args)
+    if args.command == "yc-owner":
+        if args.yc_owner_command == "stage":
+            try:
+                _owned_installed_core()
+            except (SelfUpdateError, OSError, ValueError):
+                print("YC_OWNER_MANAGED_CORE_REQUIRED", file=sys.stderr)
+                return 2
+        return setup_yc_owner_component.run_cli(args)
 
     check = args.command == "check"
     if not check and bool(getattr(args, "install_needed", False)):

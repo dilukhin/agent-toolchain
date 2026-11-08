@@ -61,6 +61,7 @@ REQUIRED_FILES = (
     "setup_external_updates.py",
     "setup_tools.py",
     "setup_yc_transitional_guard.py",
+    "setup_yc_owner_component.py",
     "yc_transitional_entry.py",
     "bootstrap_core.py",
     "proxy_tools.py",
@@ -76,7 +77,7 @@ REQUIRED_FILES = (
     "workspace_trust_contract.py",
     "config_data.json",
 )
-REQUIRED_TREES = ("templates", "skills/remote-long-running")
+REQUIRED_TREES = ("templates", "skills/remote-long-running", "native")
 
 
 def data_root() -> Path:
