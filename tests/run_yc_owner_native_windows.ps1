@@ -59,12 +59,27 @@ param([string]$Source,[string]$Sid,[string]$Audit,[string]$Nonce)
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -Language CSharp
 [YcOwnerNative.Guard]::VerifyCapabilityAudit($Sid,$Nonce,$Audit)
+try {
+    [YcOwnerNative.Guard]::VerifyCapabilityAudit($Sid, [guid]::NewGuid().ToString('D'), $Audit)
+    throw 'WRONG_NONCE_ACCEPTED'
+} catch {
+    if ($_.Exception.GetBaseException().Message -ne 'YC_OWNER_CAPABILITY_BINDING_INVALID') { throw }
+}
+$forged = Join-Path $PWD 'forged-capabilities.txt'
+[IO.File]::WriteAllBytes($forged,[IO.File]::ReadAllBytes($Audit))
+try {
+    [YcOwnerNative.Guard]::VerifyCapabilityAudit($Sid,$Nonce,$forged)
+    throw 'ORDINARY_FILE_ACCEPTED_AS_ADMIN_AUDIT'
+} catch {
+    if ($_.Exception.GetBaseException().Message -ne 'YC_OWNER_ADMIN_AUDIT_REQUIRED') { throw }
+}
 [Console]::WriteLine('STANDARD_OWNER_RIGHTS_PASS')
 '@
     [IO.File]::WriteAllText($checker, $checkerText)
     $audit = Join-Path $root 'capabilities.txt'
     $auditNonce = [guid]::NewGuid().ToString('D')
     [YcOwnerNative.Guard]::WriteCapabilityAudit($user.SID.Value, $ownerUser.SID.Value, $auditNonce, $audit)
+    Expect-Code { [YcOwnerNative.Guard]::WriteCapabilityAudit($user.SID.Value, $ownerUser.SID.Value, $auditNonce, $audit) } 'YC_OWNER_AUDIT_OUTPUT_EXISTS'
     $credential = [PSCredential]::new(($env:COMPUTERNAME + '\' + $ownerName), $ownerPassword)
     $out = Join-Path $exchange 'ordinary.out'
     $err = Join-Path $exchange 'ordinary.err'
