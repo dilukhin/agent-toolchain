@@ -253,6 +253,10 @@ $config = Join-Path $work 'config.json'
 $entryText = @"
 import json, os, pathlib, subprocess, sys, time
 p = pathlib.Path(sys.argv[1]).parent
+def publish(name, text):
+    temporary = p/(name + '.new')
+    temporary.write_text(text)
+    os.replace(temporary, p/name)
 assert sys.flags.isolated and sys.flags.no_site and sys.dont_write_bytecode
 allowed = {'PATH','SYSTEMROOT','TEMP','TMP','USERPROFILE','LC_CTYPE'}
 assert set(os.environ).issubset(allowed), sorted(set(os.environ) - allowed)
@@ -288,17 +292,17 @@ if mode == 'context':
         raise AssertionError('CLOSED_CONTEXT_ACCEPTED')
     except ReadError:
         pass
-    (p/'context.pass').write_text('PROTECTED_CONTEXT_PASS')
+    publish('context.pass', 'PROTECTED_CONTEXT_PASS')
 elif mode == 'timeout':
     time.sleep(60)
 else:
-    (p/'ready').write_text(str(os.getpid()))
+    publish('ready', str(os.getpid()))
     until = time.monotonic() + 30
     while not (p/'release').exists():
         if time.monotonic() > until: raise RuntimeError('TEST_RELEASE_TIMEOUT')
         time.sleep(.05)
     child = subprocess.Popen([sys.executable, '-I', '-S', '-c', 'import time; time.sleep(60)'])
-    (p/'descendant.pid').write_text(str(child.pid))
+    publish('descendant.pid', str(child.pid))
     while not (p/'finish').exists():
         if time.monotonic() > until: raise RuntimeError('TEST_FINISH_TIMEOUT')
         time.sleep(.05)
