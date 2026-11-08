@@ -26,6 +26,42 @@ try {
     Expect-Code { [YcOwnerNative.Guard]::AssertLocalAgentAccount($owner) } 'YC_OWNER_STANDARD_AGENT_ACCOUNT_REQUIRED'
     [YcOwnerNative.Guard]::CreatePrivateDirectory($root)
     Expect-Code { [YcOwnerNative.Guard]::CreatePrivateDirectory($root) } 'YC_OWNER_DESTINATION_EXISTS'
+    # Verify lookup/LSA rights also from the ordinary owner account, not just admin CI.
+    $readable = Get-Acl -LiteralPath $root
+    $readable.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($user.SID,
+        'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+    Set-Acl -LiteralPath $root -AclObject $readable
+    $exchange = Join-Path $root 'exchange'
+    [void](New-Item -ItemType Directory -Path $exchange)
+    $exchangeAcl = Get-Acl -LiteralPath $exchange
+    $exchangeAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($user.SID,
+        'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+    Set-Acl -LiteralPath $exchange -AclObject $exchangeAcl
+    $copiedSource = Join-Path $root 'native.cs'
+    [IO.File]::WriteAllText($copiedSource, [IO.File]::ReadAllText((Join-Path $repo 'native\yc_owner_native.cs')))
+    $checker = Join-Path $root 'check-rights.ps1'
+    $checkerText = @'
+param([string]$Source,[string]$Sid)
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -Language CSharp
+[YcOwnerNative.Guard]::AssertLocalAgentAccount($Sid)
+[Console]::WriteLine('STANDARD_OWNER_RIGHTS_PASS')
+'@
+    [IO.File]::WriteAllText($checker, $checkerText)
+    $credential = [PSCredential]::new(($env:COMPUTERNAME + '\' + $userName), $password)
+    $out = Join-Path $exchange 'ordinary.out'
+    $err = Join-Path $exchange 'ordinary.err'
+    $arguments = @('-NoProfile', '-File', ('"' + $checker + '"'), ('"' + $copiedSource + '"'), $user.SID.Value)
+    $ordinary = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+        -ArgumentList $arguments -Credential $credential -LoadUserProfile -WorkingDirectory $exchange `
+        -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+    $ordinaryHandle = $ordinary.Handle
+    if (-not $ordinary.WaitForExit(30000)) { $ordinary.Kill(); throw 'STANDARD_OWNER_RIGHTS_TIMEOUT' }
+    $ordinary.WaitForExit()
+    if ($ordinary.ExitCode -ne 0 -or (Get-Content -LiteralPath $out -Raw).Trim() -ne 'STANDARD_OWNER_RIGHTS_PASS') {
+        Get-Content -LiteralPath $err | Write-Host
+        throw 'STANDARD_OWNER_RIGHTS_FAILED'
+    }
     $payload = Join-Path $root 'payload'
     [YcOwnerNative.Guard]::CreatePrivateDirectory($payload)
     $file = Join-Path $payload 'runtime.py'
