@@ -56,7 +56,7 @@ function Write-JsonNew([string]$Path,$Value) {
 function Replace-Json([string]$Path,$Value) {
     $pending = $Path + '.' + [guid]::NewGuid().ToString('N') + '.new'
     Write-JsonNew $pending $Value
-    if ([IO.File]::Exists($Path)) { [IO.File]::Replace($pending,$Path,$null) }
+    if ([IO.File]::Exists($Path)) { [IO.File]::Replace($pending,$Path,[NullString]::Value) }
     else { [IO.File]::Move($pending,$Path) }
 }
 function Download-Fixed([string]$Url,[string]$Path,[long]$Limit,[string]$Digest) {
