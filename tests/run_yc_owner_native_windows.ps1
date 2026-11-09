@@ -127,7 +127,7 @@ try {
     [void](New-Item -ItemType HardLink -Path $hard -Target $file)
     try {
         $lease = New-Object YcOwnerNative.FileLease
-        try { Expect-Code { $lease.HoldFile($file, $null) } 'YC_OWNER_HARDLINK_FORBIDDEN' }
+        try { Expect-Code { $lease.HoldFile($file, [NullString]::Value) } 'YC_OWNER_HARDLINK_FORBIDDEN' }
         finally { $lease.Dispose() }
     } finally { Remove-Item -LiteralPath $hard }
     $other = Join-Path $root 'other'
@@ -184,11 +184,75 @@ try {
     $rootAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($user.SID,
         'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
     Set-Acl -LiteralPath $root -AclObject $rootAcl
+    function Get-VerifiedFixtureFile([string]$Url,[string]$Path,[string]$Hash,[long]$Size) {
+        $request = [Net.HttpWebRequest]::Create($Url)
+        $request.Timeout = 10000; $request.ReadWriteTimeout = 5000; $request.AllowAutoRedirect = $false
+        $watch = [Diagnostics.Stopwatch]::StartNew()
+        $response = $request.GetResponse()
+        try {
+            if ($response.ContentLength -gt $Size) { throw 'FIXTURE_SOURCE_SIZE_LIMIT' }
+            $source = $response.GetResponseStream()
+            $target = [IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+            try {
+                $buffer = New-Object byte[] 65536
+                $total = 0L
+                while (($count = $source.Read($buffer,0,$buffer.Length)) -gt 0) {
+                    $total += $count
+                    if ($total -gt $Size -or $watch.Elapsed.TotalSeconds -gt 60) { throw 'FIXTURE_SOURCE_DOWNLOAD_LIMIT' }
+                    $target.Write($buffer,0,$count)
+                }
+                $target.Flush($true)
+            } finally { $target.Dispose(); $source.Dispose() }
+        } finally { $response.Dispose() }
+        if ((Get-Item -LiteralPath $Path).Length -ne $Size -or
+            (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Hash) { throw 'FIXTURE_SOURCE_DIGEST_MISMATCH' }
+    }
+    function Protect-FixtureSource([string]$Path) {
+        foreach ($item in @((Get-Item -LiteralPath $Path)) + @(Get-ChildItem -LiteralPath $Path -Recurse -Force)) {
+            if ($item.PSIsContainer) {
+                Set-Acl -LiteralPath $item.FullName -AclObject $readable
+            } else {
+                $acl = [Security.AccessControl.FileSecurity]::new()
+                $acl.SetAccessRuleProtection($true,$false)
+                $acl.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
+                foreach ($sid in @('S-1-5-18','S-1-5-32-544')) {
+                    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
+                        [Security.Principal.SecurityIdentifier]::new($sid),'FullControl','Allow'))
+                }
+                $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($ownerUser.SID,'ReadAndExecute','Allow'))
+                Set-Acl -LiteralPath $item.FullName -AclObject $acl
+            }
+        }
+    }
+    $component = Join-Path $root 'component'
+    [YcOwnerNative.Guard]::CreatePrivateDirectory($component)
+    $componentPins = Get-Content (Join-Path $PSScriptRoot 'yc59_context_component_pins.json') -Raw | ConvertFrom-Json
+    foreach ($row in $componentPins.manifest.files) {
+        $sourcePath = $componentPins.source_map.($row.path)
+        if ($row.path -notmatch '^[A-Za-z0-9_./-]+$' -or $row.path.Contains('..') -or -not $sourcePath) { throw 'FIXTURE_PIN_PATH_INVALID' }
+        $target = Join-Path $component $row.path
+        [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($target))
+        Get-VerifiedFixtureFile ('https://raw.githubusercontent.com/dilukhin/opencode_permissions/' +
+            $componentPins.source_ref + '/' + $sourcePath) $target $row.sha256 $row.size
+    }
+    [IO.File]::WriteAllText((Join-Path $component 'manifest.json'),$componentPins.manifest_json,[Text.UTF8Encoding]::new($false))
+    Protect-FixtureSource $component
+    $yc = Join-Path $root 'yc.exe'
+    Get-VerifiedFixtureFile 'https://storage.yandexcloud.net/yandexcloud-yc/release/1.39.0/windows/amd64/yc.exe' `
+        $yc '7dc58200b8ecba6913ec3f9961d0fda21ee3b67fa6972dad0cffdde5198acb94' 196325832
+    Protect-FixtureSource $yc
     $supervisor = Join-Path $root 'supervisor.ps1'
     $supervisorText = @'
-param([string]$Source,[string]$AgentSid,[string]$Python,[string]$Exchange)
+param([string]$Source,[string]$AgentSid,[string]$Python,[string]$Exchange,[string]$Component,[string]$Yc)
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition ([IO.File]::ReadAllText($Source)) -Language CSharp
+[YcOwnerNative.ManagedChild]::SealParent($AgentSid)
+try {
+    [YcOwnerNative.Guard]::AssertOwnerLoginSession($AgentSid)
+    throw 'CREDENTIAL_PROCESS_ACCEPTED_AS_OWNER_LOGIN'
+} catch {
+    if ($_.Exception.GetBaseException().Message -notin @('YC_OWNER_OWN_INTERACTIVE_LOGON_REQUIRED','YC_OWNER_SESSION_LOGIN_UNAVAILABLE')) { throw }
+}
 $work = Join-Path $Exchange 'private-run'
 [YcOwnerNative.Guard]::CreatePrivateDirectory($work)
 $entry = Join-Path $work 'entry.py'
@@ -196,20 +260,56 @@ $config = Join-Path $work 'config.json'
 $entryText = @"
 import json, os, pathlib, subprocess, sys, time
 p = pathlib.Path(sys.argv[1]).parent
+def publish(name, text):
+    temporary = p/(name + '.new')
+    temporary.write_text(text)
+    os.replace(temporary, p/name)
 assert sys.flags.isolated and sys.flags.no_site and sys.dont_write_bytecode
 allowed = {'PATH','SYSTEMROOT','TEMP','TMP','USERPROFILE','LC_CTYPE'}
 assert set(os.environ).issubset(allowed), sorted(set(os.environ) - allowed)
 mode = json.loads(pathlib.Path(sys.argv[1]).read_text())['mode']
-if mode == 'timeout':
+if mode == 'context':
+    data = json.loads(pathlib.Path(sys.argv[1]).read_text())
+    sys.path.insert(0, str(pathlib.Path(data['component'])/'runtime'))
+    from yc_owner_windows_context import WindowsReadContext
+    from yc_read_projection import SnapshotSelection
+    from yc_snapshot_read import ReadError
+    marker = 'SYNTHETIC_IAM_TOKEN_NEVER_FOR_CLOUD'
+    sources = WindowsReadContext(selection=SnapshotSelection('synthetic-folder','synthetic-vm','synthetic-disk','synthetic-snapshot'),
+        cloud_id='synthetic-cloud', observed_monotonic=time.monotonic(), yc_path=data['yc'], cwd=str(p),
+        native_policy_path=str(pathlib.Path(data['component'])/'policy/native/rules.v1.json'),
+        yc_policy_path=str(pathlib.Path(data['component'])/'policy/yc/yc_policy.v1.json'),
+        native_sha256=data['native_sha'], yc_policy_sha256=data['yc_policy_sha'], iam_token=marker)
+    try:
+        operation = sources.profile.operation()
+        assert marker not in json.dumps(operation)
+        assert operation['scope']['snapshot_id'] == 'synthetic-snapshot'
+        assert operation['execution']['executable_identity'].startswith('win-file:')
+        assert sources.veto.check(sources.current()) == 'ask'
+        for argv in operation['execution']['argv']:
+            try:
+                sources.start(operation['execution'], tuple([*argv, '--help']))
+                raise AssertionError('UNBOUND_ARGV_ACCEPTED')
+            except ReadError as error:
+                assert error.code == 'YC_OWNER_SPAWN_BINDING_CHANGED'
+    finally:
+        sources.close()
+    try:
+        sources.current()
+        raise AssertionError('CLOSED_CONTEXT_ACCEPTED')
+    except ReadError:
+        pass
+    publish('context.pass', 'PROTECTED_CONTEXT_PASS')
+elif mode == 'timeout':
     time.sleep(60)
 else:
-    (p/'ready').write_text(str(os.getpid()))
+    publish('ready', str(os.getpid()))
     until = time.monotonic() + 30
     while not (p/'release').exists():
         if time.monotonic() > until: raise RuntimeError('TEST_RELEASE_TIMEOUT')
         time.sleep(.05)
     child = subprocess.Popen([sys.executable, '-I', '-S', '-c', 'import time; time.sleep(60)'])
-    (p/'descendant.pid').write_text(str(child.pid))
+    publish('descendant.pid', str(child.pid))
     while not (p/'finish').exists():
         if time.monotonic() > until: raise RuntimeError('TEST_FINISH_TIMEOUT')
         time.sleep(.05)
@@ -239,6 +339,22 @@ try {
 } finally { $lease.Dispose() }
 try { $still = Get-Process -Id $child.Pid -ErrorAction Stop } catch { $still = $null }
 if ($still) { throw 'TIMEOUT_CHILD_SURVIVED' }
+$contextConfig = Join-Path $work 'context.json'
+$pins = Get-Content (Join-Path $Component 'manifest.json') -Raw | ConvertFrom-Json
+$nativePin = $pins.files | Where-Object { $_.path -eq 'policy/native/rules.v1.json' }
+$ycPin = $pins.files | Where-Object { $_.path -eq 'policy/yc/yc_policy.v1.json' }
+[IO.File]::WriteAllText($contextConfig, (@{mode='context';component=$Component;yc=$Yc;
+    native_sha=$nativePin.sha256;yc_policy_sha=$ycPin.sha256} | ConvertTo-Json -Compress))
+$lease = New-Object YcOwnerNative.FileLease
+try {
+    [void]$lease.HoldTree($Python)
+    [void]$lease.HoldTree($Component)
+    [void]$lease.HoldFile($Yc,'7dc58200b8ecba6913ec3f9961d0fda21ee3b67fa6972dad0cffdde5198acb94')
+    [void]$lease.HoldTree($work)
+    $child = $lease.StartPython((Join-Path $Python 'python.exe'),$entry,$contextConfig,$work,$AgentSid)
+    if ($child.Wait(30000) -ne 0) { throw 'PROTECTED_CONTEXT_FAILED' }
+    if ([IO.File]::ReadAllText((Join-Path $work 'context.pass')) -ne 'PROTECTED_CONTEXT_PASS') { throw 'CONTEXT_RESULT_MISSING' }
+} finally { $lease.Dispose() }
 [Console]::WriteLine('PROTECTED_SUPERVISOR_PASS')
 '@
     [IO.File]::WriteAllText($supervisor, $supervisorText)
@@ -283,7 +399,7 @@ try {
     $supervisedOut = Join-Path $exchange 'supervised.out'
     $supervisedErr = Join-Path $exchange 'supervised.err'
     $arguments = @('-NoProfile','-File',('"'+$supervisor+'"'),('"'+$copiedSource+'"'),$user.SID.Value,
-                   ('"'+$python+'"'),('"'+$exchange+'"'))
+                   ('"'+$python+'"'),('"'+$exchange+'"'),('"'+$component+'"'),('"'+$yc+'"'))
     $ordinary = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
         -ArgumentList $arguments -Credential $credential -LoadUserProfile -WorkingDirectory $exchange `
         -RedirectStandardOutput $supervisedOut -RedirectStandardError $supervisedErr -PassThru
@@ -330,14 +446,108 @@ try {
         throw 'DESCENDANT_DEFAULT_DACL_FAILED'
     }
     [IO.File]::WriteAllText((Join-Path $exchange 'private-run\finish'), 'finish')
-    if (-not $ordinary.WaitForExit(30000)) { $ordinary.Kill(); throw 'SUPERVISED_STOP_TIMEOUT' }
+    if (-not $ordinary.WaitForExit(45000)) { $ordinary.Kill(); throw 'SUPERVISED_STOP_TIMEOUT' }
     $ordinary.WaitForExit()
     if ($ordinary.ExitCode -ne 0 -or (Get-Content -LiteralPath $supervisedOut -Raw).Trim() -ne 'PROTECTED_SUPERVISOR_PASS') {
         Get-Content -LiteralPath $supervisedErr | Write-Host
         throw 'PROTECTED_SUPERVISOR_FAILED'
     }
-    Write-Host 'PASS native file/process/token protection, ordinary owner supervisor, hostile account denial, timeout and descendant cleanup. No YC/approval/installed host.'
+    # Run the actual managed native seed from verified bytes, never through Python.
+    # No interactive consent is manufactured: background Run must fail before UI.
+    Protect-FixtureSource $archive
+    $releaseSeed = Join-Path $root 'release-seed.ps1'
+    [IO.File]::WriteAllBytes($releaseSeed,[IO.File]::ReadAllBytes((Join-Path $repo 'native\yc_owner_release.ps1')))
+    $releaseSha = (Get-FileHash -LiteralPath $releaseSeed -Algorithm SHA256).Hash.ToLowerInvariant()
+    $wrapper = Join-Path $root 'managed-wrapper.ps1'
+    $wrapperText = @'
+param([string]$Seed,[string]$Expected,[string]$Mode,[string]$Agent,[string]$Destination,[string]$Cache)
+$ErrorActionPreference = 'Stop'
+# The disposable credential process has not had a GUI first login. Let Windows
+# create its own standard known folder, as the already-completed user login did.
+[void][Environment]::GetFolderPath([Environment+SpecialFolder]::LocalApplicationData,[Environment+SpecialFolderOption]::Create)
+if ($Mode -eq 'Checkpoint') {
+    $anchor = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agent-toolchain-yc-owner'
+    $value = @{schema='yc-owner-active/v1';phase='closed';owner_sid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value;
+        destination=$Destination;server_pid=0;artifact_id='synthetic-previous';seed_sha256=$Expected;previous_release=''}
+    [IO.File]::WriteAllText((Join-Path $anchor 'active.json'),($value|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
+    exit 0
+}
+if ($Mode -eq 'LockedCheck') {
+    $anchor = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'agent-toolchain-yc-owner'
+    $held = [IO.File]::Open((Join-Path $anchor 'owner.lock'),[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+    try {
+        $start = [Diagnostics.ProcessStartInfo]::new()
+        $start.FileName = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $start.Arguments = '-NoProfile -File "'+$PSCommandPath+'" "'+$Seed+'" '+$Expected+' Check '+$Agent+' "'+$Destination+'" "'+$Cache+'"'
+        $start.UseShellExecute = $false
+        $start.RedirectStandardOutput = $true; $start.RedirectStandardError = $true
+        $process = [Diagnostics.Process]::Start($start)
+        if (-not $process.WaitForExit(20000)) { $process.Kill(); throw 'LOCK_TEST_TIMEOUT' }
+        if ($process.ExitCode -ne 2 -or $process.StandardError.ReadToEnd() -notmatch 'YC_OWNER_LEASE_OPEN_FAILED') { throw 'PARALLEL_OWNER_NOT_REFUSED' }
+    } finally { $held.Dispose() }
+    exit 0
+}
+$raw = [IO.File]::ReadAllBytes($Seed)
+$sha = [Security.Cryptography.SHA256]::Create()
+try { $actual = ([BitConverter]::ToString($sha.ComputeHash($raw))).Replace('-','').ToLowerInvariant() }
+finally { $sha.Dispose() }
+if ($actual -ne $Expected) { throw 'VERIFIED_SEED_MISMATCH' }
+& ([scriptblock]::Create([Text.Encoding]::UTF8.GetString($raw))) -Mode $Mode -AgentSid $Agent `
+    -SeedBytes $raw -Destination $Destination -ProtectedCache $Cache
+'@
+    [IO.File]::WriteAllText($wrapper,$wrapperText)
+    function Invoke-ManagedFixture([string]$Mode,[string]$Destination,[int]$ExpectedExit) {
+        $label = [guid]::NewGuid().ToString('N')
+        $out = Join-Path $exchange ($label+'.out'); $err = Join-Path $exchange ($label+'.err')
+        $arguments = @('-NoProfile','-File',('"'+$wrapper+'"'),('"'+$releaseSeed+'"'),$releaseSha,$Mode,$user.SID.Value,
+            ('"'+$Destination+'"'),('"'+$root+'"'))
+        $script:managedRun = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') `
+            -ArgumentList $arguments -Credential $credential -LoadUserProfile -WorkingDirectory $exchange `
+            -RedirectStandardOutput $out -RedirectStandardError $err -PassThru
+        $managedHandle = $script:managedRun.Handle
+        if (-not $script:managedRun.WaitForExit(90000)) { $script:managedRun.Kill(); throw 'MANAGED_FIXTURE_TIMEOUT' }
+        $script:managedRun.WaitForExit()
+        if ($script:managedRun.ExitCode -ne $ExpectedExit) {
+            Get-Content -LiteralPath $err | Write-Host
+            throw ('MANAGED_FIXTURE_UNEXPECTED_EXIT: '+$Mode)
+        }
+        return @{out=[IO.File]::ReadAllText($out);err=[IO.File]::ReadAllText($err)}
+    }
+    $firstRelease = Join-Path $exchange 'managed-first'
+    $nextRelease = Join-Path $exchange 'managed-next'
+    $prepared = Invoke-ManagedFixture 'Prepare' $firstRelease 0
+    if (($prepared.out|ConvertFrom-Json).status -ne 'prepared') { throw 'MANAGED_PREPARE_RESULT_INVALID' }
+    $firstJournal = (Get-FileHash (Join-Path $firstRelease 'release.json') -Algorithm SHA256).Hash
+    $checked = Invoke-ManagedFixture 'Check' $firstRelease 0
+    if (($checked.out|ConvertFrom-Json).status -ne 'prepared_verified') { throw 'MANAGED_CHECK_RESULT_INVALID' }
+    [void](Invoke-ManagedFixture 'Prepare' $firstRelease 0)
+    [void](Invoke-ManagedFixture 'LockedCheck' $firstRelease 0)
+    $refused = Invoke-ManagedFixture 'Run' $firstRelease 2
+    if ($refused.err -notmatch 'YC_OWNER_LOCAL_TERMINAL_REQUIRED') { throw 'BACKGROUND_OWNER_WAS_NOT_REFUSED' }
+    [void](Invoke-ManagedFixture 'Checkpoint' $firstRelease 0)
+    [void](Invoke-ManagedFixture 'Prepare' $nextRelease 0)
+    $nextJournalPath = Join-Path $nextRelease 'release.json'
+    $nextJournal = Get-Content $nextJournalPath -Raw | ConvertFrom-Json
+    if ($nextJournal.previous_release -ne $firstRelease) { throw 'PREVIOUS_RELEASE_NOT_RETAINED' }
+    $nextJournal.phase = 'prepared'
+    [IO.File]::WriteAllText($nextJournalPath,($nextJournal|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
+    $refused = Invoke-ManagedFixture 'Check' $nextRelease 2
+    if ($refused.err -notmatch 'YC_OWNER_RELEASE_PENDING_OR_CONFLICT') { throw 'PARTIAL_RELEASE_ACCEPTED' }
+    if ((Get-FileHash (Join-Path $firstRelease 'release.json') -Algorithm SHA256).Hash -ne $firstJournal) { throw 'PREVIOUS_RELEASE_CHANGED' }
+    Write-Host 'PASS native managed prepare/check/lock/previous-release/partial-journal/background refusal. No human consent or cloud getter simulated.'
+} catch {
+    [Console]::Error.WriteLine('NATIVE_FIXTURE_FAILURE: ' + $_.Exception.Message)
+    [Console]::Error.WriteLine($_.ScriptStackTrace)
+    throw
 } finally {
+    # Only processes created and retained by this disposable fixture. Kill the
+    # native parent first; its kill-on-close job releases all child file leases.
+    foreach ($ownedProcess in @($ordinary,$attack,$managedRun)) {
+        if ($ownedProcess -and -not $ownedProcess.HasExited) {
+            $ownedProcess.Kill()
+            [void]$ownedProcess.WaitForExit(5000)
+        }
+    }
     if ($created) { Remove-LocalUser -Name $userName }
     if ($ownerCreated) { Remove-LocalUser -Name $ownerName }
     if ($rootCreated -and (Test-Path -LiteralPath $root)) { Remove-Item -LiteralPath $root -Recurse -Force }

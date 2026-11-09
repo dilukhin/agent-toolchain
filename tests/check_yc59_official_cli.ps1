@@ -30,6 +30,7 @@ try {
     } finally { $response.Dispose() }
     if ((Get-Item -LiteralPath $binary).Length -gt 268435456) { throw 'YC_CLI_BINARY_LIMIT' }
     $hash = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($hash -ne '7dc58200b8ecba6913ec3f9961d0fda21ee3b67fa6972dad0cffdde5198acb94') { throw 'YC_CLI_REVIEWED_DIGEST_MISMATCH' }
     $held = [IO.File]::Open($binary,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
     function Read-Surface([string]$Arguments) {
         $start = [Diagnostics.ProcessStartInfo]::new()

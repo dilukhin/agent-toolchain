@@ -44,12 +44,8 @@ class OwnerComponentStagingTests(unittest.TestCase):
         self.assertEqual(source, "source/library.py")
         return self.payload["runtime/library.py"]
 
-    def test_check_and_blocked_apply_do_not_create_state_or_call_executor(self):
+    def test_read_only_check_does_not_create_state(self):
         self.assertEqual(component.check(self.data)["status"], "not_staged")
-        with patch.object(component.bootstrap_core, "data_root", return_value=self.data), \
-                contextlib.redirect_stdout(io.StringIO()) as output:
-            self.assertEqual(component.run_cli(argparse.Namespace(yc_owner_command="apply")), 2)
-        self.assertEqual(json.loads(output.getvalue())["code"], "YC_OWNER_TRUSTED_SOURCES_NOT_READY")
         self.assertFalse(self.data.exists())
 
     def test_fresh_stage_exact_readback_and_idempotent_without_network(self):
@@ -122,7 +118,10 @@ class OwnerComponentCliTests(unittest.TestCase):
                 result = subprocess.run([sys.executable, str(ROOT / "toolchainctl.py"), "yc-owner", action],
                                         cwd=root, env=env, capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode, 2 if action == "apply" else 0, result.stderr)
-                self.assertFalse(json.loads(result.stdout)["execution_enabled"])
+                if action == "apply":
+                    self.assertIn("YC_OWNER_MANAGED_CORE_REQUIRED", result.stderr)
+                else:
+                    self.assertFalse(json.loads(result.stdout)["execution_enabled"])
             self.assertFalse((root / "data").exists())
             self.assertFalse((root / "state").exists())
 

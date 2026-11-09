@@ -10,7 +10,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$NativeSha256 = '4088e014b0e4632e591e6ac485436fa477d6749fb208497e8ba0c37926bdc6ec'
+$NativeSha256 = '67a2b8f709682dd7eefbbab8ae428c4114b213e825b7195720fa5f16dee2cc93'
 $PythonUrl = 'https://www.python.org/ftp/python/3.14.2/python-3.14.2-embed-amd64.zip'
 $PythonArchiveSha256 = 'f05e28d161c6b15af64a7cb7f08b4a22b3a6b03eee71baee24ea557b3bdd5798'
 

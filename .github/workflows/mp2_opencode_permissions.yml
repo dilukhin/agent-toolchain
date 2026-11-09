@@ -54,9 +54,14 @@ jobs:
         run: |
           set -euo pipefail
           archive="$RUNNER_TEMP/$OPENCODE_TARGET_ASSET"
-          curl -fL --retry 3 --retry-all-errors \
+          if ! curl -fL --retry 3 --retry-all-errors \
             -o "$archive" \
-            "https://github.com/anomalyco/opencode/releases/download/v$OPENCODE_TARGET_VERSION/$OPENCODE_TARGET_ASSET"
+            "https://github.com/anomalyco/opencode/releases/download/v$OPENCODE_TARGET_VERSION/$OPENCODE_TARGET_ASSET"; then
+            test "$OPENCODE_TARGET_VERSION" = '1.18.32'
+            test "$OPENCODE_TARGET_ASSET" = 'opencode-linux-x64.tar.gz'
+            curl -fL --max-time 90 -H 'Accept: application/octet-stream' \
+              -o "$archive" 'https://api.github.com/repos/anomalyco/opencode/releases/assets/580000044'
+          fi
           echo "$OPENCODE_TARGET_SHA256  $archive" | sha256sum -c -
           mkdir -p "$RUNNER_TEMP/opencode-mp2"
           tar -xzf "$archive" -C "$RUNNER_TEMP/opencode-mp2"

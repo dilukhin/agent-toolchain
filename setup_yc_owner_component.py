@@ -11,19 +11,29 @@ import time
 import urllib.request
 
 import bootstrap_core
+import yc_owner_client
 
-SOURCE_REF = "7d2ed931ab7c65a3ee267791c06cd1eac817df31"
+SOURCE_REF = "1f7d89d9a8cd2352c6df865e8915f66171475972"
 REPOSITORY = "dilukhin/opencode_permissions"
 DOMAIN = b"opencode_permissions.yc_owner_component.v1\n"
-MANIFEST = json.loads('{"artifact_id":"sha256:ec771e41e6c08638ac630c97ebb3dca9a1b58f254881d52417e18dfcc9e1a82a","execution_enabled":false,"files":[{"path":"runtime/approval_owner/ledger.py","sha256":"99b9e7fb61f3b4ebb2fe1c2938cf09fa64a4c3e98b46e1f7a4f3068bf40c70ad","size":7175},{"path":"runtime/approval_owner/read_host.py","sha256":"af8e647c2d96c4dc4146fbbefe673497ea9d097d17b63a95607b98b6f738f335","size":4463},{"path":"runtime/windows_owner_boundary.py","sha256":"093843f9d9f20dfc8cef0be3d0448f734c867cc8c04e76e47dbb92a2075ca86a","size":7702},{"path":"runtime/windows_owner_pipe.py","sha256":"02e0ecf8f442b3207b054bdb47943e6dc7ff88e03596fd293f7c26770703a859","size":17687},{"path":"runtime/yc_read_capture.py","sha256":"692f8ac80220b2c68cc753e0d61556dbd04d9a89db0a6fa94c3e779f6d51487f","size":3919},{"path":"runtime/yc_read_projection.py","sha256":"a756d5906674b569a6b26c62187ebd4261890eacb3c6543f58cfe3207c9be983","size":8481},{"path":"runtime/yc_snapshot_read.py","sha256":"1a3c627252c9ffdace592131cea414765d22776fd78b873bdf9c7da9e0ed9bb4","size":8301}],"owner":"dilukhin/opencode_permissions","platform":"windows","profile":"yc-snapshot-read/v1","required_before_activation":["native_bootstrap_and_file_protection","live_native_veto_authority","trusted_read_context_and_spawn","managed_activation_and_installed_acceptance"],"schema":"yc-owner-component/v1","status":"library_only"}')
+MANIFEST = json.loads('{"artifact_id":"sha256:96ab79c0779f4804f63ebcc7e505fff8750657afa08965969bfabbda16db6c29","execution_enabled":false,"files":[{"path":"policy/native/rules.v1.json","sha256":"b7af96ecefd9fce341d128073f1bccae8b66c72e544bf0f47ccbb024232c3490","size":10650},{"path":"policy/yc/yc_policy.v1.json","sha256":"c4f8fba27d4c47118be4da3cd15ae06bd30520de6f95d827783b0d293e52cd2d","size":2063},{"path":"runtime/approval_owner/console.py","sha256":"a07d8aaa8a87f650e4f83e19f1aa7a00bb78f22843603bcd2c7373e884b59bd6","size":3252},{"path":"runtime/approval_owner/entry.py","sha256":"faafa5447211861f8f5ba3c8ca0dbf7fce9b2822e3a9b04630befc8d594d3335","size":5822},{"path":"runtime/approval_owner/ledger.py","sha256":"99b9e7fb61f3b4ebb2fe1c2938cf09fa64a4c3e98b46e1f7a4f3068bf40c70ad","size":7175},{"path":"runtime/approval_owner/read_host.py","sha256":"ab652a2a760ffb7773524006f53793b69438cf2d235011c7b529c8d58a75ab19","size":5720},{"path":"runtime/native_policy_matcher.py","sha256":"e70b27f110ba729d8bbc32c0dba0a62caea1a48cb53712cefbe79b497f965477","size":999},{"path":"runtime/render_native_policy.py","sha256":"f519d74ae76eb8a5a32af97230fcc007fa7955a3df9724e0588abfc046e415dd","size":5189},{"path":"runtime/windows_owner_boundary.py","sha256":"093843f9d9f20dfc8cef0be3d0448f734c867cc8c04e76e47dbb92a2075ca86a","size":7702},{"path":"runtime/windows_owner_pipe.py","sha256":"02e0ecf8f442b3207b054bdb47943e6dc7ff88e03596fd293f7c26770703a859","size":17687},{"path":"runtime/yc_owner_native_veto.py","sha256":"dd8187e00fc60ea54800e45f6c2c73edcdc70c598cff2c207d3142246f4bf706","size":4704},{"path":"runtime/yc_owner_windows_context.py","sha256":"a9a98ea2db26ab0d091ed36d9b1ac213b7b92851d9d08c1577272564c7f2349a","size":9314},{"path":"runtime/yc_policy_veto.py","sha256":"6fa913ce712a54fe0f02d7e5cb1314906936ed4f66ca698af5017080d6cda1f5","size":1545},{"path":"runtime/yc_read_capture.py","sha256":"692f8ac80220b2c68cc753e0d61556dbd04d9a89db0a6fa94c3e779f6d51487f","size":3919},{"path":"runtime/yc_read_projection.py","sha256":"a756d5906674b569a6b26c62187ebd4261890eacb3c6543f58cfe3207c9be983","size":8481},{"path":"runtime/yc_snapshot_read.py","sha256":"fcba2888ec9fd40b588945fdbfba33481c00b9b2b89a0acba72c3d3ae17c9def","size":8965}],"owner":"dilukhin/opencode_permissions","platform":"windows","profile":"yc-snapshot-read/v1","required_before_activation":["native_bootstrap_and_file_protection","live_native_veto_authority","trusted_read_context_and_spawn","managed_activation_and_installed_acceptance"],"schema":"yc-owner-component/v1","status":"library_only"}')
 SOURCES = {
+    "policy/native/rules.v1.json": "policy/native/rules.v1.json",
+    "policy/yc/yc_policy.v1.json": "policy/yc/yc_policy.v1.json",
+    "runtime/approval_owner/console.py": "runtime/approval_owner/console.py",
+    "runtime/approval_owner/entry.py": "runtime/approval_owner/entry.py",
     "runtime/approval_owner/ledger.py": "runtime/approval_owner/ledger.py",
     "runtime/approval_owner/read_host.py": "runtime/approval_owner/read_host.py",
+    "runtime/native_policy_matcher.py": "tools/native_policy_matcher.py",
+    "runtime/render_native_policy.py": "tools/render_native_policy.py",
     "runtime/windows_owner_boundary.py": "tools/windows_owner_boundary.py",
     "runtime/windows_owner_pipe.py": "tools/windows_owner_pipe.py",
-    "runtime/yc_snapshot_read.py": "tools/yc_snapshot_read.py",
+    "runtime/yc_owner_native_veto.py": "tools/yc_owner_native_veto.py",
+    "runtime/yc_owner_windows_context.py": "tools/yc_owner_windows_context.py",
+    "runtime/yc_policy_veto.py": "tools/yc_policy_veto.py",
     "runtime/yc_read_capture.py": "tools/yc_read_capture.py",
     "runtime/yc_read_projection.py": "tools/yc_read_projection.py",
+    "runtime/yc_snapshot_read.py": "tools/yc_snapshot_read.py"
 }
 ROOT_MARKER = b'agent-toolchain:yc-owner-inactive-staging:v1\n'
 LOCK_MARKER = b'agent-toolchain:yc-owner-staging-lock:v1\n'
@@ -62,7 +72,8 @@ def _ancestors(path):
 
 
 def _root(data):
-    path = Path(data).absolute() / "tools" / "yc-owner-inactive"
+    # Versioned staging keeps previous verified bytes/journals untouched.
+    path = Path(data).absolute() / "tools" / "yc-owner-inactive" / "v2" / MANIFEST["artifact_id"][7:23]
     require(".." not in path.parts, "YC_OWNER_PATH_CONFLICT")
     _ancestors(path)
     return path
@@ -225,18 +236,35 @@ def add_cli_parser(sub):
     actions = command.add_subparsers(dest="yc_owner_command", required=True)
     for name in ("plan", "check", "stage", "apply"):
         actions.add_parser(name)
+    reader = actions.add_parser("read", help="один запрос чтения с подтверждением в отдельной консоли владельца")
+    reader.add_argument("--owner-sid", required=True)
 
 
 def run_cli(args):
     try:
         action = args.yc_owner_command
         if action == "apply":
-            result = {**plan(), "status": "blocked", "code": "YC_OWNER_TRUSTED_SOURCES_NOT_READY"}
+            import setup_yc_owner_release as release
+            # Stage client libraries and exact bootstrap data, never start under
+            # the agent SID or elevate/switch an account from this Python.
+            stage(bootstrap_core.data_root())
+            result = release.prepare(bootstrap_core.data_root())
             print(json.dumps(result, sort_keys=True))
-            return 2
+            return 0
+        if action == "read":
+            import setup_yc_owner_release as release
+            result = release.read(bootstrap_core.data_root(), args.owner_sid)
+            print(json.dumps(result, sort_keys=True))
+            return 0
         result = plan() if action == "plan" else check(bootstrap_core.data_root()) if action == "check" else stage(bootstrap_core.data_root())
         print(json.dumps(result, sort_keys=True))
         return 0
-    except (ComponentConflict, OSError, ValueError):
+    except yc_owner_client.ClientRefusal as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    except KeyboardInterrupt:
+        print('YC_OWNER_INTERRUPTED_NO_AUTOMATIC_RETRY', file=sys.stderr)
+        return 130
+    except Exception:
         print("YC_OWNER_COMPONENT_REFUSED", file=sys.stderr)
         return 2
