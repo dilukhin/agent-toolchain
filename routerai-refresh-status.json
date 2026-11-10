@@ -2,25 +2,29 @@
   "_managed_notice": "НЕ РЕДАКТИРОВАТЬ ВРУЧНУЮ. Этот файл и ветка automation/routerai-status полностью принадлежат автоматизации обновления RouterAI. Здесь хранится машинно-читаемое состояние последней попытки, последней успешной проверки, опубликованных данных и кандидата. Подробности, решённые проблемы и схема повторного применения: docs/routerai_refresh_status_design_ru.md. Штатный ручной запуск полного обновления: gh workflow run routerai_catalog.yml --repo dilukhin/agent-toolchain --ref main",
   "schema": 1,
   "owner": "agent-toolchain:routerai-status:v1",
-  "updated_at": "2026-11-09T11:35:45Z",
+  "updated_at": "2026-11-10T11:16:25Z",
   "published": {
     "catalog_observed_at": "2026-08-29T07:50:20Z",
     "main_sha": "838c50d1ebe8e32e585afbbd2897fdc7893aa8e2"
   },
   "last_successful_check": {
-    "at": "2026-11-09T11:29:52Z",
+    "at": "2026-11-10T11:10:29Z",
     "catalog_changed": true
   },
   "last_attempt": {
-    "at": "2026-11-09T11:35:45Z",
+    "at": "2026-11-10T11:16:25Z",
     "trigger": "schedule",
-    "status": "success",
-    "phase": "complete",
-    "error": null
+    "status": "failed",
+    "phase": "publish-prices",
+    "error": {
+      "code": "price-publication",
+      "summary": "Проверенные тарифы не опубликованы; используется последняя подтверждённая версия.",
+      "advice": "Проверьте ownership, лимиты цен и SHA канала automation/routerai-prices; повторите полный refresh."
+    }
   },
   "candidate": {
-    "catalog_observed_at": "2026-11-09T11:29:50Z",
-    "branch_sha": "d385c73e7789b9987d8424e857877c8f7270b6da",
+    "catalog_observed_at": "2026-11-10T11:10:26Z",
+    "branch_sha": "eda6b4d535841d5f5a83b09fff6840a9246aef6b",
     "pr_number": 34,
     "validation": "success"
   }
