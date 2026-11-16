@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-11-15T10:51:58Z",
+  "observed_at": "2026-11-16T11:16:05Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -2368,9 +2368,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000018054046374",
-        "completion": "0.0000036108092748",
-        "input_cache_read": "0.00000036108092748"
+        "prompt": "0.0000101446546292",
+        "completion": "0.0000202893092584",
+        "input_cache_read": "0.00000202893092584"
       },
       "pricing_units": {
         "prompt": "token",
@@ -2441,9 +2441,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00003107987262744",
-        "completion": "0.00006215974525488",
-        "input_cache_read": "0.00000257466400464"
+        "prompt": "0.0001345643208",
+        "completion": "0.000224273868",
+        "input_cache_read": "0.000037378978"
       },
       "pricing_units": {
         "prompt": "token",
@@ -2465,9 +2465,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00009848314091616",
-        "completion": "0.00029544942274848",
-        "input_cache_read": "0.000003133554483696"
+        "prompt": "0.00009868050192",
+        "completion": "0.00029604150576",
+        "input_cache_read": "0.000003289350064"
       },
       "pricing_units": {
         "prompt": "token",
@@ -2490,9 +2490,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.0000059560731516",
-        "completion": "0.0000238242926064",
-        "input_cache_read": "0.000000119121463032"
+        "prompt": "0.000011277771648",
+        "completion": "0.000045111086592",
+        "input_cache_read": "0.00000022555543296"
       },
       "pricing_units": {
         "prompt": "token",
@@ -2515,8 +2515,8 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00000234953576",
-        "completion": "0.000012687493104",
+        "prompt": "0.0000058738394",
+        "completion": "0.0000117476788",
         "input_cache_read": "0.000000822337516"
       },
       "pricing_units": {
@@ -4229,9 +4229,9 @@
         "tokenizer": "Gemma"
       },
       "pricing": {
-        "prompt": "0.00000117476788",
-        "completion": "0.00000352430364",
-        "input_cache_read": "0.00000064078248"
+        "prompt": "0.0000042718832",
+        "completion": "0.000016019562",
+        "input_cache_read": "0.0000010679708"
       },
       "pricing_units": {
         "prompt": "token",
@@ -7244,9 +7244,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00004159746266",
-        "completion": "0.0001751472112",
-        "input_cache_read": "0.000007005888448"
+        "prompt": "0.0000416508612",
+        "completion": "0.000192234744",
+        "input_cache_read": "0.00000416508612"
       },
       "pricing_units": {
         "prompt": "token",
@@ -9469,9 +9469,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000416508612",
-        "completion": "0.00000897095472",
-        "input_cache_read": "0.0000037378978"
+        "prompt": "0.00000598063648",
+        "completion": "0.00001292244668",
+        "input_cache_read": "0.00000544665108"
       },
       "pricing_units": {
         "prompt": "token",
@@ -9493,9 +9493,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000416508612",
-        "completion": "0.00000897095472",
-        "input_cache_read": "0.0000037378978"
+        "prompt": "0.00000598063648",
+        "completion": "0.00001292244668",
+        "input_cache_read": "0.00000544665108"
       },
       "pricing_units": {
         "prompt": "token",
@@ -9517,9 +9517,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000288352116",
-        "completion": "0.0000042718832",
-        "input_cache_read": "0.00000256312992"
+        "prompt": "0.0000021359416",
+        "completion": "0.0000032039124",
+        "input_cache_read": "0.00000192234744"
       },
       "pricing_units": {
         "prompt": "token",
@@ -10571,8 +10571,8 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.0000074757956",
-        "completion": "0.0000299031824"
+        "prompt": "0.000016019562",
+        "completion": "0.000064078248"
       },
       "pricing_units": {
         "prompt": "token",
@@ -10809,29 +10809,6 @@
         "completion": "token"
       }
     },
-    "qwen/qwen3-vl-30b-a3b-thinking": {
-      "name": "Qwen: Qwen3 VL 30B A3B Thinking",
-      "created": 1759794479,
-      "context_length": 262144,
-      "architecture": {
-        "input_modalities": [
-          "text",
-          "image"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Qwen3"
-      },
-      "pricing": {
-        "prompt": "0.0000309711532",
-        "completion": "0.00010679708"
-      },
-      "pricing_units": {
-        "prompt": "token",
-        "completion": "token"
-      }
-    },
     "qwen/qwen3-vl-8b-instruct": {
       "name": "Qwen: Qwen3 VL 8B Instruct",
       "created": 1760463308,
@@ -10971,9 +10948,9 @@
         "tokenizer": "Qwen3"
       },
       "pricing": {
-        "prompt": "0.00000277672408",
-        "completion": "0.00000405828904",
-        "input_cache_read": "0.00000245633284"
+        "prompt": "0.0000085437664",
+        "completion": "0.0000138836204",
+        "input_cache_read": "0.0000042718832"
       },
       "pricing_units": {
         "prompt": "token",
@@ -11099,9 +11076,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00000181555036",
-        "completion": "0.00001644675032",
-        "input_cache_read": "0.0000016019562"
+        "prompt": "0.00000662141896",
+        "completion": "0.00006108792976",
+        "input_cache_read": "0.00000598063648"
       },
       "pricing_units": {
         "prompt": "token",
@@ -11288,9 +11265,9 @@
         "tokenizer": "Qwen"
       },
       "pricing": {
-        "prompt": "0.00001057291092",
-        "completion": "0.00007486475308",
-        "input_cache_read": "0.00000117476788"
+        "prompt": "0.00000971853428",
+        "completion": "0.00006877731952",
+        "input_cache_read": "0.0000010679708"
       },
       "pricing_units": {
         "prompt": "token",
@@ -11405,6 +11382,34 @@
         "prompt": "token",
         "completion": "token",
         "input_cache_read": "token"
+      }
+    },
+    "qwen/qwen4-max": {
+      "name": "Qwen: Qwen4 Max",
+      "created": 1794795526,
+      "context_length": 1000000,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image",
+          "video"
+        ],
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "Qwen"
+      },
+      "pricing": {
+        "prompt": "0.00016019562",
+        "completion": "0.00048058686",
+        "input_cache_read": "0.000008009781",
+        "input_cache_write": "0.000200244525"
+      },
+      "pricing_units": {
+        "prompt": "token",
+        "completion": "token",
+        "input_cache_read": "token",
+        "input_cache_write": "token"
       }
     },
     "recraft/recraft-v3": {
@@ -12521,28 +12526,6 @@
         "completion": "token"
       }
     },
-    "stepfun/step-3.5-flash": {
-      "name": "StepFun: Step 3.5 Flash",
-      "created": 1769728337,
-      "context_length": 262144,
-      "architecture": {
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other"
-      },
-      "pricing": {
-        "prompt": "0.000010679708",
-        "completion": "0.000032039124"
-      },
-      "pricing_units": {
-        "prompt": "token",
-        "completion": "token"
-      }
-    },
     "stepfun/step-3.7-flash": {
       "name": "StepFun: Step 3.7 Flash",
       "created": 1779985069,
@@ -12615,28 +12598,6 @@
       "pricing_units": {
         "prompt": "token",
         "seconds": "second",
-        "completion": "token"
-      }
-    },
-    "tencent/hunyuan-a13b-instruct": {
-      "name": "Tencent: Hunyuan A13B Instruct",
-      "created": 1751987664,
-      "context_length": 131072,
-      "architecture": {
-        "input_modalities": [
-          "text"
-        ],
-        "output_modalities": [
-          "text"
-        ],
-        "tokenizer": "Other"
-      },
-      "pricing": {
-        "prompt": "0.0000149515912",
-        "completion": "0.0000608743356"
-      },
-      "pricing_units": {
-        "prompt": "token",
         "completion": "token"
       }
     },
@@ -13790,29 +13751,6 @@
         "completion": "token"
       }
     },
-    "x-ai/grok-stt-1.0": {
-      "name": "SpaceXAI: Grok STT 1.0",
-      "created": 1784817014,
-      "context_length": 0,
-      "architecture": {
-        "input_modalities": [
-          "audio"
-        ],
-        "output_modalities": [
-          "transcription"
-        ]
-      },
-      "pricing": {
-        "prompt": "0.002966585555557929",
-        "seconds": "0.002966585555557929",
-        "completion": "0.0"
-      },
-      "pricing_units": {
-        "prompt": "token",
-        "seconds": "second",
-        "completion": "token"
-      }
-    },
     "x-ai/grok-stt-2.0": {
       "name": "SpaceXAI: Grok STT 2.0",
       "created": 1794329167,
@@ -14406,9 +14344,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000095989215504",
-        "completion": "0.000301680391584",
-        "input_cache_read": "0.0000178265685936"
+        "prompt": "0.000096117372",
+        "completion": "0.000309711532",
+        "input_cache_read": "0.0000096117372"
       },
       "pricing_units": {
         "prompt": "token",
@@ -14430,9 +14368,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.00002018464812",
-        "completion": "0.00006343746552",
-        "input_cache_read": "0.000003748577508"
+        "prompt": "0.0000600733575",
+        "completion": "0.000192234744",
+        "input_cache_read": "0.0000112136934"
       },
       "pricing_units": {
         "prompt": "token",
@@ -14727,8 +14665,8 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00000234953576",
-        "completion": "0.000012687493104",
+        "prompt": "0.0000058738394",
+        "completion": "0.0000117476788",
         "input_cache_read": "0.000000822337516"
       },
       "pricing_units": {
@@ -14751,9 +14689,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00009848314091616",
-        "completion": "0.00029544942274848",
-        "input_cache_read": "0.000003133554483696"
+        "prompt": "0.00009868050192",
+        "completion": "0.00029604150576",
+        "input_cache_read": "0.000003289350064"
       },
       "pricing_units": {
         "prompt": "token",
