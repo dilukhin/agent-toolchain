@@ -39,6 +39,22 @@ $currentLatch=Join-Path $temp 'current-latch';$legacyLatch=Join-Path $temp 'lega
 GuardConsumeMarkers $currentLatch $legacyLatch
 [IO.File]::WriteAllText($legacyLatch,'unknown old consume outcome')
 Refuses {GuardConsumeMarkers $currentLatch $legacyLatch} 'legacy_consume_cannot_be_bypassed'
+# Load definitions without the workflow dispatcher. A previous R11b native
+# attempt without an owner cancellation proof must stop the managed wrapper.
+$tokens=$null;$errors=$null
+$flow=[Management.Automation.Language.Parser]::ParseInput([IO.File]::ReadAllText((Join-Path $package 'flow.ps1')),[ref]$tokens,[ref]$errors)
+foreach($definition in $flow.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst]},$false)){
+    . ([scriptblock]::Create($definition.Extent.Text))
+}
+$savedProfile=$OwnerProfile;$savedAnchor=$Anchor
+try{
+    $OwnerProfile=$temp;$Anchor=Join-Path $temp 'native-anchor'
+    [void][IO.Directory]::CreateDirectory((Join-Path $temp 'Documents'))
+    $history=Join-Path $temp 'Documents\YC59_Owner_R11';FreshDirectory $history $OwnerSid
+    $run=Join-Path $history ('a'*32);FreshDirectory $run $OwnerSid
+    JsonNew (Join-Path $run 'native-started.json') @{synthetic_only=$true}
+    Refuses {CheckOldSessions} 'legacy_unknown_native_attempt_cannot_be_bypassed'
+}finally{$OwnerProfile=$savedProfile;$Anchor=$savedAnchor}
 $lease=[Yc59PackageLease]::Directory($temp)
 try{Refuses {[IO.Directory]::Move($temp,$temp+'-moved')} 'held_directory_cannot_move'}finally{$lease.Dispose()}
 $file=Join-Path $temp 'held.txt';[IO.File]::WriteAllText($file,'synthetic')
