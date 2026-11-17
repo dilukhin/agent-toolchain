@@ -24,7 +24,7 @@ native seed и дополнительный объект `assisted_operator`. В
 Первоначальное доверие задаётся независимо опубликованным хешем, а не ответом
 агента или файлом pins из копируемого каталога. Хеш запуска этого выпуска:
 
-`b3db1b2af4370ae1704bff4e0a1f372b1427761746d36737cac31913473f7d1c`
+`f7571cec0c4fe8dc05ccad2b7db0479765c9f09893027a6476e4ea9bcb3cb015`
 
 В новом системном Windows PowerShell 5.1 с `-NoProfile` один раз прочитать
 `launch.ps1`, проверить SHA-256 и исполнять именно прочитанные байты из памяти.
@@ -57,7 +57,7 @@ native seed и дополнительный объект `assisted_operator`. В
 в сеансе владельца. `$package` указывает личную копию пакета.
 
 ```powershell
-$expected = 'b3db1b2af4370ae1704bff4e0a1f372b1427761746d36737cac31913473f7d1c'
+$expected = 'f7571cec0c4fe8dc05ccad2b7db0479765c9f09893027a6476e4ea9bcb3cb015'
 $bytes = [IO.File]::ReadAllBytes((Join-Path $package 'launch.ps1'))
 $hash = [Security.Cryptography.SHA256]::Create()
 try { $actual = ([BitConverter]::ToString($hash.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() }
@@ -85,6 +85,8 @@ if ($actual -cne $expected) { throw 'YC59_LAUNCH_CHANGED' }
 новую подготовку. Для новой подготовки допустима только независимая проверка
 точного rejected/expired через защищённый канал владельца и закрытие процесса;
 автоматического нового consume нет. При consumed или unknown — остановка и разбор.
+Переход с частной оболочки R11b также проверяет её прежнюю агентскую отметку:
+новый каталог управляемого пакета не даёт обойти старую попытку consume.
 
 Успех требует native exit 0 и совпадения полного содержимого обеих квитанций,
 независимо пересчитанного хеша, SID/сеанса/PID и профиля трёх чтений. Частичные

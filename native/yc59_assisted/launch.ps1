@@ -25,7 +25,9 @@ public static class Yc59PackageLease {
     [DllImport("kernel32.dll", CharSet=CharSet.Unicode, SetLastError=true)]
     static extern SafeFileHandle CreateFile(string p,uint a,uint s,IntPtr sa,uint c,uint f,IntPtr t);
     public static SafeFileHandle Directory(string path) {
-        var h=CreateFile(path,0x80,3,IntPtr.Zero,3,0x02200000,IntPtr.Zero);
+        // Metadata-only handles do not participate in all sharing checks.
+        // GENERIC_READ includes directory listing; FILE_SHARE_READ excludes rename/write.
+        var h=CreateFile(path,0x80000000,1,IntPtr.Zero,3,0x02200000,IntPtr.Zero);
         if(h.IsInvalid){h.Dispose();throw new IOException("YC59_PACKAGE_DIRECTORY_LEASE_FAILED");}
         if((File.GetAttributes(path)&FileAttributes.ReparsePoint)!=0){h.Dispose();throw new IOException("YC59_PACKAGE_REPARSE_REFUSED");}
         return h;
@@ -54,7 +56,7 @@ public static class Yc59PackageLease {
     $LaunchSha=$ExpectedLaunchSha
     if((BytesHash (LeasedBytes 'launch.ps1')) -cne $LaunchSha){throw 'YC59_LAUNCH_CHANGED'}
     $pinBytes=LeasedBytes 'pins.json'
-    if((BytesHash $pinBytes) -cne 'ceecee0010c4efda78eae1b7f1212f66616ca943169c4a2ac365d0b5b3142205'){throw 'YC59_PACKAGE_MANIFEST_CHANGED'}
+    if((BytesHash $pinBytes) -cne 'c4ff147cd501ebba03ac8f8409041f10a45269468af5c3cc810aaf6833e60d22'){throw 'YC59_PACKAGE_MANIFEST_CHANGED'}
     $pins=[Text.Encoding]::UTF8.GetString($pinBytes)|ConvertFrom-Json
     $sources=@{}
     foreach($p in $pins.PSObject.Properties){

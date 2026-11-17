@@ -14,8 +14,9 @@ function ReportDirectory {
     if(-not [IO.Directory]::Exists($base)){FreshDirectory $base $OwnerSid}
     $p=Join-Path $base ([guid]::NewGuid().ToString('N'));FreshDirectory $p $OwnerSid;return $p
 }
-function CheckReport([string]$Path){
-    $base=Join-Path $OwnerProfile 'Documents\YC59_Assisted_Owner'
+function CheckReport([string]$Path,[bool]$Legacy=$false){
+    $relative=if($Legacy){'Documents\YC59_Owner_R11'}else{'Documents\YC59_Assisted_Owner'}
+    $base=Join-Path $OwnerProfile $relative
     Need ($Path -cmatch ('^'+[regex]::Escape($base)+'\\[0-9a-f]{32}$')) 'YC59_REPORT_PATH_OUT_OF_SCOPE'
     NoReparse $Path
     $i=Get-Item -LiteralPath $Path -Force;$a=Get-Acl -LiteralPath $Path
@@ -31,12 +32,13 @@ function CheckOldSessions {
     # A fresh package never deletes, resets or imports an earlier consent.
     # Within this workflow any native attempt blocks another preparation unless
     # the owner-side authenticated rejection/expiry proof was saved after closure.
-    $base=Join-Path $OwnerProfile 'Documents\YC59_Assisted_Owner'
+    foreach($relative in @('Documents\YC59_Assisted_Owner','Documents\YC59_Owner_R11')){
+    $base=Join-Path $OwnerProfile $relative
     if([IO.Directory]::Exists($base)){
         NoReparse $base
         foreach($dir in @(Get-ChildItem -LiteralPath $base -Directory)){
             if(-not [IO.File]::Exists((Join-Path $dir.FullName 'native-started.json'))){continue}
-            CheckReport $dir.FullName
+            CheckReport $dir.FullName ($relative -ceq 'Documents\YC59_Owner_R11')
             $done=Join-Path $dir.FullName 'safe-to-prepare-again.json'
             Need ([IO.File]::Exists($done)) 'YC59_PRIOR_OUTCOME_REQUIRES_DIAGNOSIS_NO_RETRY'
             $proof=Json $done
@@ -44,6 +46,7 @@ function CheckOldSessions {
             $trusted=Join-Path $dir.FullName 'trusted-no-consume.json'
             Need ((Hash $trusted) -ceq $proof.proof_sha256 -and (Json $trusted).state -in @('rejected','expired') -and [IO.File]::Exists((Join-Path $dir.FullName 'native-exit.json')) -and -not [IO.File]::Exists((Join-Path $dir.FullName 'owner-result.json'))) 'YC59_PRIOR_CANCELLATION_NOT_PROVEN'
         }
+    }
     }
     $path=Join-Path $Anchor 'active.json'
     if(-not [IO.File]::Exists($path)){return}
@@ -284,8 +287,10 @@ function ApprovalFromConsole([string]$Text){
 function AgentSetup {
     Actor $AgentSid;Personal;CheckPython;CheckGroups;InstalledCheck
     $base=Join-Path $env:LOCALAPPDATA 'agent-toolchain-yc59-assisted'
+    $legacyLatch=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'YC59_Agent_R5\read\read_attempted.json'
+    GuardConsumeMarkers (Join-Path $base 'read_attempted.json') $legacyLatch
     if(-not [IO.Directory]::Exists($base)){FreshDirectory $base $AgentSid};NoReparse $base
-    Need (-not [IO.File]::Exists((Join-Path $base 'read_attempted.json'))) 'YC59_PREVIOUS_CONSUME_ATTEMPT_STOP'
+    GuardConsumeMarkers (Join-Path $base 'read_attempted.json') $legacyLatch
     $agentReports=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'YC59_Assisted_Agent'
     if(-not [IO.Directory]::Exists($agentReports)){FreshDirectory $agentReports $AgentSid}
     $Report=Join-Path $agentReports ([guid]::NewGuid().ToString('N'));Set-Variable -Name Report -Value $Report -Scope 1;FreshDirectory $Report $AgentSid

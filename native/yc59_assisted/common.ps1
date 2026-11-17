@@ -54,6 +54,12 @@ function Personal {
     }
 }
 function CheckPython {Need ((Hash $Python) -ceq $ClientPythonSha256) 'YC59_PYTHON_CHANGED'}
+function GuardConsumeMarkers([string]$Current,[string]$Legacy){
+    # The first managed package must not bypass a consume attempted by R11b.
+    foreach($path in @($Current,$Legacy)){
+        Need (-not (Test-Path -LiteralPath $path)) 'YC59_PREVIOUS_CONSUME_ATTEMPT_STOP'
+    }
+}
 function Capture([string]$Executable,[string]$Arguments){
     $info=[Diagnostics.ProcessStartInfo]::new($Executable,$Arguments);$info.UseShellExecute=$false;$info.CreateNoWindow=$true
     $info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true

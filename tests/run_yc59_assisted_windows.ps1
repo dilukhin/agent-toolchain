@@ -34,6 +34,11 @@ Assert $match.Success 'lease_source_found'
 Add-Type -TypeDefinition $match.Groups[1].Value
 $temp=Join-Path $env:RUNNER_TEMP ('yc59-assisted-'+[guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($temp)
+. (Join-Path $package 'common.ps1')
+$currentLatch=Join-Path $temp 'current-latch';$legacyLatch=Join-Path $temp 'legacy-latch'
+GuardConsumeMarkers $currentLatch $legacyLatch
+[IO.File]::WriteAllText($legacyLatch,'unknown old consume outcome')
+Refuses {GuardConsumeMarkers $currentLatch $legacyLatch} 'legacy_consume_cannot_be_bypassed'
 $lease=[Yc59PackageLease]::Directory($temp)
 try{Refuses {[IO.Directory]::Move($temp,$temp+'-moved')} 'held_directory_cannot_move'}finally{$lease.Dispose()}
 $file=Join-Path $temp 'held.txt';[IO.File]::WriteAllText($file,'synthetic')
