@@ -6,7 +6,10 @@ $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $package=Join-Path $root 'native\yc59_assisted'
 foreach($script in @(Get-ChildItem -LiteralPath $package -Filter '*.ps1')){
     $tokens=$null;$errors=$null
-    [void][Management.Automation.Language.Parser]::ParseFile($script.FullName,[ref]$tokens,[ref]$errors)
+    # Match the real pinned loader: decode UTF-8 explicitly, including the
+    # unchanged seed which intentionally has no BOM. ParseFile uses legacy ACP.
+    $source=[Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($script.FullName)).TrimStart([char]0xFEFF)
+    [void][Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors)
     Assert ($errors.Count -eq 0) ('parse_'+$script.Name)
 }
 # Exercise trusted parameter validation with an existing OS profile. No accounts are created.
