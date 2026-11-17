@@ -24,7 +24,7 @@ native seed и дополнительный объект `assisted_operator`. В
 Первоначальное доверие задаётся независимо опубликованным хешем, а не ответом
 агента или файлом pins из копируемого каталога. Хеш запуска этого выпуска:
 
-`f7571cec0c4fe8dc05ccad2b7db0479765c9f09893027a6476e4ea9bcb3cb015`
+`7138bbcb338adb9e3030eafd2417055d020dab873eee31c1d44100fbf59e7b13`
 
 В новом системном Windows PowerShell 5.1 с `-NoProfile` один раз прочитать
 `launch.ps1`, проверить SHA-256 и исполнять именно прочитанные байты из памяти.
@@ -41,7 +41,7 @@ native seed и дополнительный объект `assisted_operator`. В
 | --- | --- |
 | `OwnerSid`, `AgentSid`, `AdminSid` | Три различные существующие локальные учётные записи. Владельца и агента дополнительно проверяют ОС и native seed; административный помощник сверяет настоящий SID и elevation. |
 | `OwnerProfile` | Канонический локальный путь, совпадающий с ProfileList ОС для OwnerSid. Выпуск и результаты выводятся из него. |
-| `ClientPython`, `ClientPythonSha256` | Принятые точные путь и байты интерпретатора клиента; это не Python защищённого владельца. |
+| `ClientPython`, `ClientPythonSha256` | Принятые точные путь и байты интерпретатора только агентского клиента. Помощники владельца используют Python его защищённого выпуска после native Check. |
 | `InputRoot` | Уже подготовленная закрытая передача формата `yc59-dima-inputs/v1`: admin/SYSTEM FullControl, владелец ReadAndExecute, агент доступа не получает. Имя `dima_sid` в историческом формате означает выбранного администратора. |
 | `PackageRoot`, `ExpectedLaunchSha` | Личная копия точного пакета и внешний хеш запуска. |
 
@@ -57,7 +57,7 @@ native seed и дополнительный объект `assisted_operator`. В
 в сеансе владельца. `$package` указывает личную копию пакета.
 
 ```powershell
-$expected = 'f7571cec0c4fe8dc05ccad2b7db0479765c9f09893027a6476e4ea9bcb3cb015'
+$expected = '7138bbcb338adb9e3030eafd2417055d020dab873eee31c1d44100fbf59e7b13'
 $bytes = [IO.File]::ReadAllBytes((Join-Path $package 'launch.ps1'))
 $hash = [Security.Cryptography.SHA256]::Create()
 try { $actual = ([BitConverter]::ToString($hash.ComputeHash($bytes))).Replace('-','').ToLowerInvariant() }

@@ -118,7 +118,7 @@ function SafeError($Record){
     return @{code=$name;exception_type=$e.GetType().FullName;hresult=$e.HResult;line=$Record.InvocationInfo.ScriptLineNumber}
 }
 function FixtureHost {
-    Actor $OwnerSid;CheckReport $Report;CheckPython
+    Actor $OwnerSid;CheckReport $Report
     $python=Join-Path $Release 'payload\python\python.exe'
     Need ([IO.File]::Exists($python)) 'YC59_PROTECTED_FIXTURE_PYTHON_MISSING'
     $arg='-I -S -B '+(CommandArgument (Join-Path $PackageRoot 'fixture.py'))+' '+(CommandArgument $Report)
@@ -241,7 +241,7 @@ function OwnerBridge {
                 $proof=Join-Path $Report 'trusted-no-consume.json'
                 $runtime=Join-Path $Release 'payload\component\runtime'
                 $args='-I -S -B '+(CommandArgument (Join-Path $PackageRoot 'reject-only.py'))+' '+(CommandArgument $runtime)+' '+$active.server_pid+' '+(CommandArgument (Join-Path $shared 'request.json'))+' '+(CommandArgument $proof)+' '+(CommandArgument $OwnerSid)
-                $rejected=Capture $Python $args
+                $rejected=Capture $OwnerPython $args
                 if($rejected.rc -eq 0){
                     $v=Json $proof
                     EndCancelledChild $child $v $request ([int]$active.server_pid)
@@ -342,7 +342,7 @@ function AgentRequest([string]$RunId,[string]$Base){
     TextNew (Join-Path $shared 'agent-exit.txt') ([string]$r.rc)
 }
 function Owner {
-    Actor $OwnerSid;Personal;CheckPython;CheckGroups;PublicDirectory;CheckOldSessions
+    Actor $OwnerSid;Personal;CheckGroups;PublicDirectory;CheckOldSessions
     $Report=ReportDirectory
     Set-Variable -Name Report -Value $Report -Scope 1
     JsonNew (Join-Path $Report 'controller.json') @{pid=$PID;started_ticks=[Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().Ticks}
@@ -404,7 +404,7 @@ function Owner {
         Need ([IO.File]::Exists((Join-Path $shared 'agent-result.json'))) 'YC59_AGENT_RECEIPT_MISSING_NO_RETRY'
         $active=Json (Join-Path $Anchor 'active.json')
         $args='-I -S -B '+(CommandArgument (Join-Path $PackageRoot 'compare-results.py'))+' '+(CommandArgument $receipt)+' '+(CommandArgument (Join-Path $shared 'agent-result.json'))+' '+$active.server_pid+' '+[Diagnostics.Process]::GetCurrentProcess().SessionId+' '+(CommandArgument (Join-Path $Report 'agent-result.json'))+' '+(CommandArgument $OwnerSid)
-        $checked=Capture $Python $args
+        $checked=Capture $OwnerPython $args
         Need ($checked.rc -eq 0) 'YC59_RECEIPTS_DONT_MATCH_NO_RETRY'
         JsonNew (Join-Path $Report 'status.json') @{status='RESULTS_READY_PENDING_INDEPENDENT_REVIEW';installed_acceptance=$false;restore_verified=$false;automatic_retry=$false}
         Write-Host 'RESULTS_READY_PENDING_INDEPENDENT_REVIEW. Пришлите только owner-result.json, agent-result.json и status.json из папки результатов.'

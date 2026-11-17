@@ -8,7 +8,7 @@ from pathlib import Path
 
 import setup_yc_owner_component as library
 
-MANIFEST_SHA256 = 'f7360b68153556405bd73d24cf43bfa236d6169c8ff3afd4ce8c2bc2589b1916'
+MANIFEST_SHA256 = '341333d213584410d67a44820e71b3b2e222fa3a4fb41ede02682f7c88ebb186'
 SOURCE = Path(__file__).resolve().parent / 'native' / 'yc59_assisted'
 MARKER = b'agent-toolchain:yc59-assisted-staging:v1\n'
 DOMAIN = b'agent-toolchain.yc59-assisted/v1\n'

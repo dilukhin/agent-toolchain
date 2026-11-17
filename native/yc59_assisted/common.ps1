@@ -7,6 +7,7 @@ $Python=$ClientPython
 $Public=Join-Path ([Environment]::GetFolderPath('CommonDocuments')) 'YC59_Assisted_v1'
 $Anchor=Join-Path $OwnerProfile 'AppData\Local\agent-toolchain-yc-owner'
 $Release=Join-Path $Anchor ('releases\'+$Artifact+'-'+$SeedSha.Substring(0,16)+'-r6')
+$OwnerPython=Join-Path $Release 'payload\python\python.exe'
 function Need([bool]$Value,[string]$Code){if(-not $Value){throw $Code}}
 function Quote([string]$Value){return "'"+$Value.Replace("'","''")+"'"}
 function Hash([string]$Path){return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()}

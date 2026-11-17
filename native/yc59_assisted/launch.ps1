@@ -56,7 +56,7 @@ public static class Yc59PackageLease {
     $LaunchSha=$ExpectedLaunchSha
     if((BytesHash (LeasedBytes 'launch.ps1')) -cne $LaunchSha){throw 'YC59_LAUNCH_CHANGED'}
     $pinBytes=LeasedBytes 'pins.json'
-    if((BytesHash $pinBytes) -cne 'c4ff147cd501ebba03ac8f8409041f10a45269468af5c3cc810aaf6833e60d22'){throw 'YC59_PACKAGE_MANIFEST_CHANGED'}
+    if((BytesHash $pinBytes) -cne 'b15cb78be409fec91ef924869ac537ceea1a4e40cad2e6f3aa51bb27804d5c61'){throw 'YC59_PACKAGE_MANIFEST_CHANGED'}
     $pins=[Text.Encoding]::UTF8.GetString($pinBytes)|ConvertFrom-Json
     $sources=@{}
     foreach($p in $pins.PSObject.Properties){
