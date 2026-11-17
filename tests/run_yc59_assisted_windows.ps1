@@ -1,7 +1,14 @@
 ﻿$ErrorActionPreference='Stop'
 Set-StrictMode -Version Latest
 function Assert([bool]$Value,[string]$Name){if(-not $Value){throw ('TEST_FAILED_'+$Name)}}
-function Refuses([scriptblock]$Action,[string]$Name){$failed=$false;try{& $Action}catch{$failed=$true};Assert $failed $Name}
+function Refuses([scriptblock]$Action,[string]$Name,[string]$Code=''){
+    $failed=$false
+    try{& $Action}catch{
+        $failed=$true
+        if($Code){Assert ($_.Exception.Message -ceq $Code) ($Name+'_specific_reason')}
+    }
+    Assert $failed $Name
+}
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $package=Join-Path $root 'native\yc59_assisted'
 foreach($script in @(Get-ChildItem -LiteralPath $package -Filter '*.ps1')){
@@ -53,7 +60,7 @@ try{
     $history=Join-Path $temp 'Documents\YC59_Owner_R11';FreshDirectory $history $OwnerSid
     $run=Join-Path $history ('a'*32);FreshDirectory $run $OwnerSid
     JsonNew (Join-Path $run 'native-started.json') @{synthetic_only=$true}
-    Refuses {CheckOldSessions} 'legacy_unknown_native_attempt_cannot_be_bypassed'
+    Refuses {CheckOldSessions} 'legacy_unknown_native_attempt_cannot_be_bypassed' 'YC59_PRIOR_OUTCOME_REQUIRES_DIAGNOSIS_NO_RETRY'
 }finally{$OwnerProfile=$savedProfile;$Anchor=$savedAnchor}
 $lease=[Yc59PackageLease]::Directory($temp)
 try{Refuses {[IO.Directory]::Move($temp,$temp+'-moved')} 'held_directory_cannot_move'}finally{$lease.Dispose()}
