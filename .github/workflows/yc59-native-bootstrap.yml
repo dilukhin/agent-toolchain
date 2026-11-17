@@ -6,11 +6,26 @@ on:
       - 'tests/run_yc_owner_native_windows.ps1'
       - 'tests/check_yc59_official_cli.ps1'
       - 'tests/yc59_context_component_pins.json'
+      - 'tests/*yc59_assisted*'
+      - 'tests/test_yc_owner_operator.py'
+      - 'setup_yc_owner_operator.py'
+      - 'scripts/build_yc59_assisted.py'
       - '.github/workflows/yc59-native-bootstrap.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
+  assisted-operator:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify data-only staging and one-consume protocol
+        shell: powershell
+        run: py -3 -B -m unittest tests.test_yc_owner_operator tests.test_yc_owner_release -v
+      - name: Verify parameters, file leases and real synthetic console
+        shell: powershell
+        run: .\tests\run_yc59_assisted_windows.ps1
   native-boundary:
     runs-on: windows-latest
     timeout-minutes: 8
