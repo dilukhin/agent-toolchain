@@ -90,7 +90,10 @@ def prepare(data, *, source=None):
                 __import__('os').fsync(stream.fileno())
             replacement.replace(package / 'journal.json')
             _validate(package)
+    import setup_yc_owner_operator
+    operator = setup_yc_owner_operator.prepare(data)
     return {**plan(), 'package': str(package), 'seed_path': str(package / 'owner-start.ps1'),
+            'assisted_operator': operator,
             'independent_web_pin_required': True,
             'next_action': 'В отдельном сеансе выбранного владельца: проверить внешний хеш, подготовить, проверить и запустить выпуск.'}
 
