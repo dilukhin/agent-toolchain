@@ -226,7 +226,7 @@ def _brew_installed_version() -> str | None:
 def _known_opencode_managers(npm: str | None) -> dict[str, str]:
     result: dict[str, str] = {}
     if npm:
-        npm_version = _npm_global_version(npm, "opencode-ai")
+        npm_version = _npm_global_version(npm, "@opencode/cli") or _npm_global_version(npm, "opencode-ai")
         if npm_version:
             result["npm"] = npm_version
     choco_version = _choco_installed_version()
@@ -241,12 +241,12 @@ def _known_opencode_managers(npm: str | None) -> dict[str, str]:
     return result
 
 
-def _update_command(manager: str) -> str | None:
+def _update_command(manager: str, cli_package: str = "opencode-ai") -> str | None:
     return {
         "curl": "opencode upgrade --method curl",
-        "npm": "npm install -g opencode-ai@latest",
-        "pnpm": "pnpm install -g opencode-ai@latest",
-        "bun": "bun install -g opencode-ai@latest",
+        "npm": f"npm install -g {cli_package}@latest",
+        "pnpm": f"pnpm install -g {cli_package}@latest",
+        "bun": f"bun install -g {cli_package}@latest",
         "choco": "choco upgrade opencode -y",
         "scoop": "scoop update opencode",
         "brew": "brew upgrade anomalyco/tap/opencode",
@@ -273,6 +273,9 @@ def _version_number(text: str | None) -> str | None:
 
 def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: bool, npm: str | None) -> None:
     cli_package = str(config["dependencies"].get("opencode-cli-package", "opencode-ai"))
+    if cli_package not in {"opencode-ai", "@opencode/cli"}:
+        reporter.add("OpenCode CLI", STATE_CONFLICT, f"unsupported OpenCode package: {cli_package}")
+        return
     items = executable_inventory("opencode")
     active = active_instance(items)
     managers = _known_opencode_managers(npm)
@@ -296,6 +299,25 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
             details + ". " + recommendation + " Автоматическая установка/обновление CLI остановлена.",
         )
         return
+
+    if active is not None:
+        actual_version = _version_number(active.version)
+        if actual_version and (actual_version.startswith("2.") != (cli_package == "@opencode/cli")):
+            reporter.add(
+                "OpenCode CLI", STATE_CONFLICT,
+                f"активный OpenCode {actual_version} не соответствует политике {cli_package}; "
+                "проверьте конфигурацию V2 перед toolchainctl apply; CLI не изменён",
+            )
+            return
+        if npm and active.manager == "npm":
+            other_package = "opencode-ai" if cli_package == "@opencode/cli" else "@opencode/cli"
+            if _npm_global_version(npm, other_package):
+                reporter.add(
+                    "OpenCode CLI", STATE_CONFLICT,
+                    f"обнаружены оба npm-пакета OpenCode ({cli_package} и {other_package}); "
+                    "автоматическое обновление остановлено до устранения неоднозначности",
+                )
+                return
 
     if active is None:
         if managers:
@@ -361,7 +383,7 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
         detail = "; ".join(isolated_manager_detail(name, version) for name, version in sorted(extra_managers.items()))
         reporter.add("ПРЕДУПРЕЖДЕНИЕ: изолированные установки OpenCode", STATE_INFO, detail)
 
-    update_command = _update_command(manager)
+    update_command = _update_command(manager, cli_package)
     command_detail = f"; команда обновления: {update_command}" if update_command else "; команда обновления не определена"
 
     actual_version = _version_number(active.version)
@@ -439,6 +461,10 @@ def reconcile_npm(config_dir: Path, config: dict[str, Any], reporter: Reporter,
 
     _reconcile_opencode_cli(config, reporter, check, npm)
 
+    if any(item.component == "OpenCode CLI" and item.state == STATE_CONFLICT for item in reporter.results):
+        reporter.add("OpenCode plugin", STATE_CONFLICT, "проверка CLI не пройдена; установка плагина остановлена")
+        return
+
     if not npm:
         if active_instance(executable_inventory("opencode")) is not None:
             reporter.add(
@@ -456,7 +482,7 @@ def reconcile_npm(config_dir: Path, config: dict[str, Any], reporter: Reporter,
             )
         return
 
-    plugin_package = "@opencode-ai/plugin"
+    plugin_package = "@opencode/plugin" if config["dependencies"].get("opencode-cli-package") == "@opencode/cli" else "@opencode-ai/plugin"
     configured = config["dependencies"].get(plugin_package, "latest")
     target = _resolve_npm_target(npm, plugin_package, configured)
     if target is None:
@@ -464,7 +490,7 @@ def reconcile_npm(config_dir: Path, config: dict[str, Any], reporter: Reporter,
                      f"не удалось определить целевую версию {plugin_package} для политики {configured!r}")
         return
 
-    package_json = config_dir / "node_modules" / "@opencode-ai" / "plugin" / "package.json"
+    package_json = config_dir / "node_modules" / plugin_package / "package.json"
     current = installed_version(package_json)
     if current == target:
         suffix = " (npm latest)" if str(configured).lower() == "latest" else ""

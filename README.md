@@ -65,7 +65,7 @@ toolchainctl update          обновить установленный упр�
 toolchainctl update --apply  обновить core и затем применить новый target state
 ```
 
-`--version` использует semantic version управляющего core `0.1.0` и идентичность именно запущенного установленного payload. Для production core с доказанным `source_ref` формат — `toolchainctl 0.1.0.<8hex>`, где `<8hex>` — первые восемь символов полного source SHA из managed-core marker. Старый или локально опубликованный core без доказанного Git SHA явно помечается как `local.<fingerprint8>` (либо `dev` без marker), поэтому версия не подменяется текущим checkout или удалённым `main`.
+`--version` использует semantic version управляющего core `0.2.0` и идентичность именно запущенного установленного payload. Для production core с доказанным `source_ref` формат — `toolchainctl 0.2.0.<8hex>`, где `<8hex>` — первые восемь символов полного source SHA из managed-core marker. Локально опубликованный core без доказанного Git SHA явно помечается четвёртой частью `local-<fingerprint8>` (либо `dev` без marker), поэтому версия не подменяется текущим checkout или удалённым `main`.
 
 Обычные `check`/`apply`/`updates`/`update` и ранние ошибки оставляют identity один раз в stderr. Для `opencode-proxied` и `codex-proxied` собственная версия доступна через `--wrapper-version`, структурированные метаданные — через `--health-json`; `--version` по-прежнему передаётся дочернему CLI. [Контракт диагностической identity и provenance](docs/diagnostic_identity_ru.md).
 
