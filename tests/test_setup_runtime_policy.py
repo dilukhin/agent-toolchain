@@ -206,6 +206,108 @@ class OpenCodeOwnershipTests(unittest.TestCase):
         self.assertIn("1.18.18", warning[-1].detail)
         self.assertIn("1.18.16", warning[-1].detail)
 
+    def test_v2_cli_under_v1_policy_stops_before_plugin_install(self) -> None:
+        runtime.executable_inventory = lambda command: [
+            ExecutableInstance(Path("C:/Users/Dima/AppData/Roaming/npm/opencode.cmd"), "2.3.2", "npm", True),
+        ] if command == "opencode" else []
+        runtime._known_opencode_managers = lambda npm: {"npm": "2.3.2"}
+        commands = []
+        runtime.run = lambda cmd, **kwargs: commands.append(cmd) or subprocess.CompletedProcess(cmd, 0, "", "")
+        with mock.patch.object(runtime.shutil, "which", return_value="npm"), \
+             mock.patch.object(runtime, "report_common_tool_inventory", return_value=None):
+            reporter = runtime.Reporter()
+            runtime.reconcile_npm(Path("/unused"), {"dependencies": {
+                "opencode-cli-package": "opencode-ai", "@opencode-ai/plugin": "latest",
+            }}, reporter, check=False, skip=False)
+        self.assertTrue(reporter.has_conflict)
+        self.assertIn("не соответствует политике", next(r.detail for r in reporter.results if r.component == "OpenCode CLI"))
+        self.assertFalse(commands)
+
+    def test_v2_policy_with_existing_choco_v1_never_installs_second_cli(self) -> None:
+        runtime.executable_inventory = lambda command: [
+            ExecutableInstance(Path("C:/ProgramData/chocolatey/bin/opencode.exe"), "1.19.5", "choco", True),
+        ] if command == "opencode" else []
+        runtime._known_opencode_managers = lambda npm: {"choco": "1.19.5"}
+        commands = []
+        runtime.run = lambda cmd, **kwargs: commands.append(cmd) or subprocess.CompletedProcess(cmd, 0, "", "")
+        with mock.patch.object(runtime.shutil, "which", return_value="npm"), \
+             mock.patch.object(runtime, "report_common_tool_inventory", return_value=None):
+            reporter = runtime.Reporter()
+            runtime.reconcile_npm(Path("/unused"), {"dependencies": {
+                "opencode-cli-package": "@opencode/cli", "@opencode/plugin": "match-opencode",
+            }}, reporter, check=False, skip=False)
+        self.assertTrue(reporter.has_conflict)
+        self.assertIn("не соответствует политике", next(r.detail for r in reporter.results if r.component == "OpenCode CLI"))
+        self.assertFalse(commands)
+
+    def test_v2_policy_checks_and_reconciles_only_matching_plugin(self) -> None:
+        runtime.executable_inventory = lambda command: [
+            ExecutableInstance(Path("C:/Users/Dima/AppData/Roaming/npm/opencode.cmd"), "2.3.2", "npm", True),
+        ] if command == "opencode" else []
+        runtime._known_opencode_managers = lambda npm: {"npm": "2.3.2"}
+        commands = []
+
+        with tempfile.TemporaryDirectory() as td, \
+             mock.patch.object(runtime.shutil, "which", return_value="npm"), \
+             mock.patch.object(runtime, "report_common_tool_inventory", return_value=None), \
+             mock.patch.object(runtime, "_external_opencode_inventory", return_value=None):
+            package_json = Path(td) / "node_modules" / "@opencode" / "plugin" / "package.json"
+
+            def fake_run(cmd, **kwargs):
+                commands.append(cmd)
+                if cmd[1] == "list":
+                    return subprocess.CompletedProcess(cmd, 0, json.dumps({"dependencies": {"@opencode/cli": {"version": "2.3.2"}}}), "")
+                if cmd[1] == "view":
+                    return subprocess.CompletedProcess(cmd, 0, json.dumps("2.3.2"), "")
+                if cmd[1] == "install" and "@opencode/plugin@2.3.2" in cmd and "-g" not in cmd:
+                    package_json.parent.mkdir(parents=True)
+                    package_json.write_text(json.dumps({"version": "2.3.2"}), encoding="utf-8")
+                    return subprocess.CompletedProcess(cmd, 0, "", "")
+                raise AssertionError(cmd)
+
+            runtime.run = fake_run
+            config = {"dependencies": {
+                "opencode-cli-package": "@opencode/cli", "@opencode/plugin": "match-opencode",
+            }}
+            reporter = runtime.Reporter()
+            runtime.reconcile_npm(Path(td), config, reporter, check=True, skip=False)
+            self.assertFalse(any(cmd[1] == "install" for cmd in commands))
+            self.assertFalse(package_json.exists())
+            self.assertTrue(any(cmd[1:3] == ["view", "@opencode/plugin@2.3.2"] for cmd in commands))
+            self.assertIn("@opencode/cli@2.3.2", next(r.detail for r in reporter.results if r.component == "OpenCode CLI"))
+            self.assertEqual(next(r.state for r in reporter.results if r.component == "OpenCode plugin"), runtime.STATE_MISSING)
+            applied = runtime.Reporter()
+            runtime.reconcile_npm(Path(td), config, applied, check=False, skip=False)
+            self.assertEqual(package_json.read_text(encoding="utf-8"), '{"version": "2.3.2"}')
+            self.assertEqual(next(r.state for r in applied.results if r.component == "OpenCode plugin"), runtime.STATE_CONFIGURED)
+            self.assertEqual(len([cmd for cmd in commands if cmd[1] == "install"]), 1)
+
+    def test_v2_policy_refuses_old_npm_package_even_when_v2_is_active(self) -> None:
+        runtime.executable_inventory = lambda command: [
+            ExecutableInstance(Path("C:/Users/Dima/AppData/Roaming/npm/opencode.cmd"), "2.3.2", "npm", True),
+        ] if command == "opencode" else []
+        runtime._known_opencode_managers = lambda npm: {"npm": "2.3.2"}
+        commands = []
+
+        def fake_run(cmd, **kwargs):
+            commands.append(cmd)
+            if cmd[1] == "list":
+                return subprocess.CompletedProcess(cmd, 0, json.dumps({"dependencies": {
+                    "opencode-ai": {"version": "1.19.6"}, "@opencode/cli": {"version": "2.3.2"},
+                }}), "")
+            raise AssertionError(cmd)
+
+        runtime.run = fake_run
+        with mock.patch.object(runtime.shutil, "which", return_value="npm"), \
+             mock.patch.object(runtime, "report_common_tool_inventory", return_value=None):
+            reporter = runtime.Reporter()
+            runtime.reconcile_npm(Path("/unused"), {"dependencies": {
+                "opencode-cli-package": "@opencode/cli", "@opencode/plugin": "latest",
+            }}, reporter, check=False, skip=False)
+        self.assertTrue(reporter.has_conflict)
+        self.assertIn("оба npm-пакета", next(r.detail for r in reporter.results if r.component == "OpenCode CLI"))
+        self.assertFalse(any(cmd[1] in {"install", "view"} for cmd in commands))
+
 
 if __name__ == "__main__":
     unittest.main()

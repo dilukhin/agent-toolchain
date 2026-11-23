@@ -324,8 +324,9 @@ def _tldr_actions(results) -> list[str]:
             if "package version not published" in result.detail:
                 action = f"«{result.component}»: {reason}; {result.detail.split('; npm metadata lookup:', 1)[0]}"
             else:
+                plugin_name = "@opencode/plugin" if "@opencode/plugin" in result.detail else "@opencode-ai/plugin"
                 action = (
-                    f"«{result.component}»: {reason}; проверьте `npm view @opencode-ai/plugin version --json`"
+                    f"«{result.component}»: {reason}; проверьте `npm view {plugin_name} version --json`"
                     if result.component == "OpenCode plugin" else f"«{result.component}»: {reason}"
                 ) + "; после устранения причины повторите `toolchainctl apply`"
         elif result.state in {STATE_FAILED, STATE_CONFLICT}:
@@ -454,7 +455,7 @@ def _standalone_opencode_version() -> str | None:
 def _resolve_npm_target(npm: str, package: str, configured: object) -> str | None:
     global _plugin_target_error
     policy = str(configured or "latest").strip()
-    if package != "@opencode-ai/plugin":
+    if package not in {"@opencode-ai/plugin", "@opencode/plugin"}:
         return _legacy_resolve_npm_target(npm, package, configured)
 
     _plugin_target_error = None
@@ -470,7 +471,7 @@ def _resolve_npm_target(npm: str, package: str, configured: object) -> str | Non
         if target is None:
             _plugin_target_error = (
                 "npm не подтвердил опубликованную версию плагина; проверьте ответ: "
-                "`npm view @opencode-ai/plugin version --json`, затем выполните `toolchainctl apply`"
+                f"`npm view {package} version --json`, затем выполните `toolchainctl apply`"
             )
         return target
 
@@ -648,8 +649,9 @@ def reconcile_npm(config_dir, config, reporter, check, skip):
                 item.detail = _plugin_target_error + (
                     f"; npm metadata lookup: {_last_npm_metadata_error}" if _last_npm_metadata_error else ""
                 )
+    plugin_package = "@opencode/plugin" if config["dependencies"].get("opencode-cli-package") == "@opencode/cli" else "@opencode-ai/plugin"
     _annotate_plugin_version_match(
-        reporter, start_index, config["dependencies"].get("@opencode-ai/plugin", "latest")
+        reporter, start_index, config["dependencies"].get(plugin_package, "latest")
     )
     return result
 

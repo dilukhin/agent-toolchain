@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from setup_inventory import ExecutableInstance, duplicate_recommendation, infer_manager, render_instances  # noqa: E402
+from setup_inventory import ExecutableInstance, ExternalCliSpec, duplicate_recommendation, external_cli_inventory, infer_manager, render_instances  # noqa: E402
 
 
 class WindowsNpmLayeredInventoryTests(unittest.TestCase):
@@ -66,6 +66,28 @@ class WindowsNpmLayeredInventoryTests(unittest.TestCase):
     def test_local_bin_opencode_is_not_assumed_to_be_curl(self) -> None:
         path = Path("/home/test/.local/bin/opencode")
         self.assertEqual(infer_manager(path, command="opencode"), "local")
+
+    def test_v2_npm_update_advisory_uses_v2_package(self) -> None:
+        from unittest import mock
+        for path in (
+            Path("C:/Users/Dima/AppData/Roaming/npm/opencode.cmd"),
+            Path("/home/dima/.local/lib/node_modules/@opencode/cli/bin/opencode"),
+        ):
+            with self.subTest(path=path), mock.patch("setup_inventory.executable_inventory", return_value=[
+                ExecutableInstance(path, "opencode v2.3.2", "npm", True),
+            ]):
+                result = external_cli_inventory(ExternalCliSpec("opencode", "OpenCode"))
+            self.assertEqual(result.active.package, "@opencode/cli")
+            self.assertEqual(result.update_advice, "npm install -g @opencode/cli@latest")
+
+    def test_unknown_npm_opencode_version_has_no_update_advice(self) -> None:
+        from unittest import mock
+        with mock.patch("setup_inventory.executable_inventory", return_value=[
+            ExecutableInstance(Path("C:/Users/Dima/AppData/Roaming/npm/opencode.cmd"), None, "npm", True),
+        ]):
+            result = external_cli_inventory(ExternalCliSpec("opencode", "OpenCode"))
+        self.assertIsNone(result.active.package)
+        self.assertIsNone(result.update_advice)
 
 
 if __name__ == "__main__":
