@@ -3,7 +3,7 @@
   "schema": 1,
   "source_url": "https://routerai.ru/api/v1/models",
   "source_state": "live",
-  "observed_at": "2026-11-22T11:23:40Z",
+  "observed_at": "2026-11-23T12:37:52Z",
   "models": {
     "aion-labs/aion-2.0": {
       "name": "AionLabs: Aion-2.0",
@@ -2496,9 +2496,9 @@
         "tokenizer": "DeepSeek"
       },
       "pricing": {
-        "prompt": "0.00009884612368358",
-        "completion": "0.00019769224736716",
-        "input_cache_read": "0.00000818843628148"
+        "prompt": "0.000098595115351824",
+        "completion": "0.000197190230703648",
+        "input_cache_read": "0.000008216259612652"
       },
       "pricing_units": {
         "prompt": "token",
@@ -4814,7 +4814,7 @@
     "inclusionai/ling-3.1-flash": {
       "name": "inclusionAI: Ling 3.1 Flash",
       "created": 1790950024,
-      "context_length": 1000000,
+      "context_length": 1048576,
       "architecture": {
         "input_modalities": [
           "text"
@@ -5068,6 +5068,75 @@
         "prompt": "token",
         "completion": "token",
         "input_cache_read": "token"
+      }
+    },
+    "kwaivgi/kling-v3.0-pro": {
+      "name": "Kling: Video v3.0 Pro",
+      "created": 1777496206,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "video"
+        ]
+      },
+      "pricing": {
+        "prompt": "0.0",
+        "seconds": "17.95053624",
+        "completion": "0.0"
+      },
+      "pricing_units": {
+        "prompt": "token",
+        "seconds": "second",
+        "completion": "token"
+      }
+    },
+    "kwaivgi/kling-v3.0-std": {
+      "name": "Kling: Video v3.0 Standard",
+      "created": 1777496205,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "video"
+        ]
+      },
+      "pricing": {
+        "prompt": "0.0",
+        "seconds": "13.46290218",
+        "completion": "0.0"
+      },
+      "pricing_units": {
+        "prompt": "token",
+        "seconds": "second",
+        "completion": "token"
+      }
+    },
+    "kwaivgi/kling-video-o1": {
+      "name": "Kling: Video O1",
+      "created": 1776704777,
+      "architecture": {
+        "input_modalities": [
+          "text",
+          "image"
+        ],
+        "output_modalities": [
+          "video"
+        ]
+      },
+      "pricing": {
+        "prompt": "0.0",
+        "seconds": "11.96702416",
+        "completion": "0.0"
+      },
+      "pricing_units": {
+        "prompt": "token",
+        "seconds": "second",
+        "completion": "token"
       }
     },
     "liquid/d1-ultra": {
@@ -7464,9 +7533,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.000128218116",
-        "completion": "0.00064109058",
-        "input_cache_read": "0.0000128218116"
+        "prompt": "0.0001324920532",
+        "completion": "0.000662460266",
+        "input_cache_read": "0.00001324920532"
       },
       "pricing_units": {
         "prompt": "token",
@@ -7911,9 +7980,9 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000096163587",
-        "completion": "0.000032054529",
-        "input_cache_read": "0.00000128218116"
+        "prompt": "0.0000064109058",
+        "completion": "0.0000373969505",
+        "input_cache_read": "0.0000010684843"
       },
       "pricing_units": {
         "prompt": "token",
@@ -9780,9 +9849,9 @@
         "tokenizer": "GPT"
       },
       "pricing": {
-        "prompt": "0.00000181642331",
-        "completion": "0.00000908211655",
-        "input_cache_read": "0.000000908211655"
+        "prompt": "0.000001634780979",
+        "completion": "0.000008173904895",
+        "input_cache_read": "0.0000008173904895"
       },
       "pricing_units": {
         "prompt": "token",
@@ -14702,8 +14771,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000055358171583",
-        "completion": "0.0000085681756017",
+        "prompt": "0.0000046895775927",
+        "completion": "0.0000092146086032",
         "input_cache_read": "0.00000352599819"
       },
       "pricing_units": {
@@ -15221,8 +15290,8 @@
         "tokenizer": "Other"
       },
       "pricing": {
-        "prompt": "0.0000055358171583",
-        "completion": "0.0000085681756017",
+        "prompt": "0.0000046895775927",
+        "completion": "0.0000092146086032",
         "input_cache_read": "0.00000352599819"
       },
       "pricing_units": {
@@ -15455,7 +15524,8 @@
       "DeepSeek V4 Pro [reasoning, 44/87 ₽]",
       "DeepSeek V4 Pro [reasoning, 31/62 ₽]",
       "DeepSeek V4 Pro [reasoning, 134/224 ₽]",
-      "DeepSeek V4 Pro [reasoning, 99/198 ₽]"
+      "DeepSeek V4 Pro [reasoning, 99/198 ₽]",
+      "DeepSeek V4 Pro [reasoning, 99/197 ₽]"
     ],
     "minimax/minimax-m2.7": [
       "MiniMax M2.7",
