@@ -158,7 +158,9 @@ class OpenCodeOwnershipTests(unittest.TestCase):
     def test_version_number_accepts_v2_cli_output_without_matching_embedded_versions(self) -> None:
         self.assertEqual(runtime._legacy._version_number("opencode v2.3.2"), "2.3.2")
         self.assertEqual(runtime._legacy._version_number("1.19.5"), "1.19.5")
-        self.assertIsNone(runtime._legacy._version_number("prefix2.3.2"))
+        for text in ("prefix2.3.2", "prefix_2.3.2", "prefix_v2.3.2", "сборкаv2.3.2"):
+            with self.subTest(text=text):
+                self.assertIsNone(runtime._legacy._version_number(text))
 
     def test_choco_plus_npm_in_path_is_conflict_and_no_update_runs(self) -> None:
         runtime.executable_inventory = lambda command: [
