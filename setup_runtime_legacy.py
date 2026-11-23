@@ -267,7 +267,7 @@ def _uninstall_command(manager: str) -> str | None:
 def _version_number(text: str | None) -> str | None:
     if not text:
         return None
-    match = re.search(r"\b(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)\b", text)
+    match = re.search(r"(?<![0-9A-Za-z])v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)\b", text)
     return match.group(1) if match else None
 
 
