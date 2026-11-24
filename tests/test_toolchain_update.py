@@ -168,7 +168,7 @@ class ToolchainUpdateTests(unittest.TestCase):
             }
             (core / toolchainctl.CORE_MARKER).write_text(json.dumps(marker), encoding="utf-8")
             with mock.patch.object(toolchainctl, "__file__", str(tool)):
-                expected = "toolchainctl 0.2.0.39dea792"
+                expected = "toolchainctl 0.3.0.39dea792"
                 self.assertEqual(toolchainctl._version_text(), expected)
                 stdout = io.StringIO()
                 with contextlib.redirect_stdout(stdout), self.assertRaises(SystemExit) as exited:
@@ -189,7 +189,7 @@ class ToolchainUpdateTests(unittest.TestCase):
             }
             (core / toolchainctl.CORE_MARKER).write_text(json.dumps(marker), encoding="utf-8")
             with mock.patch.object(toolchainctl, "__file__", str(tool)):
-                self.assertEqual(toolchainctl._version_text(), "toolchainctl 0.2.0.local-bbbbbbbb")
+                self.assertEqual(toolchainctl._version_text(), "toolchainctl 0.3.0.local-bbbbbbbb")
 
     def test_update_archive_rejects_path_traversal(self) -> None:
         buffer = io.BytesIO()
