@@ -12,9 +12,8 @@ import sys
 import tempfile
 import time
 import uuid
+from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
-
-from core_identity import emit_identity, read_identity
 
 SOURCE_ROOT = Path(__file__).resolve().parent
 CORE_MARKER = ".agent-toolchain-managed-core.json"
@@ -476,7 +475,18 @@ def _report_resolution() -> None:
         )
 
 
-def main() -> int:
+def main(argv: Sequence[str] = ()) -> int:
+    if argv:
+        if len(argv) == 1 and argv[0] in ("-h", "--help"):
+            print("Usage: bootstrap_core.py [-h | --help]")
+            print("Run without arguments to install or update the agent-toolchain core.")
+            return 0
+        print("Unexpected bootstrap arguments. Use --help for usage.", file=sys.stderr)
+        return 2
+
+    # Keep help and argument errors from creating a bytecode cache in the checkout.
+    from core_identity import emit_identity, read_identity
+
     emit_identity("agent-toolchain-bootstrap", read_identity(SOURCE_ROOT))
     if sys.version_info < (3, 10):
         print("agent-toolchain requires Python 3.10+ for its stdlib-only core.", file=sys.stderr)
@@ -509,4 +519,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))

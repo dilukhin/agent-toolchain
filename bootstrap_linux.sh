@@ -14,4 +14,4 @@ if ! "$PYTHON_EXE" -B -c 'import sys; raise SystemExit(0 if sys.version_info >= 
   exit 2
 fi
 
-exec "$PYTHON_EXE" -B "$SOURCE_DIR/bootstrap_core.py"
+exec "$PYTHON_EXE" -B "$SOURCE_DIR/bootstrap_core.py" "$@"
