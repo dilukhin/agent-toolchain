@@ -329,6 +329,71 @@ class OpenCodeOwnershipTests(unittest.TestCase):
             self.assertEqual(json.loads(plugin.read_text(encoding="utf-8"))["version"], "2.3.2")
             self.assertFalse(any(cmd[1] == "install" for cmd in commands))
 
+    def test_no_update_advice_when_npm_latest_is_older_or_executable_disagrees(self) -> None:
+        config = {"dependencies": {"opencode-cli-package": "@opencode/cli"}}
+        cases = (
+            ("latest older", "2.4.1", "2.4.1", "2.3.2", "не новее"),
+            ("executable mismatch", "2.4.1", "2.3.2", "2.3.2", "расходятся"),
+        )
+        for label, executable, installed, latest, reason in cases:
+            for check in (True, False):
+                with self.subTest(case=label, check=check):
+                    runtime.executable_inventory = lambda command: [
+                        ExecutableInstance(Path("/fake/npm/opencode"), executable, "npm", True),
+                    ] if command == "opencode" else []
+                    runtime._known_opencode_managers = lambda npm: {"npm": installed}
+                    commands = []
+
+                    def fake_run(cmd, **kwargs):
+                        commands.append(cmd)
+                        if cmd[1] == "list":
+                            return subprocess.CompletedProcess(
+                                cmd, 0, json.dumps({"dependencies": {"@opencode/cli": {"version": installed}}}), "",
+                            )
+                        if cmd[1] == "view":
+                            return subprocess.CompletedProcess(cmd, 0, json.dumps(latest), "")
+                        raise AssertionError(f"unexpected install: {cmd}")
+
+                    runtime.run = fake_run
+                    reporter = runtime.Reporter()
+                    runtime._reconcile_opencode_cli(config, reporter, check, "npm")
+                    cli = next(r for r in reporter.results if r.component == "OpenCode CLI")
+                    self.assertEqual(cli.state, runtime.STATE_INFO)
+                    self.assertIn(reason, cli.detail)
+                    self.assertIn(f"npm latest {latest}", cli.detail)
+                    self.assertNotIn("npm install -g", cli.detail)
+                    summary = runtime._format_tldr(reporter.results)
+                    self.assertNotIn("npm install -g", summary)
+                    self.assertNotIn("обновить OpenCode", summary)
+                    self.assertFalse(any(cmd[1] == "install" for cmd in commands))
+
+    def test_up_to_date_npm_cli_has_no_update_command(self) -> None:
+        runtime.executable_inventory = lambda command: [
+            ExecutableInstance(Path("/fake/npm/opencode"), "2.3.2", "npm", True),
+        ] if command == "opencode" else []
+        runtime._known_opencode_managers = lambda npm: {"npm": "2.3.2"}
+        commands = []
+
+        def fake_run(cmd, **kwargs):
+            commands.append(cmd)
+            if cmd[1] == "list":
+                return subprocess.CompletedProcess(
+                    cmd, 0, '{"dependencies":{"@opencode/cli":{"version":"2.3.2"}}}', "",
+                )
+            if cmd[1] == "view":
+                return subprocess.CompletedProcess(cmd, 0, '"2.3.2"', "")
+            raise AssertionError(f"unexpected install: {cmd}")
+
+        runtime.run = fake_run
+        reporter = runtime.Reporter()
+        runtime._reconcile_opencode_cli(
+            {"dependencies": {"opencode-cli-package": "@opencode/cli"}}, reporter, False, "npm",
+        )
+        cli = next(r for r in reporter.results if r.component == "OpenCode CLI")
+        self.assertEqual(cli.state, runtime.STATE_OK)
+        self.assertNotIn("npm install -g", cli.detail)
+        self.assertFalse(any(cmd[1] == "install" for cmd in commands))
+
     def test_existing_npm_cli_without_package_metadata_is_not_reinstalled(self) -> None:
         runtime.executable_inventory = lambda command: [
             ExecutableInstance(Path("/fake/npm/opencode"), "2.3.2", "npm", True),

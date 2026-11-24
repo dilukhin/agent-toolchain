@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from setup_external_updates import _version, _version_key
 from setup_inventory import (
     active_instance,
     duplicate_recommendation,
@@ -422,11 +423,34 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
         )
         return
     latest_cli = _npm_latest_version(npm, cli_package)
+    current_parsed = _version(current_cli)
+    latest_parsed = _version(latest_cli)
     if latest_cli is None:
         reporter.add("OpenCode CLI", STATE_CONFLICT, f"не удалось получить актуальную версию npm-пакета {cli_package}")
-    elif current_cli == latest_cli and actual_version in {None, latest_cli}:
+    elif actual_version != current_cli:
+        reporter.add(
+            "OpenCode CLI", STATE_INFO,
+            f"активный npm-экземпляр {active.path}; executable сообщает {actual_version or 'не определено'}, "
+            f"npm зарегистрировал {current_cli}, npm latest {latest_cli}; "
+            "версии активного CLI и npm расходятся; команда обновления не рекомендована",
+        )
+    elif current_parsed is None or latest_parsed is None:
+        reporter.add(
+            "OpenCode CLI", STATE_INFO,
+            f"активный npm-экземпляр {active.path}; установлено {current_cli}; npm latest {latest_cli}; "
+            "сравнить версии не удалось; команда обновления не рекомендована",
+        )
+    elif _version_key(latest_parsed) <= _version_key(current_parsed):
+        if latest_cli != current_cli:
+            reporter.add(
+                "OpenCode CLI", STATE_INFO,
+                f"активный npm-экземпляр {active.path}; установлено {current_cli}; npm latest {latest_cli} "
+                "не новее установленной версии; команда обновления не рекомендована",
+            )
+            return
         reporter.add("OpenCode CLI", STATE_OK,
-                     f"активный npm-экземпляр {active.path}; {cli_package}@{current_cli}{command_detail}")
+                     f"активный npm-экземпляр {active.path}; {cli_package}@{current_cli}; "
+                     "доступных обновлений через npm не найдено")
     else:
         reporter.add(
             "OpenCode CLI", STATE_OUTDATED,
