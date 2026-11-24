@@ -68,7 +68,7 @@ class WorkspaceTrustRegistryTests(unittest.TestCase):
         rc, out, err = self.cli("list")
         self.assertEqual(rc, 0)
         self.assertEqual(json.loads(out), {"schema": trust.REGISTRY_SCHEMA, "entries": []})
-        self.assertEqual(err.count("toolchainctl 0.2.0."), 1)
+        self.assertEqual(err.count("toolchainctl 0.3.0."), 1)
         self.assertIsNone(provider.lookup(trust.observe_workspace(self.path)))
         self.assertEqual(self.add()[0], 2)
         self.assertEqual(before, self.snapshot())
