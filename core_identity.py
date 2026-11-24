@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import sys
 
-CORE_SEMVER = '0.1.0'
+CORE_SEMVER = '0.2.0'
 CORE_MARKER = '.agent-toolchain-managed-core.json'
 BUNDLED_IDENTITY = 'core_identity.json'
 
@@ -46,7 +46,7 @@ def version_text(label: str, identity: dict[str, object]) -> str:
     if provenance == 'git':
         build = str(identity['source_ref'])[:8]
     elif provenance == 'local':
-        build = 'local.' + str(identity['fingerprint'])[:8]
+        build = 'local-' + str(identity['fingerprint'])[:8]
     else:
         build = str(provenance)
     return f'{label} {CORE_SEMVER}.{build}'

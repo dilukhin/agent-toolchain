@@ -1,12 +1,12 @@
 # Диагностическая identity core и proxy-tools
 
 Контракт issue [#46](https://github.com/dilukhin/agent-toolchain/issues/46).
-Semantic version core остаётся `0.1.0`; единственный источник — `core_identity.py`.
+Semantic version core для миграции OpenCode V2 — `0.2.0`; единственный источник — `core_identity.py`.
 
 ## Каналы и команды
 
 `toolchainctl --version` печатает в stdout одну строку:
-`toolchainctl 0.1.0.<8hex>`. Это первые восемь символов полного `source_ref`
+`toolchainctl 0.2.0.<8hex>`. Это первые восемь символов полного `source_ref`
 из marker запущенного установленного core. Git и сеть при чтении версии не нужны.
 
 Обычные `check`, `apply`, `updates`, `update` печатают ту же identity один раз
@@ -20,7 +20,7 @@ Bootstrap пишет в stderr identity исполняемого bootstrap-ко�
 
 | Вызов | Результат |
 |---|---|
-| `--wrapper-version` | Собственная строка `<command>-proxied 0.1.0.<8hex>` в stdout |
+| `--wrapper-version` | Собственная строка `<command>-proxied 0.2.0.<8hex>` в stdout |
 | `--health-json` | JSON в stdout: `tool`, `identity`, `scope=wrapper-runtime`, `network_checked=false` |
 | `--health` | Прежний текстовый health, совместимый с ToolSpec |
 | `--version` и обычные аргументы | Passthrough дочернему CLI; одна identity wrapper в stderr |
@@ -50,7 +50,7 @@ stdout child; exit codes и transport сохраняются.
   архива: ручная подстановка переменной не доказывает происхождение его содержимого.
   Неправильный формат SHA или несовпадение с доступным checkout блокируют публикацию.
 - Dirty checkout, копия без `.git` и без exact-archive caller, либо недоступный Git
-  не получают недоказанный SHA. Установленный core имеет `local.<fingerprint8>`.
+  не получают недоказанный SHA. Установленный core имеет `local-<fingerprint8>` в четвёртой части версии.
   Отсутствующий marker означает `dev`, повреждённый/чужой/нечитаемый — `unknown`.
 
 Чистый локальный Git доказывает соответствие payload конкретному commit, но сам

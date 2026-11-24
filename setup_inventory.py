@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -257,7 +258,7 @@ def active_instance(items: list[ExecutableInstance]) -> ExecutableInstance | Non
     return next((item for item in items if item.active), items[0] if items else None)
 
 
-def _external_provider(path: Path, command: str) -> tuple[str, str, str, str | None]:
+def _external_provider(path: Path, command: str, version: str | None = None) -> tuple[str, str, str, str | None]:
     """Classify path evidence conservatively; this never changes package-manager state."""
     normalized = str(path).replace("\\", "/").lower()
     if "chocolatey" in normalized or "/choco/" in normalized:
@@ -266,7 +267,12 @@ def _external_provider(path: Path, command: str) -> tuple[str, str, str, str | N
     if "/scoop/" in normalized:
         return "scoop", f"path:{path}", "user", command
     if "/npm/" in normalized or "node_modules" in normalized:
-        package = "opencode-ai" if command == "opencode" else "@openai/codex"
+        if command == "opencode":
+            # V1 and V2 publish different npm packages with the same executable name.
+            parsed = re.fullmatch(r"(?:opencode\s+)?v?(\d+)\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?", version.strip()) if version else None
+            package = {"1": "opencode-ai", "2": "@opencode/cli"}.get(parsed.group(1)) if parsed else None
+        else:
+            package = "@openai/codex"
         return "npm", f"path:{path}", "user", package
     if command == "opencode" and ("/.opencode/bin/" in normalized or "/.local/bin/" in normalized):
         return "standalone", f"path:{path}", "user", None
@@ -277,7 +283,7 @@ def external_cli_inventory(spec: ExternalCliSpec) -> ExternalCliInventory:
     raw = executable_inventory(spec.command)
     items: list[ExternalCliInstance] = []
     for item in raw:
-        provider, evidence, scope, package = _external_provider(item.path, spec.command)
+        provider, evidence, scope, package = _external_provider(item.path, spec.command, item.version)
         items.append(ExternalCliInstance(item.path, item.path.resolve(strict=False), item.version,
                                          provider, evidence, package, scope, item.active))
     active = next((item for item in items if item.active), items[0] if items else None)
@@ -286,9 +292,10 @@ def external_cli_inventory(spec: ExternalCliSpec) -> ExternalCliInventory:
     advice = None
     if active and not conflict:
         commands = {"chocolatey": f"choco upgrade {spec.command} -y",
-                    "npm": f"npm install -g {active.package or spec.command}@latest",
                     "scoop": f"scoop update {spec.command}"}
-        if active.provider in commands:
+        if active.provider == "npm" and active.package:
+            advice = f"npm install -g {active.package}@latest"
+        elif active.provider in commands:
             advice = commands[active.provider]
     return ExternalCliInventory(spec, tuple(items), active, conflict, advice)
 
