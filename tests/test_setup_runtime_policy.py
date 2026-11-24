@@ -155,6 +155,13 @@ class OpenCodeOwnershipTests(unittest.TestCase):
         runtime._known_opencode_managers = self.original_managers
         runtime.run = self.original_run
 
+    def test_version_number_accepts_v2_cli_output_without_matching_embedded_versions(self) -> None:
+        self.assertEqual(runtime._legacy._version_number("opencode v2.3.2"), "2.3.2")
+        self.assertEqual(runtime._legacy._version_number("1.19.5"), "1.19.5")
+        for text in ("prefix2.3.2", "prefix_2.3.2", "prefix_v2.3.2", "сборкаv2.3.2"):
+            with self.subTest(text=text):
+                self.assertIsNone(runtime._legacy._version_number(text))
+
     def test_choco_plus_npm_in_path_is_conflict_and_no_update_runs(self) -> None:
         runtime.executable_inventory = lambda command: [
             ExecutableInstance(Path("C:/ProgramData/chocolatey/bin/opencode.exe"), "1.18.16", "choco", True),
@@ -242,7 +249,7 @@ class OpenCodeOwnershipTests(unittest.TestCase):
 
     def test_v2_policy_checks_and_reconciles_only_matching_plugin(self) -> None:
         runtime.executable_inventory = lambda command: [
-            ExecutableInstance(Path("C:/Users/Dima/AppData/Roaming/npm/opencode.cmd"), "2.3.2", "npm", True),
+            ExecutableInstance(Path("C:/Users/Dima/AppData/Roaming/npm/opencode.cmd"), "opencode v2.3.2", "npm", True),
         ] if command == "opencode" else []
         runtime._known_opencode_managers = lambda npm: {"npm": "2.3.2"}
         commands = []
