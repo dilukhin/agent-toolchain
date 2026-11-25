@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import sys
 
-CORE_SEMVER = '0.2.0'
+CORE_SEMVER = '0.3.0'
 CORE_MARKER = '.agent-toolchain-managed-core.json'
 BUNDLED_IDENTITY = 'core_identity.json'
 

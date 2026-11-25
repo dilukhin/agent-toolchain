@@ -1,12 +1,12 @@
 # Диагностическая identity core и proxy-tools
 
 Контракт issue [#46](https://github.com/dilukhin/agent-toolchain/issues/46).
-Semantic version core для миграции OpenCode V2 — `0.2.0`; единственный источник — `core_identity.py`.
+Semantic version core после перехода OpenCode V2 на ручное обновление существующего CLI — `0.3.0` (для исходной миграции V2 — `0.2.0`); единственный источник — `core_identity.py`.
 
 ## Каналы и команды
 
 `toolchainctl --version` печатает в stdout одну строку:
-`toolchainctl 0.2.0.<8hex>`. Это первые восемь символов полного `source_ref`
+`toolchainctl 0.3.0.<8hex>`. Это первые восемь символов полного `source_ref`
 из marker запущенного установленного core. Git и сеть при чтении версии не нужны.
 
 Обычные `check`, `apply`, `updates`, `update` печатают ту же identity один раз
@@ -20,7 +20,7 @@ Bootstrap пишет в stderr identity исполняемого bootstrap-ко�
 
 | Вызов | Результат |
 |---|---|
-| `--wrapper-version` | Собственная строка `<command>-proxied 0.2.0.<8hex>` в stdout |
+| `--wrapper-version` | Собственная строка `<command>-proxied 0.3.0.<8hex>` в stdout |
 | `--health-json` | JSON в stdout: `tool`, `identity`, `scope=wrapper-runtime`, `network_checked=false` |
 | `--health` | Прежний текстовый health, совместимый с ToolSpec |
 | `--version` и обычные аргументы | Passthrough дочернему CLI; одна identity wrapper в stderr |

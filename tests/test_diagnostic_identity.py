@@ -37,20 +37,20 @@ class DiagnosticIdentityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             marker = root / identity.CORE_MARKER
-            self.assertEqual(identity.version_text('toolchainctl', identity.read_identity(root)), 'toolchainctl 0.2.0.dev')
+            self.assertEqual(identity.version_text('toolchainctl', identity.read_identity(root)), 'toolchainctl 0.3.0.dev')
             for raw in ('[]', '{', '{"owner":"foreign","source_ref":"' + REF + '"}'):
                 marker.write_text(raw)
                 self.assertEqual(identity.read_identity(root)['provenance'], 'unknown')
             marker.write_text(json.dumps(dict(schema=1, owner='agent-toolchain', source_ref=REF, fingerprint='b' * 64)))
             info = identity.read_identity(root)
             self.assertEqual(info['source_ref'], REF)
-            self.assertEqual(identity.version_text('toolchainctl', info), 'toolchainctl 0.2.0.12345678')
+            self.assertEqual(identity.version_text('toolchainctl', info), 'toolchainctl 0.3.0.12345678')
             with mock.patch.object(Path, 'read_text', side_effect=PermissionError('denied')):
                 self.assertEqual(identity.read_identity(root)['provenance'], 'unknown')
 
     def test_ordinary_core_commands_emit_once_on_stderr(self):
         for args in (['check'], ['apply'], ['updates', 'show'], ['updates', 'refresh'], ['update'], ['update', '--apply']):
-            with self.subTest(args=args), mock.patch.object(toolchainctl, '_version_text', return_value='toolchainctl 0.2.0.12345678'), \
+            with self.subTest(args=args), mock.patch.object(toolchainctl, '_version_text', return_value='toolchainctl 0.3.0.12345678'), \
                     mock.patch.object(toolchainctl, 'prepare_state', return_value=(Path('fixture-state'), None, None)), \
                     mock.patch.object(toolchainctl, '_managed_phase', return_value=0), \
                     mock.patch.object(toolchainctl, '_reconcile_routerai_model_labels', return_value=0), \
@@ -60,20 +60,20 @@ class DiagnosticIdentityTests(unittest.TestCase):
                     contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
                 self.assertEqual(toolchainctl.main(args), 0)
                 self.assertEqual(out.getvalue(), '')
-                self.assertEqual(err.getvalue(), 'toolchainctl 0.2.0.12345678\n')
+                self.assertEqual(err.getvalue(), 'toolchainctl 0.3.0.12345678\n')
 
     def test_core_parser_state_and_update_errors_include_identity(self):
-        with mock.patch.object(toolchainctl, '_version_text', return_value='toolchainctl 0.2.0.12345678'):
+        with mock.patch.object(toolchainctl, '_version_text', return_value='toolchainctl 0.3.0.12345678'):
             with contextlib.redirect_stderr(io.StringIO()) as err, self.assertRaises(SystemExit) as error:
                 toolchainctl.main(['not-a-command'])
             self.assertEqual(error.exception.code, 2)
-            self.assertEqual(err.getvalue().count('toolchainctl 0.2.0.12345678'), 1)
+            self.assertEqual(err.getvalue().count('toolchainctl 0.3.0.12345678'), 1)
             for command, target, error in [('apply', 'prepare_state', toolchainctl.StateMigrationError('fixture')),
                                            ('update', '_owned_installed_core', toolchainctl.SelfUpdateError('fixture'))]:
                 with mock.patch.object(toolchainctl, target, side_effect=error), \
                         contextlib.redirect_stderr(io.StringIO()) as err, contextlib.redirect_stdout(io.StringIO()) as out:
                     self.assertEqual(toolchainctl.main([command]), 2)
-                    self.assertEqual(err.getvalue().count('toolchainctl 0.2.0.12345678'), 1)
+                    self.assertEqual(err.getvalue().count('toolchainctl 0.3.0.12345678'), 1)
                     self.assertEqual(out.getvalue(), '')
 
     def test_proxy_reserved_commands_do_not_launch_child_or_network(self):
@@ -81,7 +81,7 @@ class DiagnosticIdentityTests(unittest.TestCase):
             with mock.patch.object(proxy_tools, 'launch', return_value=37) as launch:
                 with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
                     self.assertEqual(proxy_tools.main([command, '--wrapper-version']), 0)
-                    self.assertTrue(out.getvalue().startswith(command + '-proxied 0.2.0.'))
+                    self.assertTrue(out.getvalue().startswith(command + '-proxied 0.3.0.'))
                     self.assertEqual(err.getvalue(), '')
                 with contextlib.redirect_stdout(io.StringIO()) as out:
                     self.assertEqual(proxy_tools.main([command, '--health-json']), 0)
@@ -95,7 +95,7 @@ class DiagnosticIdentityTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err:
             self.assertEqual(proxy_tools.main(['codex', '--version']), 127)
         self.assertEqual(out.getvalue(), '')
-        self.assertEqual(err.getvalue().count('codex-proxied 0.2.0.'), 1)
+        self.assertEqual(err.getvalue().count('codex-proxied 0.3.0.'), 1)
         self.assertIn('no executable found', err.getvalue())
 
     def test_installed_core_and_proxy_keep_ref_without_source_or_core_checkout(self):
@@ -108,7 +108,7 @@ class DiagnosticIdentityTests(unittest.TestCase):
             bootstrap._copy_payload(ROOT, source, bootstrap.source_fingerprint(ROOT))
             bootstrap._copy_payload(source, core, bootstrap.source_fingerprint(source), REF)
             source.rename(root / 'removed-source')
-            expected = 'toolchainctl 0.2.0.12345678\n'
+            expected = 'toolchainctl 0.3.0.12345678\n'
             cp = subprocess.run([sys.executable, '-B', str(core / 'toolchainctl.py'), '--version'], capture_output=True, check=True, text=True)
             self.assertEqual(cp.stdout, expected)
             self.assertEqual(cp.stderr, '')

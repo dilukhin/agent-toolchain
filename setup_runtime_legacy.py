@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from setup_external_updates import _version, _version_key
 from setup_inventory import (
     active_instance,
     duplicate_recommendation,
@@ -414,41 +415,50 @@ def _reconcile_opencode_cli(config: dict[str, Any], reporter: Reporter, check: b
         return
 
     current_cli = _npm_global_version(npm, cli_package)
+    if current_cli is None:
+        reporter.add(
+            "OpenCode CLI", STATE_CONFLICT,
+            f"активный npm-экземпляр {active.path}, но npm не подтвердил установленный пакет {cli_package}; "
+            "CLI не изменён; проверьте владельца установки и npm global prefix",
+        )
+        return
     latest_cli = _npm_latest_version(npm, cli_package)
+    current_parsed = _version(current_cli)
+    latest_parsed = _version(latest_cli)
     if latest_cli is None:
         reporter.add("OpenCode CLI", STATE_CONFLICT, f"не удалось получить актуальную версию npm-пакета {cli_package}")
-    elif current_cli == latest_cli and actual_version in {None, latest_cli}:
-        reporter.add("OpenCode CLI", STATE_OK,
-                     f"активный npm-экземпляр {active.path}; {cli_package}@{current_cli}{command_detail}")
-    else:
-        state = STATE_MISSING if current_cli is None else STATE_OUTDATED
-        detail = (f"активный npm-экземпляр {active.path}; цель {latest_cli}, npm зарегистрировал {current_cli or 'нет'}, "
-                  f"executable сообщает {actual_version or 'не определено'}{command_detail}")
-        if check:
-            reporter.add("OpenCode CLI", state, detail + "; обычный apply обновит npm-установку автоматически")
+    elif actual_version != current_cli:
+        reporter.add(
+            "OpenCode CLI", STATE_INFO,
+            f"активный npm-экземпляр {active.path}; executable сообщает {actual_version or 'не определено'}, "
+            f"npm зарегистрировал {current_cli}, npm latest {latest_cli}; "
+            "версии активного CLI и npm расходятся; команда обновления не рекомендована",
+        )
+    elif current_parsed is None or latest_parsed is None:
+        reporter.add(
+            "OpenCode CLI", STATE_INFO,
+            f"активный npm-экземпляр {active.path}; установлено {current_cli}; npm latest {latest_cli}; "
+            "сравнить версии не удалось; команда обновления не рекомендована",
+        )
+    elif _version_key(latest_parsed) <= _version_key(current_parsed):
+        if latest_cli != current_cli:
+            reporter.add(
+                "OpenCode CLI", STATE_INFO,
+                f"активный npm-экземпляр {active.path}; установлено {current_cli}; npm latest {latest_cli} "
+                "не новее установленной версии; команда обновления не рекомендована",
+            )
             return
-        cp = run([npm, "install", "-g", f"{cli_package}@{latest_cli}"])
-        if cp.returncode != 0:
-            reporter.add("OpenCode CLI", STATE_FAILED,
-                         "npm install не выполнил обновление OpenCode: " + cp.stderr.strip()[-400:])
-        elif _npm_global_version(npm, cli_package) != latest_cli:
-            reporter.add("OpenCode CLI", STATE_FAILED,
-                         "npm install завершён, но npm не показывает целевую версию")
-        else:
-            refreshed = active_instance(executable_inventory("opencode"))
-            refreshed_version = _version_number(refreshed.version) if refreshed else None
-            if refreshed is None or refreshed.manager != "npm" or refreshed_version != latest_cli:
-                reporter.add(
-                    "OpenCode CLI",
-                    STATE_FAILED,
-                    "npm обновлён, но итоговый активный opencode в PATH не соответствует управляемому npm-экземпляру/версии",
-                )
-            else:
-                reporter.add(
-                    "OpenCode CLI",
-                    STATE_CONFIGURED,
-                    f"OpenCode обновлён через npm: {refreshed.path}; {cli_package}@{latest_cli}{command_detail}",
-                )
+        reporter.add("OpenCode CLI", STATE_OK,
+                     f"активный npm-экземпляр {active.path}; {cli_package}@{current_cli}; "
+                     "доступных обновлений через npm не найдено")
+    else:
+        reporter.add(
+            "OpenCode CLI", STATE_OUTDATED,
+            f"активный npm-экземпляр {active.path}; установлено {current_cli}; доступно {latest_cli}; "
+            f"executable сообщает {actual_version or 'не определено'}; "
+            f"рекомендуемая команда обновления: `{update_command}`; "
+            "обычный apply не обновляет уже установленный OpenCode",
+        )
 
 
 def reconcile_npm(config_dir: Path, config: dict[str, Any], reporter: Reporter,
