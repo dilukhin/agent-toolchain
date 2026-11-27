@@ -10,10 +10,10 @@
   "models": {
     "openai/gpt-4o": {
       "description": "Дорогая универсальная модель, запасной вариант для сложных задач",
-      "name": "OpenAI GPT-4o [дорогая универсальная, 268/1070 ₽]",
-      "price_input_rub_per_1m": 268,
-      "price_output_rub_per_1m": 1070,
-      "cache_read_rub_per_1m": 134
+      "name": "OpenAI GPT-4o [дорогая универсальная, 267/1068 ₽]",
+      "price_input_rub_per_1m": 267,
+      "price_output_rub_per_1m": 1068,
+      "cache_read_rub_per_1m": 133
     },
     "openai/gpt-4o-mini": {
       "description": "Быстрая и дешёвая модель для простых задач",
@@ -30,30 +30,30 @@
     },
     "anthropic/claude-opus-4.7": {
       "description": "Топовая модель для сложного агентного программирования",
-      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 535/2675 ₽]",
-      "price_input_rub_per_1m": 535,
-      "price_output_rub_per_1m": 2675,
-      "cache_read_rub_per_1m": 54
+      "name": "Anthropic Claude Opus 4.7 [топ код/агент, 534/2669 ₽]",
+      "price_input_rub_per_1m": 534,
+      "price_output_rub_per_1m": 2669,
+      "cache_read_rub_per_1m": 53
     },
     "qwen/qwen3.6-plus": {
       "description": "Основная рабочая модель для OpenCode",
-      "name": "Qwen 3.6 Plus [основная, 35/209 ₽]",
+      "name": "Qwen 3.6 Plus [основная, 35/208 ₽]",
       "price_input_rub_per_1m": 35,
-      "price_output_rub_per_1m": 209,
+      "price_output_rub_per_1m": 208,
       "cache_read_rub_per_1m": 3
     },
     "deepseek/deepseek-v4-pro": {
       "description": "Сильная reasoning/code модель",
-      "name": "DeepSeek V4 Pro [reasoning, 133/226 ₽]",
+      "name": "DeepSeek V4 Pro [reasoning, 133/225 ₽]",
       "price_input_rub_per_1m": 133,
-      "price_output_rub_per_1m": 226,
+      "price_output_rub_per_1m": 225,
       "cache_read_rub_per_1m": 30
     },
     "minimax/minimax-m2.7": {
       "description": "Дешёвая рабочая модель",
-      "name": "MiniMax M2.7 [дешёвая, 64/193 ₽]",
+      "name": "MiniMax M2.7 [дешёвая, 64/192 ₽]",
       "price_input_rub_per_1m": 64,
-      "price_output_rub_per_1m": 193
+      "price_output_rub_per_1m": 192
     },
     "z-ai/glm-5": {
       "description": "Для архитектора/ревьюера: планирование, декомпозиция",
@@ -64,37 +64,37 @@
     },
     "moonshotai/kimi-k2.5": {
       "description": "Запасная агентная для tool-use и анализа кода",
-      "name": "Kimi K2.5 [агентная, 54/268 ₽]",
-      "price_input_rub_per_1m": 54,
-      "price_output_rub_per_1m": 268,
+      "name": "Kimi K2.5 [агентная, 53/267 ₽]",
+      "price_input_rub_per_1m": 53,
+      "price_output_rub_per_1m": 267,
       "cache_read_rub_per_1m": 16
     },
     "z-ai/glm-5-turbo": {
       "description": "Дорогой fallback для длинных цепочек",
-      "name": "GLM-5 Turbo [fallback, 128/428 ₽]",
+      "name": "GLM-5 Turbo [fallback, 128/427 ₽]",
       "price_input_rub_per_1m": 128,
-      "price_output_rub_per_1m": 428,
+      "price_output_rub_per_1m": 427,
       "cache_read_rub_per_1m": 26
     },
     "openai/gpt-5.2-codex": {
       "description": "Оптимизированная для программной инженерии",
-      "name": "GPT-5.2-Codex [код/агент, 187/1498 ₽]",
+      "name": "GPT-5.2-Codex [код/агент, 187/1495 ₽]",
       "price_input_rub_per_1m": 187,
-      "price_output_rub_per_1m": 1498,
+      "price_output_rub_per_1m": 1495,
       "cache_read_rub_per_1m": 19
     },
     "qwen/qwen3-coder-next": {
       "description": "Новая модель RouterAI для кодинга",
-      "name": "Qwen 3 Coder Next [код/агент, 13/86 ₽]",
+      "name": "Qwen 3 Coder Next [код/агент, 13/85 ₽]",
       "price_input_rub_per_1m": 13,
-      "price_output_rub_per_1m": 86,
+      "price_output_rub_per_1m": 85,
       "cache_read_rub_per_1m": 7
     },
     "qwen/qwen3.5-122b-a10b": {
       "description": "Мультимодальная модель с reasoning, контекст 262K токенов",
-      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 28/223 ₽]",
+      "name": "Qwen 3.5 122B A10B [мультимод. reasoning, 28/222 ₽]",
       "price_input_rub_per_1m": 28,
-      "price_output_rub_per_1m": 223
+      "price_output_rub_per_1m": 222
     }
   },
   "config_defaults": {
